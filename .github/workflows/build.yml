@@ -1,11 +1,13 @@
-name: Importar fuente y compilar
+name: Compilar ArlightBingo 1.40.0
 
 on:
   workflow_dispatch:
   pull_request:
   push:
-    paths:
-      - '.github/workflows/build.yml'
+    branches:
+      - main
+      - 'feature/**'
+      - 'import/**'
 
 permissions:
   contents: write
@@ -27,39 +29,13 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Descargar fuente estable 1.39.1
+      - name: Verificar fuente 1.40.0
         shell: bash
         run: |
           set -euo pipefail
-          FILE_ID='1fpcxezwEqioNv-3tUZNpbSqLJFD_7gdo'
-          curl -L --fail --retry 3 \
-            "https://drive.usercontent.google.com/download?id=${FILE_ID}&export=download&confirm=t" \
-            -o /tmp/source.zip
-          unzip -t /tmp/source.zip
-          rm -rf /tmp/source-extracted
-          mkdir -p /tmp/source-extracted
-          unzip -q /tmp/source.zip -d /tmp/source-extracted
-
-      - name: Importar fuente al repositorio
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT_FILE="$(find /tmp/source-extracted -maxdepth 5 -type f -name pom.xml | head -n 1)"
-          if [ -z "$ROOT_FILE" ]; then
-            echo 'No se encontró pom.xml en el ZIP.' >&2
-            exit 1
-          fi
-          ROOT="$(dirname "$ROOT_FILE")"
-          rsync -a --delete --exclude '.git/' --exclude '.github/' "$ROOT/" ./
-          printf '%s\n' 'ArlightBingo 1.39.1 SERVER-HANG-WATCHDOG-FIX' > SOURCE_VERSION.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m 'Importar ArlightBingo 1.39.1'
-            BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
-            git push origin "HEAD:${BRANCH}"
-          fi
+          grep -q '<version>1.40.0</version>' pom.xml
+          grep -q '^version: 1.40.0$' src/main/resources/plugin.yml
+          grep -q '^1.40.0$' BUILD_VERSION.txt
 
       - name: Instalar dependencia ArlightCore 1.20.0
         shell: bash
@@ -99,6 +75,6 @@ jobs:
       - name: Subir JAR compilado
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.39.1-JAR
+          name: ArlightBingo-1.40.0-JAR
           path: dist/*.jar
           if-no-files-found: error
