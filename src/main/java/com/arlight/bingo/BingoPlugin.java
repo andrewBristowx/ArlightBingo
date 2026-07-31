@@ -204,7 +204,17 @@ public class BingoPlugin extends JavaPlugin {
         getConfig().addDefault("template-worlds.overworld.lootr-mode", "LOOT_TABLES");
         getConfig().addDefault("template-worlds.overworld.max-build-millis-per-tick", 8L);
         getConfig().addDefault("template-worlds.overworld.dungeon-extra-spawners", 18);
+        getConfig().addDefault("template-worlds.overworld.layout.village-x", -360);
+        getConfig().addDefault("template-worlds.overworld.layout.village-z", 0);
+        getConfig().addDefault("template-worlds.overworld.layout.city-x", 420);
+        getConfig().addDefault("template-worlds.overworld.layout.city-z", 0);
+        getConfig().addDefault("template-worlds.overworld.zone-a.enabled", true);
+        getConfig().addDefault("template-worlds.overworld.zone-a.irregular-boundary", true);
+        getConfig().addDefault("template-worlds.overworld.zone-a.functional-interiors", true);
+        getConfig().addDefault("template-worlds.overworld.zone-a.visible-route-to-zone-b", true);
 
+        getConfig().addDefault("template-worlds.revisions.keep-latest", 3);
+        getConfig().addDefault("template-worlds.revisions.require-explicit-promotion", true);
         getConfig().addDefault("template-worlds.safety.chunky-tile-radius", 384);
         getConfig().addDefault("template-worlds.safety.max-loaded-chunks-between-batches", 1024);
         getConfig().addDefault("template-worlds.safety.drain-check-interval-ticks", 100L);
