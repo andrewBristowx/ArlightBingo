@@ -1,4 +1,4 @@
-# ArlightBingo 1.40.0 - plantillas con revisiones seguras
+# ArlightBingo 1.41.0 - isla Overworld integrada y revisiones seguras
 arena-world:
   enabled: true
   lobby-world: legos
@@ -64,6 +64,13 @@ template-worlds:
     name: bingo_template_overworld
     seed: 741905270311
     radius: 1536
+    island:
+      enabled: true
+      # Isla principal de unos 1000 bloques de diametro, rodeada por oceano.
+      land-radius: 500
+      sea-level: 62
+      ocean-margin: 160
+      block-external-structures: true
     blocks-per-tick: 500
     corruption-spacing: 48
     max-build-millis-per-tick: 8
@@ -74,9 +81,9 @@ template-worlds:
     lootr-mode: LOOT_TABLES
     dungeon-extra-spawners: 18
     layout:
-      village-x: -360
+      village-x: -230
       village-z: 0
-      city-x: 420
+      city-x: 230
       city-z: 0
     zone-a:
       enabled: true
