@@ -1,0 +1,50 @@
+ARLIGHTBINGO 1.6.1 - CHUNKY + BOTIN ADAPTATIVO + LOOTR
+=====================================
+
+REQUISITOS
+- Chunky-Bukkit 1.4.40 instalado en /plugins.
+- No debe existir una partida de Bingo activa.
+
+CONFIGURACION RECOMENDADA
+world-pool:
+  enabled: true
+  size: 2
+  base-name: "bingo_arena"
+  prepare-on-startup: false
+  prepare-next-during-match: false
+  pregeneration:
+    overworld-radius: 256
+    nether-radius: 128
+    end-radius: 128
+  portals:
+    use-multiverse-netherportals: true
+    require-plugin: false
+  inventories:
+    auto-configure-groups: false
+
+PRIMERA PREPARACION
+1. Inicia el servidor y ejecuta /bingo world status
+2. Ejecuta /bingo world prepare
+3. Espera a que Chunky termine Overworld, Nether y End, en ese orden.
+4. Ejecuta /bingo world status
+5. Inicia la partida solamente cuando indique al menos 1 arena lista.
+
+Para preparar el segundo slot, cuando no haya una partida activa, vuelve a usar:
+/bingo world prepare
+
+SEGURIDAD
+- Bingo ya no pregenera el pool mediante World#getChunkAt.
+- No prepara mundos al arrancar ni durante una partida con estos valores.
+- Si Chunky falla o no está disponible, la arena no se marca como lista.
+- Sin una arena lista, Bingo cancela el inicio.
+
+END
+- Después de derrotar al dragón, el gateway central lleva a una torre cercana.
+- La torre busca terreno firme dentro del radio pregenerado por Chunky.
+- Tiene cinco pisos, spawners de zombis, esqueletos y creepers, y shulkers finales.
+- Los cofres usan loot tables vanilla para que Lootr entregue botín individual.
+- Bingo agrega después una selección de objetivos ITEM_COLLECT del cartón personal.
+- El primer cofre final garantiza una élitra y una cabeza de dragón por jugador.
+- Los jugadores pueden romper bloques de la torre después de vencer al dragón.
+- Se configura en end-dungeon dentro de config.yml.
+- En una instalación existente, copia manualmente esa sección al config del servidor.

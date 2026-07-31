@@ -1,0 +1,21 @@
+ARLIGHTBINGO 1.38.0 - VALIDACION DEL FUENTE
+
+REVISION ESTATICA
+- Base utilizada: ArlightBingo 1.37.1 Somita Scene Effect Control.
+- Compatibilidad revisada contra los IDs registrados en ArlightBosses 1.21.0.
+- IDs usados: emerald_zombie_minion, emerald_creeper_minion,
+  emerald_skeleton_archer_minion, emerald_ravager_cub_minion,
+  emerald_golem_sentinel_minion y mossbound_spider_minion.
+- Objetos de misión con clave PDC y protección contra duplicación por nombre.
+- Flujo secuencial revisado: spawners -> cofre -> objeto -> siguiente distrito.
+- Spawners inactivos protegidos contra jugadores y explosiones.
+- Cofres, sello e indicadores protegidos.
+- pom.xml y archivos YAML revisados sintácticamente.
+- Integridad y contenido del ZIP deben verificarse al empaquetar.
+
+LIMITES DE ESTA VALIDACION
+- No se ejecutó una partida dentro de Arclight.
+- Los puntos se calculan sobre los marcadores y asentamientos de la plantilla actual;
+  la prueba visual puede requerir mover algunos bloques o cofres unos pocos bloques.
+- No se generaron todavía modelos personalizados para los tres objetos de distrito.
+- El build Maven completo depende de Paper API y ArlightCore locales.

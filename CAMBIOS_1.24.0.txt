@@ -1,0 +1,43 @@
+ArlightBingo 1.24.0 — THREE-DIMENSION-CAMPAIGN-OVERHAUL
+
+ESTABILIDAD Y PROGRESIÓN
+- Invocación protegida del Dragón Corrupto con reintentos sin duplicarlo y restauración de llave si falla.
+- El Guardián del Nether no existe antes de insertar la Llave Ígnea en la cerradura.
+- Portales posteriores aparecen únicamente al validar la muerte del jefe.
+- Llaves restauradas si su portador se desconecta.
+- Comandos administrativos /bingo campaign para probar cada etapa.
+
+PROTECCIÓN SELECTIVA
+- Spawners y obstáculos normales se pueden romper.
+- Los spawners destruidos dejan de reaparecer y liberan su distrito.
+- También se eliminan correctamente si una explosión los destruye.
+- Cofres personales, cofres de misión, llaves, cerraduras, altares, portales y accesos de jefe quedan protegidos.
+
+OVERWORLD
+- Ciudad musgosa ampliada con barrios, refugios, mercado, talleres, biblioteca, enfermería, armería, prisión, barricadas, alcantarillas, rutas opcionales y aldeanos cautivos.
+- Interiores ocupados y encuentros por distrito.
+- Más cofres personales y contenedores con botín por rareza.
+
+NETHER
+- Ciudad fortaleza ampliada con bazar, fundiciones, bóvedas, cuarteles, corrales, prisión, minas, túneles de lava y fortaleza central.
+- Llave Ígnea aleatoria en un cofre compartido.
+- Cerradura animada y portón obligatorio.
+- Jefe y apoyos se activan solamente después de la apertura.
+
+END
+- Se elimina la isla central vanilla, pilares y portal dentro del radio configurado.
+- Isla custom orgánica con profundidad, fragmentos flotantes, ciudadela, mercado, biblioteca, prisión de shulkers, jardines de chorus, observatorio, tesorería y castillo del Gólem.
+- Segunda isla diseñada para la pelea del dragón, conectada por puente ritual, con pilares separados, ruinas y cobertura.
+- Rescate del vacío con velocidad reiniciada, checkpoint seguro, cooldown, resistencia y caída lenta.
+- Gólem obligatorio, llave aleatoria, altar protegido y ritual del dragón.
+
+COFRES Y BOTÍN
+- Cofres custom conservan su orientación al abrir/cerrar.
+- Botín personal escalonado: hierro en Overworld, diamante en Nether y netherita en End.
+- Suministros garantizados, cofres comunes/raros/épicos/legendarios y recompensas modded configurables.
+- Ayuda limitada a objetivos ITEM_COLLECT y ADVANCEMENT permitidos; nunca completa jefes o rituales.
+
+SOMITA Y PRESENTACIÓN
+- Globo de texto compacto sobre el NPC.
+- Introducción y final con recogida del huevo, limpieza y portal de salida de respaldo.
+- Mensajes de protección con cooldown, pistas de llaves y avisos al liberar distritos.

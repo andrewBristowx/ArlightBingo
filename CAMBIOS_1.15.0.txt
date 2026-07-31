@@ -1,0 +1,15 @@
+ArlightBingo 1.15.0 - OVERWORLD CASTLE PROGRESSION
+
+- Castillo Overworld convertido en una ruta completa: llegada segura, camino marcado, patio de asedio, muralla exterior, torres, campamentos, biblioteca, armería, sótano/prisión y sala final.
+- Grupos configurables: entrance, interior, ambush, elite y boss-support.
+- Integración de Emerald Golem Sentinel como guardián fijo de puertas y zonas élite.
+- Spawners de apoyo del jefe permanecen apagados hasta entrar en la arena.
+- Escalado de cantidad de enemigos para 1, 2-4 y 5+ jugadores.
+- Cofres COMMON/RARE/EPIC/LEGENDARY con botín adaptativo y suministros por nivel.
+- Intento configurable de usar bloques de Lootr con fallback seguro a cofres Bukkit.
+- Puntos de control y teletransporte de rescate si el jugador cae bajo la estructura.
+- IDs corregidos de emerald_skeleton_archer_minion.
+- Conserva la regeneración automática mediante el pool de mundos.
+
+Requiere ArlightBosses 1.8.0 para todos los encuentros nuevos.
+Compilar con Java 21: mvn clean package

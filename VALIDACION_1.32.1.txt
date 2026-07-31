@@ -1,0 +1,40 @@
+VALIDACIÓN — ARLIGHTBINGO 1.32.1
+================================
+
+DIAGNÓSTICO DEL REPORTE
+- El reporte crash-2026-07-28_06.59.10-server.txt termina por
+  ServerHangWatchdog, no por falta de memoria.
+- El hilo principal estaba serializando chunks en
+  SimpleBitStorage.unpack -> PalettedContainer.pack -> ChunkSerializer.write
+  -> ChunkMap.save -> ChunkMap.processUnloads.
+- bingo_template_overworld todavía registraba 31 570 chunks, 9 253 block
+  entities y 390 228 block ticks cuando comenzó la siguiente dimensión.
+- El proceso usaba aproximadamente 6 GiB de un máximo de 32 GiB; el problema
+  reproducible era la cola de guardado/descarga, no el heap.
+
+RESULTADOS DE FUENTE
+- Los 62 archivos Java pasan análisis sintáctico completo con
+  java-parser 3.0.1.
+- config.yml y plugin.yml cargan como YAML válido.
+- pom.xml carga como XML válido.
+- pom.xml, plugin.yml y BUILD_VERSION.txt declaran 1.32.1.
+- Las 12 opciones críticas de seguridad, Nether y End coinciden entre
+  config.yml y los valores predeterminados internos de BingoPlugin.
+- El radio 1536 del Overworld se divide en 16 tandas; los radios 1024 de
+  Nether y End se dividen en 9. Ninguna tanda supera radio 384 y la cobertura
+  completa no deja huecos.
+- El constructor territorial de Overworld, Nether y End es idéntico al de
+  1.32.0. Sólo cambian la pregeneración, estabilización, guardado y descarga.
+- Los marcadores COMPLETE de Overworld y End conservan compatibilidad con
+  1.32.0. Nether exige su marcador seguro 1.32.1.
+- Los slots desechables usan runtime 1.32.1 para no reutilizar copias parciales.
+- Las colas Nether/End conservan como máximo ocho chunks modificados durante
+  100 ticks y liberan como máximo un ticket vencido por tick.
+- No quedan guardados globales durante la pregeneración ni la construcción;
+  cada dimensión guarda una sola vez después de estabilizarse y antes de
+  escribir COMPLETE.
+
+LÍMITE DEL ENTORNO
+- No se produjo un JAR: el entorno no incluye Maven ni un compilador Java 21.
+  El proyecto requiere Java 21, Paper 1.21.1 y ArlightCore.
+- La prueba final dentro de Arclight debe seguir PROBAR_1.32.1.txt.

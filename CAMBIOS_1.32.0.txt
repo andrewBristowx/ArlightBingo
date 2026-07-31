@@ -1,0 +1,45 @@
+ArlightBingo 1.32.0 TEMPLATE-RUNTIME-CAMPAIGN-INTEGRATION
+========================================================
+
+INTEGRACIÓN EN PARTIDAS
+- El pool ya no genera mundos vanilla cuando template-worlds.matches.enabled
+  está activado: copia las tres plantillas maestras terminadas.
+- Las copias excluyen datos de jugadores y entidades de revisión, conservando
+  chunks, bloques, block entities, loot y marcadores de campaña.
+- Las partidas se cancelan de forma segura si falta una plantilla completa.
+- La campaña enlaza jefes, llaves, cerraduras, altares y portales directamente
+  a las coordenadas de cada plantilla, sin reconstruir las estructuras antiguas.
+- Las llaves de misión admiten cofres y barriles; si no pueden insertarse, la
+  preparación se cancela en vez de iniciar una campaña imposible de completar.
+
+OVERWORLD
+- El Cartógrafo de la Campana se reinstala en cada copia de partida.
+- El aldeano queda sobre una plataforma abierta, fuera del mercado, y siempre
+  conserva las coordenadas y la brújula de la ciudadela.
+- Somita guía se reinstala junto al punto inicial sin duplicar entidades.
+- Las casas iniciales usan entramado de madera, ventanas, porches, chimeneas,
+  anexos irregulares y tejados inclinados de la familia visual del pueblo vecino.
+- La muralla de la ciudadela ahora es una banda octogonal continua, con paseo
+  de ronda, almenas, cuatro portones y torres de puerta.
+- La geometría del anfiteatro de jefes se conserva.
+
+NETHER
+- Después de Chunky entra en FINALIZING y construye secuencialmente todos los
+  chunks del súper-bastión, igual que el End.
+- Sólo escribe el marcador COMPLETE y anuncia la finalización cuando no queda
+  ningún chunk estructural pendiente.
+- La finalización se reanuda automáticamente después de un reinicio.
+- La regeneración forzada detiene primero cualquier cola anterior y puede volver
+  a solicitar un chunk descargado sin quedar bloqueada en FINALIZING.
+- Se añadió un corredor seguro desde la llegada hasta el súper-bastión.
+
+END
+- La arquitectura aprobada no se modifica.
+- El Guardián del Vacío queda en la ciudadela central; la llave abre la puerta
+  del puente y el altar/dragón permanecen en la arena estelar.
+
+COMPATIBILIDAD
+- Requiere regenerar las tres plantillas porque sus marcadores internos cambian.
+- La configuración añade template-worlds.matches y el intervalo de finalización
+  del Nether. El modo de arenas Chunky anterior sigue disponible al desactivar
+  template-worlds.matches.enabled.

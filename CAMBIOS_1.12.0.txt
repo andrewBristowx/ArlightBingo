@@ -1,0 +1,10 @@
+ARLIGHTBINGO 1.12.0 - INTEGRACION MULTIVERSE
+
+- Registra automáticamente cada trío bingo_arena_N, _nether y _the_end en el grupo "bingo".
+- Delega los enlaces Nether/End a ArlightCore cuando MV-NetherPortals está activo.
+- Mantiene el enrutamiento nativo de Bingo como respaldo.
+- Corrige la transición de inventario desde la cola del lobby: antes del cambio de grupo,
+  MVI guarda el inventario verdadero de Survival y no los items temporales de la cola.
+- Limpia el perfil de Bingo al entrar para evitar objetos de partidas anteriores.
+- El valor world-pool.size admite correctamente 1 arena.
+- world-pool.inventories.auto-configure-groups queda activado por defecto.

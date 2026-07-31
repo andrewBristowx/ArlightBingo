@@ -1,0 +1,9 @@
+PRUEBA ARLIGHTBINGO 1.19.0
+
+1. Instala ArlightBosses 1.11.0 en servidor y clientes.
+2. Compila ArlightBingo con mvn clean package y reemplaza el JAR anterior.
+3. Inicia una partida nueva y entra al End.
+4. Comprueba que el dragón se llame Dragón del End Corrupto por la Amatista.
+5. Revisa las fases al 60% y 25% de vida.
+6. Mata al dragón y comprueba que el gateway de recompensa se abra y el objetivo boss_dragon se complete.
+7. Verifica que Somita/dragon_guardian no aparezca.

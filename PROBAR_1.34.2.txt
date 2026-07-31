@@ -1,0 +1,9 @@
+PRUEBA RECOMENDADA - ArlightBingo 1.34.2
+
+1. Ejecuta Maven > clean y Maven > package.
+2. Comprueba que TemplateWorldCloner.java ya no produce el error de la línea 149.
+3. Instala el JAR y reinicia completamente el servidor.
+4. Ejecuta /bingo template all audit.
+5. Reinicia el servidor y repite el audit.
+6. Ejecuta /bingo template nether resume y /bingo template end resume si faltan anclajes.
+7. Inicia una partida y valida llave/cerradura del Nether y altar del End.

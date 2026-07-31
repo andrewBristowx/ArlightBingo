@@ -1,0 +1,12 @@
+# ArlightBingo 1.36.5
+# Este archivo es únicamente el índice de la configuración modular.
+# Edita los archivos dentro de plugins/ArlightBingo/config-sections/.
+config-schema: 2
+modular-config:
+  enabled: true
+  files:
+    - game.yml
+    - worlds.yml
+    - campaign.yml
+    - dungeons.yml
+    - interface.yml

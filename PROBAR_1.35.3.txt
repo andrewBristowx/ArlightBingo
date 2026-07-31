@@ -1,0 +1,13 @@
+PRUEBA ARLIGHTBINGO 1.35.3
+
+1. Apaga completamente el servidor. No uses /reload.
+2. Instala ArlightCore 1.20.0 y ArlightBingo 1.35.3.
+3. Conserva las tres plantillas maestras y sus carpetas.
+4. Inicia el servidor y ejecuta /bingo template all audit.
+5. No es necesario volver a ejecutar Chunky.
+6. Ejecuta /bingo world prepare o inicia una partida. La primera vez 1.35.3 volverá a
+   copiar Overworld, Nether y End porque cambia el marcador de integridad del runtime.
+7. Espera el mensaje: Arena del pool lista desde las tres plantillas maestras.
+8. Inicia Bingo y prueba el portal del Nether: debe llegar al spawn marcado de la fortaleza.
+9. Desbloquea y prueba el End: debe llegar a la zona segura de la ciudadela, no al vacío.
+10. Revisa consola: no debe decir que creó mundos nuevos ni aceptar un slot con dimensiones faltantes.

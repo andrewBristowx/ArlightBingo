@@ -1,0 +1,10 @@
+ARLIGHTBINGO 1.23.0 - COFRES PERSONALES Y BOTÍN PROGRESIVO
+
+- Usa los cinco cofres animados de ArlightBosses 1.16.0.
+- Inventario personal por UUID y cofre, estilo Lootr, sin almacenamiento compartido.
+- Animación de apertura global al interactuar y cierre automático.
+- Progresión garantizada: hierro en Overworld, diamante en Nether y netherita en End.
+- Cofres finales completan piezas faltantes para que cada jugador pueda combatir.
+- Recompensas raras configurables de mods, con ejemplos de Ice and Fire.
+- Cofres épicos/legendarios pueden completar un objetivo ITEM_COLLECT o ADVANCEMENT del cartón.
+- Nunca completa objetivos de matar, romper bloques o derrotar jefes.

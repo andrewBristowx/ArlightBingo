@@ -1,0 +1,7 @@
+ArlightBingo 1.36.1 - OFFLINE TEMPLATE SNAPSHOT CLONE
+
+- Las plantillas se guardan y descargan con save=true antes de copiarse.
+- El clonador trabaja con los archivos MCA cerrados, evitando copiar chunks antiguos.
+- La plantilla se vuelve a cargar automáticamente al terminar cada copia.
+- Se invalida el marcador de arenas creadas por versiones anteriores.
+- Se conserva la configuración modular de 1.36.0.

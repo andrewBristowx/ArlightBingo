@@ -1,0 +1,22 @@
+PRUEBA ARLIGHTBINGO 1.36.2
+
+1. Apaga completamente el servidor.
+2. Conserva bingo_template, bingo_template_nether y bingo_template_end.
+3. Elimina los JAR anteriores de ArlightBingo y coloca sólo ArlightBingo-1.36.2.jar.
+4. No es obligatorio borrar manualmente bingo_arena_1*: la 1.36.2 limpia rutas antiguas
+   de la raíz y de dimensions/, pero se recomienda tener respaldo.
+5. Inicia el servidor y confirma en el log:
+   Loading ArlightBingo v1.36.2
+   Enabling ArlightBingo v1.36.2
+6. Ejecuta /bingo join y /bingo start.
+7. Busca en latest.log estas líneas:
+   Clonado en frío completado para bingo_arena_1_nether
+   Clonado en frío completado para bingo_arena_1_the_end
+   Mundo frío cargado desde su almacenamiento verificado
+8. Las líneas deben mostrar CUSTOM_DIMENSION_DEDICATED_WORLD o CUSTOM_DIMENSION_SHARED_LEVEL si Arclight guarda esos mundos en
+   dimensions/minecraft/<nombre>. Si muestran STANDALONE_WORLD también es válido.
+9. Prueba:
+   /bingo campaign tpnether
+   /bingo campaign tpend
+10. Si Arclight intenta cargar una ruta distinta a la copiada, la partida NO iniciará y
+    la consola mostrará ambas rutas exactas en vez de aceptar una arena vacía.

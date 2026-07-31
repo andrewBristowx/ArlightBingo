@@ -1,0 +1,8 @@
+ArlightBingo 1.36.3 - CRITICAL STORAGE VERIFIER FIX
+
+- Corrige el falso negativo de la 1.36.2 que cancelaba la arena cuando Arclight añadía archivos de metadatos inocuos.
+- La validación estricta ahora compara únicamente los datos críticos de mundo: region/, entities/ y poi/.
+- Los archivos críticos deben coincidir exactamente por ruta, tamaño y contenido byte a byte.
+- Marcadores de Arclight, level.dat_old, archivos runtime y otros metadatos fuera de esas carpetas ya no invalidan la copia.
+- Se mantiene el clonado en frío y la detección de dimensions/<namespace>/<world>.
+- RUNTIME_VERSION nuevo para descartar arenas incompletas creadas por 1.36.2.

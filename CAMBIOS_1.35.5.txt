@@ -1,0 +1,8 @@
+ArlightBingo 1.35.5 — NETHER SAFE ARRIVAL AUTO REPAIR
+
+- Repara automáticamente la llegada segura del Nether en copias de plantillas antiguas.
+- Crea una plataforma 5x5 de ladrillos de piedra negra pulida bajo el marcador.
+- Limpia un volumen 3x3x3 para evitar aparición dentro de bloques.
+- Reintenta la validación antes de cancelar la partida.
+- No reconstruye ni reemplaza la arquitectura aprobada del Nether.
+- Cambia el marcador runtime para volver a copiar las arenas del pool con la corrección.

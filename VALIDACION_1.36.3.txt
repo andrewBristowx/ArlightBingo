@@ -1,0 +1,7 @@
+VALIDACIÓN DE FUENTE 1.36.3
+
+- Verificador limitado a region/, entities/ y poi/.
+- Igualdad exacta del manifiesto crítico por ruta y tamaño.
+- Verificación adicional byte a byte con Files.mismatch.
+- Los archivos extra fuera del almacenamiento crítico se ignoran.
+- RUNTIME_VERSION actualizado para forzar una copia nueva.

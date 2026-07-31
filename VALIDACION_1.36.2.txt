@@ -1,0 +1,10 @@
+VALIDACIÓN DE FUENTE 1.36.2
+
+- Versión actualizada en pom.xml, plugin.yml y recursos modulares.
+- El destino no se carga hasta terminar las tres copias.
+- El almacenamiento custom dimensions/<namespace>/<nombre> tiene prioridad absoluta.
+- El clonado usa staging oculto y move atómico.
+- region/, entities/ y poi/ se comparan con Files.mismatch.
+- La limpieza nunca elimina una raíz compartida si no termina en el nombre del slot ni
+  contiene marcadores de ArlightBingo.
+- Las copias anteriores quedan invalidadas por RUNTIME_VERSION y ready marker nuevos.

@@ -1,0 +1,16 @@
+1. Compilar e instalar ArlightBingo 1.35.8.
+2. Iniciar o preparar una partida Bingo.
+3. Ejecutar como administrador:
+   /bingo campaign tpnether
+4. Confirmar que cambia a creativo y llega al Nether de la arena activa.
+5. Ejecutar:
+   /bingo campaign tpend
+6. Confirmar que cambia a creativo y llega al End de la arena activa.
+7. Para volver a supervivencia:
+   /bingo campaign survival
+
+También se pueden probar puntos concretos:
+/bingo campaign tp netherboss
+/bingo campaign tp golem
+/bingo campaign tp altar
+/bingo campaign tp dragon

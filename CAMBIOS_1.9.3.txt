@@ -1,0 +1,17 @@
+ARLIGHTBINGO 1.9.3 — ESBIRROS CORROMPIDOS Y TECHOS REFORZADOS
+
+- Elimina los spawners vanilla de las torres de Overworld, Nether y End.
+- Genera entidades personalizadas de ArlightBosses directamente en cada piso:
+  * arlightbosses:emerald_zombie_minion
+  * arlightbosses:gilded_piglin_minion
+  * arlightbosses:void_enderman_minion
+- Añade dimension-dungeons.minions-per-floor.
+- Añade end-dungeon.minions-per-floor.
+- Refuerza el techo de las tres mazmorras con una segunda capa.
+- Evita que la limpieza del cuarto del portal borre el techo del último piso.
+- Corrige la activación y contención del Guardián del Vacío usando Mob en lugar de Enderman vanilla.
+- Conserva prepare-on-startup y prepare-next-during-match en false por defecto:
+  las arenas se preparan únicamente al comenzar una partida si no hay una lista.
+
+REQUISITO:
+- ArlightBosses 1.4.0 debe estar instalado tanto en servidor como en clientes.

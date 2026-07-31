@@ -1,0 +1,5 @@
+ArlightBingo 1.33.0 - UNIVERSAL PODIUM
+- Podio individual 3D compatible con la campaña de tres dimensiones.
+- Clasificación por ganador y objetivos completados.
+- Muestra puntos, objetivos y tiempo restante.
+- Se abre después de restaurar inventarios y volver a legos.

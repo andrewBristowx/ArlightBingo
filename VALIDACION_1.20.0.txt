@@ -1,0 +1,6 @@
+VALIDACIÓN ARLIGHTBINGO 1.20.0
+
+- pom.xml y plugin.yml actualizados a 1.20.0.
+- EndEncounterManager no exige que el boss sea org.bukkit.entity.EnderDragon.
+- Summon directo del EntityType de ArlightBosses mediante el jugador ancla del mundo End.
+- Seguimiento y muerte por UUID + scoreboard tag.

@@ -1,0 +1,15 @@
+PRUEBA 1.35.1
+
+1. Instala el JAR y reinicia completamente.
+2. Ejecuta:
+   /bingo template nether resume
+   /bingo template nether audit
+3. El audit debe indicar:
+   cofres=4/4, cerradura=presente
+4. Teletransporta:
+   /bingo campaign tp lock
+5. Comprueba visualmente la Cerradura Ígnea Ancestral.
+6. Inicia una partida, consigue la Llave Ígnea y úsala.
+7. Reinicia el servidor y repite audit para confirmar persistencia.
+
+No uses reset ni generate force.

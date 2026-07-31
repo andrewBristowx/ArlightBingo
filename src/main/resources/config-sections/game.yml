@@ -1,0 +1,64 @@
+# ArlightBingo 1.36.5 - configuración modular
+game:
+  card-size: 5
+  team-mode: false
+  win-condition: POINTS
+  time-limit-minutes: 60
+  glow-completed-items: true
+  broadcast-goal-completion: true
+  min-players-to-start: 2
+  max-players-scoreboard: 10
+  auto-start-countdown-seconds: 50
+  final-countdown-seconds: 5
+  celebration-seconds: 8
+teams:
+  auto-balance: true
+  friendly-fire: false
+boss-objectives:
+  enabled: true
+  first-kill-only: true
+tiebreak:
+  enabled: true
+  countdown-seconds: 5
+  platform-radius: 12
+  spawn-distance: 6
+  platform-material: SMOOTH_STONE
+goals:
+  auto-generate: true
+  auto-generate-pool-size: 150
+  blacklist-items: []
+  blacklist-mods: []
+  vanilla-only: true
+  manual:
+  - id: diamante
+    type: ITEM_COLLECT
+    target: minecraft:diamond
+    amount: 1
+    display-name: Consigue un diamante
+  - id: romper_roble
+    type: BLOCK_BREAK
+    target: minecraft:oak_log
+    amount: 16
+    display-name: Rompe 16 troncos de roble
+  - id: matar_enderman
+    type: ENTITY_KILL
+    target: minecraft:enderman
+    amount: 1
+    display-name: Mata a un enderman
+  - id: craftear_mesa_encantar
+    type: CRAFT_ITEM
+    target: minecraft:enchanting_table
+    amount: 1
+    display-name: Craftea una mesa de encantamientos
+  - id: logro_nether
+    type: ADVANCEMENT
+    target: minecraft:story/enter_the_nether
+    display-name: Entra al Nether
+  - id: lingote_modded_ejemplo
+    type: ITEM_COLLECT
+    target: examplemod:copper_alloy_ingot
+    amount: 1
+    display-name: Consigue un lingote de aleacion de cobre (mod)
+  - id: boss_modded_ejemplo
+    type: CUSTOM_TRIGGER
+    display-name: Derrota al jefe del mod (activacion manual)

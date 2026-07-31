@@ -1,0 +1,35 @@
+REQUISITOS
+- Compilar e instalar ArlightBingo 1.37.1.
+- Compilar e instalar ArlightChatClient 4.8.0 en el cliente.
+
+COMANDOS
+/bingo campaign somita list
+/bingo campaign somita scene overworld
+/bingo campaign somita scene nether
+/bingo campaign somita scene end
+/bingo campaign somita scene altar
+/bingo campaign somita scene celebration
+
+/bingo campaign somita anim celebrate_cute
+/bingo campaign somita anim celebrate_elegant
+
+/bingo campaign somita effect overworld_appear
+/bingo campaign somita effect overworld_point
+/bingo campaign somita effect nether_appear
+/bingo campaign somita effect nether_lock
+/bingo campaign somita effect end_appear
+/bingo campaign somita effect end_altar
+/bingo campaign somita effect celebration_burst
+/bingo campaign somita effect vanish
+
+/bingo campaign somita demo overworld
+/bingo campaign somita demo nether
+/bingo campaign somita demo end
+/bingo campaign somita demo celebration
+/bingo campaign somita clear
+
+COMPROBAR
+- Las escenas reales reproducen sus partículas al entrar a cada dimensión.
+- /bingo stop y los cambios de mundo limpian la guía.
+- No quedan entidades de Somita en el servidor.
+- El clonador DIM-1/DIM1 continúa funcionando igual que en 1.36.5/1.37.0.

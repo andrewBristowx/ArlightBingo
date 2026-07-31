@@ -1,0 +1,31 @@
+PRUEBA ARLIGHTBINGO 1.7.0
+=========================
+
+1. Compila con Java 21:
+   mvn clean package
+
+2. Instala target/ArlightBingo-1.7.0.jar y conserva tu config.yml actual.
+   Las claves boss-objectives se crearán en una instalación limpia; en una existente
+   agrega:
+
+   boss-objectives:
+     enabled: true
+     first-kill-only: true
+
+3. Prepara una arena nueva del pool con /bingo world prepare.
+
+4. Comprueba durante una partida:
+   - Overworld y Nether: los portales dejan al jugador fuera de las torres.
+   - El portal del End muestra ojos en todos sus marcos.
+   - Los cuatro objetivos de jefe aparecen en cada cartón.
+   - Solo el primer equipo que mata cada jefe recibe ese punto.
+   - Los enemigos de spawner brillan, llevan distintivo visual y nombre especial.
+   - Al matar al Guardián del Vacío aparece un portal con ojos en el último piso.
+   - Ese portal devuelve fuera de la torre del Overworld.
+
+5. La carpeta loading-screen contiene el fondo para la futura pantalla completa de
+   ArlightChatClient. El plugin ya conserva su sistema actual de progreso y consejos.
+
+NOTA DE COMPILACION
+Este entorno no incluye Maven; la validación realizada aquí cubrió YAML, estructura y
+referencias de código. La compilación final debe hacerse en IntelliJ como las anteriores.

@@ -1,0 +1,33 @@
+VALIDACIÓN DE FUENTE — ARLIGHTBINGO 1.35.0
+
+- pom.xml, plugin.yml y BUILD_VERSION.txt coinciden en 1.35.0.
+- config.yml y plugin.yml se analizaron correctamente como YAML.
+- pom.xml se analizó correctamente como XML.
+- Las tres clases de plantilla conservan balance estructural de llaves.
+- javac 21 no reportó errores de sintaxis en las tres clases modificadas; no se ejecutó el build Maven completo por falta de Maven/Paper/ArlightCore en este entorno.
+
+OVERWORLD
+- Revisión: 1.35.0-overworld-terrain-integrated-village-1.
+- Recupera las coordenadas guardadas de una plantilla existente para no desplazar ni apilar el pueblo al usar resume.
+- Cimientos, terrazas y caminos rellenan la diferencia completa con el terreno.
+- Añade posada, archivo/cartografía, almacén y detalles de plaza con loot.
+
+NETHER
+- Revisión: 1.35.0-nether-functional-interiors-loot-1.
+- Clave de chunk elevada a template_nether_chunk_v4 para actualizar mundos existentes con resume.
+- Ocho tipos de habitaciones funcionales.
+- Puntos de loot declarados: 24.
+- Puntos de enemigos/spawners declarados: 25.
+
+END
+- Revisión: 1.35.0-end-functional-zones-loot-1.
+- Clave de chunk elevada a template_end_chunk_v3 para actualizar mundos existentes con resume.
+- Cinco zonas funcionales en la ciudadela y seis identidades para islas satélite.
+- Puntos de loot declarados: 24.
+- Puntos de enemigos/spawners declarados: 24.
+
+SEGURIDAD
+- No se cambian las seeds configuradas.
+- No se llama a reset ni generate force desde resume.
+- Nether y End se reconstruyen por chunks con una nueva clave de revisión.
+- Overworld reutiliza los anclajes del marcador previo.

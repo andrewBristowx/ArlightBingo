@@ -1,0 +1,33 @@
+ArlightBingo 1.16.0 - OVERWORLD CASTLE REBUILD + REAL SPAWNERS
+
+ESTRUCTURA OVERWORLD
+- Se eliminó el casco genérico en forma de caja del Overworld.
+- Castillo reconstruido completamente como mazmorra modular y más detallada.
+- Nueva progresión: llegada segura -> muralla exterior -> patio ocupado -> gran salón
+  -> pisos temáticos -> arena del jefe -> tesorería/portal.
+- Murallas con adarve, torres de puerta, cuatro torres altas, campamentos, establo,
+  herrería, fuente corrompida, barricadas y daños decorativos.
+- Habitaciones funcionales: comedor, cocina, armería, biblioteca, sala de mapas,
+  barracas, prisión, almacén, alcantarilla, sala del jefe y tesorería.
+- Pisos, paredes y torres tienen soportes para reducir secciones flotantes en terreno irregular.
+
+ESCALERAS
+- Se reemplazaron los tramos antiguos por escaleras de 2 bloques de ancho.
+- Cada peldaño tiene soporte inferior, orientación explícita, forma STRAIGHT,
+  mitad BOTTOM, hueco de cabeza y descanso al llegar al siguiente piso.
+- Escalera separada y corregida para el sótano.
+- Las escaleras alternan de lado por piso para evitar superposiciones.
+
+SPAWNERS REALES
+- Los esbirros ya no aparecen mediante una tarea periódica de /summon.
+- Cada bloque spawner recibe SpawnData y SpawnPotentials por NBT.
+- Los IDs son los mismos registrados por los huevos de ArlightBosses.
+- Un spawner puede alternar entre varias criaturas del grupo configurado.
+- Conserva etiquetas de Bingo, persistencia, vida, daño y escalado por jugadores.
+- Los spawners de apoyo del jefe permanecen desactivados hasta entrar en la arena.
+- Al morir el jefe se desactivan los spawners de la dimensión.
+
+REQUISITOS
+- ArlightBosses 1.8.2 o superior.
+- Java 21.
+- Compilar con: mvn clean package

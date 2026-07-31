@@ -1,0 +1,7 @@
+ArlightBingo 1.34.2 - PERSISTENT-TEMPLATES-CAMPAIGN-ANCHORS-COMPILE-FIX
+
+- Conserva todas las correcciones de persistencia y reparación de campaña de 1.34.1.
+- Corrige el error de compilación de TemplateWorldCloner.java en la línea de world container.
+- Sustituye world.getServer().getWorldContainer() por Bukkit.getWorldContainer().
+- Añade el import org.bukkit.Bukkit.
+- No cambia semillas, plantillas, marcadores, estructuras ni configuración.

@@ -1,0 +1,30 @@
+ArlightBingo 1.31.0 THREE-DIMENSION-ARCHITECTURAL-DEPTH
+================================================================
+
+OBJETIVO
+- Mejorar la lectura visual, los interiores y la silueta de las estructuras
+  de plantilla sin mover puntos críticos de campaña, cofres, spawners, altares,
+  portales ni apariciones de jefes.
+
+OVERWORLD
+- Los salones de la ciudadela reciben ventanales altos, vigas, contrafuertes,
+  dos entradas monumentales e interiores funcionales.
+- El torreón central abre portones hacia sus cuatro alas, añade arcos interiores
+  e iluminación de esmeralda.
+- Las torres redondas ahora tienen pisos explorables, accesos y coronas almenadas.
+
+NETHER
+- Las torres del súper-bastión reciben plataformas intermedias, acceso, corona
+  y remate dorado.
+- Los distritos incorporan cubiertas aterrazadas, lucernarios, puertas amplias
+  y ventanas protegidas con vidrio naranja.
+
+END
+- Las torres de la ciudadela reciben miradores, acceso y coronas de geoda.
+- Los barrios principales y santuarios satélite incorporan cubiertas escalonadas,
+  lucernarios, entradas y ventanales morados.
+
+REGENERACIÓN SEGURA
+- Los marcadores de Overworld y Nether ahora comprueban la versión interna,
+  igual que el End. Una plantilla vieja ya no se confunde con la 1.31.0.
+- Para ver los cambios se deben regenerar las tres plantillas con force.

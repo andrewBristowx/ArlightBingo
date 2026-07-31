@@ -1,0 +1,4 @@
+ArlightBingo 1.13.3
+- La BossBar vanilla superior del tiempo queda desactivada por defecto.
+- El tiempo continúa actualizándose en el panel lateral visual.
+- Puede reactivarse con match-bossbar.enabled: true.

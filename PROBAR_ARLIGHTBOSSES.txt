@@ -1,0 +1,11 @@
+ARLIGHTBINGO 1.8.1 + ARLIGHTBOSSES 1.1.0
+
+1. Compila ArlightBosses con Java 21 y coloca su JAR en mods del servidor y de cada jugador.
+2. Compila ArlightBingo y coloca su JAR en plugins del servidor.
+3. Conserva ArlightChatClient 2.2.2 CLEAN solamente en mods de cada jugador.
+4. Elimina las versiones anteriores de esos tres JAR y reinicia completamente.
+5. Prueba primero: /summon arlightbosses:surface_guardian
+6. Prepara el pool con: /bingo world pool prepare 1
+7. Inicia una partida. Bingo invoca guardianes propios; si ArlightBosses falta, usa mobs vanilla como respaldo.
+
+Nota: el dragon normal sigue siendo vanilla para conservar cristales, fases, muerte y portal.

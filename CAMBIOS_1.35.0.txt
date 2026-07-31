@@ -1,0 +1,21 @@
+ArlightBingo 1.35.0 — PROFESSIONAL WORLD EXPLORATION OVERHAUL
+
+OVERWORLD
+- Pueblo inicial ampliado con posada, archivo/cartografía, almacén y espacios públicos.
+- Cada edificio principal recibe decoración interior y cofres con loot tables.
+- Cimientos, terrazas y caminos rellenan toda la diferencia con el terreno.
+- Se eliminan plataformas visualmente flotantes sin cambiar seed ni ejecutar Chunky.
+
+NETHER
+- Ocho tipos de salas funcionales: armería, fundición, barracones, reliquias, prisión, alquimia, suministros y tesoro.
+- Más cofres, barriles, enemigos y puntos de riesgo/recompensa.
+- Las habitaciones dejan de ser cascarones vacíos y tienen una razón para explorarse.
+
+END
+- Barrios con identidad: archivo, prisión shulker, jardín, tesorería y santuario.
+- Islas satélite diferenciadas como observatorio, arsenal, bóveda, jardín y tesoro.
+- Más loot y encuentros secundarios sin cambiar la estructura general aprobada.
+
+ACTUALIZACIÓN SEGURA
+- Los marcadores y claves de chunk cambian de revisión para que resume aplique el pase.
+- No borra mundos, no cambia semillas y no repite Chunky.

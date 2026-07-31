@@ -1,0 +1,9 @@
+PRUEBA 1.36.5
+
+1. Inicia una partida y entra al Nether.
+2. Confirma que la cerradura y los dungeons siguen presentes.
+3. Observa la consola durante 20 segundos: no debe aparecer "Could not set the block" cada cinco segundos.
+4. Ejecuta /bingo stop.
+5. Observa la consola durante al menos 30 segundos.
+6. No debe aparecer ningún nuevo "Could not set the block" procedente del mantenimiento de ArlightBingo.
+7. Inicia una segunda partida y confirma que la progresión se prepara nuevamente.

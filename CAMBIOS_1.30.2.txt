@@ -1,0 +1,12 @@
+ArlightBingo 1.30.2 TEMPLATE-BIOME-CLEARING-REBUILD
+
+- Pueblo inicial convertido en una expansión orgánica de estilo vanilla/modded village.
+- Spawn del jugador movido a una plataforma segura fuera de la fuente.
+- Cartógrafo despejado y fijado en la plaza.
+- Selección de ciudadela penaliza bosques densos y copas de árboles.
+- Arena del Guardián de la Superficie crea una cuenca despejada y deja el centro libre.
+- Núcleo de esmeralda movido fuera del punto de aparición del jefe.
+- Súper-Bastión del Nether reconstruido con barrios, patios, forja circular, laberinto y arena limpia.
+- Canales de lava hundidos para eliminar láminas flotantes.
+- End reconstruido con islas suaves, ciudadela baja, barrios, santuarios y arena estelar limpia.
+- Se conservan generación secuencial, Lootr, spawners y plantillas anteriores.

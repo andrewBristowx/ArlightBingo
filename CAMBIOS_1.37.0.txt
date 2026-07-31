@@ -1,0 +1,14 @@
+ArlightBingo 1.37.0 - SOMITA SKIN GUIDE PROTOCOL
+
+- Reemplaza las entidades persistentes de Somita por una guía personal enviada al mod cliente.
+- Elimina Somitas antiguas de plantilla/cinemática al preparar la campaña.
+- Añade escenas automáticas de introducción en Overworld, Nether y End.
+- Convierte la escena final del dragón al nuevo protocolo visual.
+- Añade el canal arlightbingo:somita.
+- Añade comandos administrativos de prueba:
+  /bingo campaign somita show <overworld|nether|end|celebration>
+  /bingo campaign somita anim <idle|wave|point|walk|look|bow|celebrate|vanish|hold|cross_arms>
+  /bingo campaign somita scene <overworld|nether|end|altar|celebration>
+  /bingo campaign somita hide
+  /bingo campaign somita list
+- Conserva sin cambios el clonador DIM-1/DIM1 y la limpieza de mantenimiento de 1.36.5.

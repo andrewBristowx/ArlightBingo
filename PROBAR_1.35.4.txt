@@ -1,0 +1,9 @@
+1. Apaga el servidor y sustituye sólo ArlightBingo por 1.35.4.
+2. Conserva las carpetas bingo_template_*, no las borres.
+3. Inicia el servidor.
+4. Ejecuta /bingo template all audit.
+5. Ejecuta /bingo world prepare para reconstruir sólo el slot del pool.
+6. Comprueba que ya no aparezca "falta level.dat".
+7. Inicia una partida y prueba Nether y End.
+
+No usar /reload. No repetir Chunky.

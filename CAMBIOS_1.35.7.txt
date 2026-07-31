@@ -1,0 +1,7 @@
+ArlightBingo 1.35.7 - DIMENSION REGION PRIORITY FIX
+
+- Corrige la copia de plantillas Nether y End en Arclight.
+- Cuando una plantilla contiene region/, DIM-1/region y DIM1/region, ahora Nether prioriza DIM-1 y End prioriza DIM1.
+- Evita copiar por error los chunks del Overworld dentro de bingo_arena_*_nether y bingo_arena_*_the_end.
+- Conserva la reparación automática de llegadas seguras de Nether y End.
+- Cambia el marcador interno de runtime para obligar a descartar y recrear arenas antiguas.

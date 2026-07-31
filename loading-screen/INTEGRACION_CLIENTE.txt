@@ -1,0 +1,16 @@
+PANTALLA DE CARGA PERSONALIZADA
+================================
+
+El fondo bingo_loading_background.png está listo para ArlightChatClient.
+
+El plugin del servidor ya controla la preparación de Chunky y los consejos mediante
+PreparationDisplay. Para mostrar esta imagen a pantalla completa hace falta añadir al
+mod cliente un paquete de red que abra/cierre la pantalla y actualice:
+
+- porcentaje y texto de progreso;
+- consejo actual;
+- imagen del carrusel;
+- mensaje "Mundo generado".
+
+No se debe colocar esta imagen dentro del JAR del servidor esperando que Bukkit la
+muestre: Minecraft solo permite esa interfaz mediante el mod cliente.

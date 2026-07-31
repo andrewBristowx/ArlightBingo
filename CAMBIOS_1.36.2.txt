@@ -1,0 +1,16 @@
+ArlightBingo 1.36.2 - COLD DIMENSION STORAGE CLONE
+
+- Corrige el clonador para mundos de Arclight guardados como dimensiones personalizadas:
+  dimensions/<namespace>/bingo_template_nether y bingo_template_end.
+- Deja de asumir que los chunks correctos siempre están en <mundo>/region, DIM-1 o DIM1.
+- Copia el almacenamiento exacto de la dimensión. Distingue entre una raíz dedicada
+  (bingo_template_nether/dimensions/.../bingo_template_nether) y una raíz compartida
+  (world/dimensions/.../bingo_template_nether), creando el destino en el lugar correcto
+  y renombrando la clave de plantilla al nombre del slot de arena.
+- Limpia las tres rutas antiguas antes de empezar y no carga ningún mundo de arena hasta
+  que Overworld, Nether y End estén copiados y verificados.
+- Usa staging oculto y movimiento atómico: una arena nunca queda visible parcialmente.
+- Verifica byte por byte region/, entities/ y poi/ antes de aceptar la copia.
+- Detecta y elimina copias antiguas tanto en la raíz como dentro de dimensions/.
+- Añade logs con ruta fuente, ruta destino, modo de almacenamiento, archivos y bytes.
+- Mantiene las plantillas maestras y la configuración modular de 1.36.0/1.36.1.

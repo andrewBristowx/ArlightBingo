@@ -1,0 +1,6 @@
+ArlightBingo 1.13.4
+- Nueva pantalla persistente de sala de espera para los participantes del Bingo.
+- Incluye contador de jugadores y cuenta regresiva actualizable.
+- Cambia automáticamente a la pantalla cinematográfica de preparación cuando empieza Chunky.
+- El botón Salir de la cola ejecuta /bingo leave desde ArlightChatClient 2.6.5.
+- Limpieza segura de la pantalla al salir, terminar, fallar la preparación o apagar el plugin.

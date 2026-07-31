@@ -1,0 +1,51 @@
+ARLIGHTBINGO 1.38.0 - OVERWORLD PLAYABLE PROGRESSION
+
+CIUDAD INICIAL
+- La copia de partida vuelve a colocar al Cartógrafo de la Campana.
+- El cartógrafo entrega la Brújula de la Antigua Calzada, vinculada a la ciudadela.
+- La brújula usa PDC; no puede falsificarse sólo renombrando otra en un yunque.
+- La ciudad recibe 8 aldeanos ambientales, 2 gólems guardianes y animales de granja.
+- Los actores están etiquetados para no duplicarse al ejecutar reparaciones posteriores.
+
+PROGRESION DE DISTRITOS
+- Ruta secuencial: residencial -> comercial -> bastión militar -> ciudadela -> jefe.
+- Se reutilizan los tres asentamientos de la plantilla sin regenerar el mundo.
+- Cada distrito tiene 4 spawners administrados por Bingo con entidades de ArlightBosses.
+- Los spawners de distritos futuros quedan inactivos y no pueden romperse ni destruirse con explosiones.
+- Al destruir los 4 spawners activos se desbloquea el cofre del distrito.
+- El siguiente distrito sólo se activa después de recoger el objeto especial del cofre.
+
+ENTIDADES ARLIGHTBOSSES
+- Residencial: zombie esmeralda, creeper esmeralda y araña musgosa.
+- Comercial: arquero esmeralda, ravager joven, zombie y creeper esmeralda.
+- Militar: gólem centinela, arquero, ravager joven y creeper esmeralda.
+- El Guardián de la Superficie sólo aparece al completar la progresión.
+
+COFRES Y OBJETOS
+- Cofres visuales de ArlightBosses con fallback a cofre vanilla.
+- Recompensas personales mediante AdaptiveDungeonLootManager.
+- Objetos provisionales garantizados: Emblema del Hogar, Emblema del Comercio y Núcleo Esmeralda.
+- Cada objeto lleva `mission_item_id` en PDC y se repone al reabrir el cofre si se perdió.
+- El cofre legendario del jefe queda bloqueado hasta derrotarlo.
+
+CIUDADELA Y SOMITA
+- Sello físico con tres indicadores en la entrada de la ciudadela.
+- Cada indicador cambia al recuperar el objeto de su distrito.
+- La puerta se abre y el jefe aparece sólo al recuperar los tres objetos.
+- Somita celebra al limpiar un distrito, señala la siguiente ruta y anuncia la ciudadela.
+- Somita Celebration aparece al derrotar al jefe.
+
+COMANDOS DE PRUEBA
+- /bingo campaign tp village
+- /bingo campaign tp residential
+- /bingo campaign tp commercial
+- /bingo campaign tp military
+- /bingo campaign tp citadel
+- /bingo campaign tp surfaceboss
+- /bingo campaign tp surfaceportal
+- /bingo campaign status
+
+SEGURIDAD
+- No modifica el clonador, las semillas, Chunky, Nether ni End.
+- Protege cofres, pedestales y sello contra rotura/explosiones.
+- Los objetos son provisionales para validar la jugabilidad antes de crear modelos definitivos.

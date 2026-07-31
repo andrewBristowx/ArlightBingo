@@ -1,0 +1,55 @@
+ArlightBingo 1.21.0 - Tres Ciudades, Llaves y Somita
+
+CAMPAÑA GENERAL
+- Progresión continua: ciudad musgosa -> Guardián de la Superficie -> Nether ->
+  Llave Ígnea -> Guardián del Nether -> End -> Gólem Centinela -> Llave del
+  Dragón -> Altar de Perla Corrompida -> Dragón Corrupto -> salida.
+- Las estructuras quedan protegidas contra rotura, explosiones y caídas fuera del recorrido.
+- Las llaves se recuperan si desaparecen o si el portador se desconecta.
+- Los cofres de misión son elegidos aleatoriamente en cada arena.
+
+OVERWORLD
+- Ciudad musgosa ampliada hasta aproximadamente 193 x 195 bloques.
+- Spawn movido a la plaza segura de la muralla exterior.
+- Avenida principal, diez barrios, casas transitables, murallas y torres.
+- Dos campos de prisioneros con aldeanos invulnerables encerrados.
+- Capilla-refugio, jardines corrompidos, cofres y spawners reales.
+- Somita aparece al inicio con animación kawai y el mensaje:
+  «Este mundo necesita tu ayuda. Explora el Bingo y sé el ganador. ¡Ánimo!»
+- Derrotar al Guardián de la Superficie conserva la apertura del portal al Nether.
+
+NETHER
+- Ciudad militar ampliada con acceso desde la puerta exterior.
+- Barrios piglin, cuarteles, mercado, minas, herrerías, corrales, canales de lava,
+  torres de vigilancia, cofres, spawners y castillo central.
+- La Llave Ígnea Legendaria se esconde en uno de ocho cofres candidatos.
+- Compatible con cofres personales de Lootr: el primer participante que abre el
+  cofre elegido recibe la llave global de misión.
+- Una cerradura de ancla de reaparición bloquea la sala del Guardián.
+- La llave se consume al abrir la puerta.
+- Derrotar al Guardián del Nether crea el portal al End en la sala posterior.
+
+END
+- Ciudadela flotante personalizada antes de la pelea del dragón.
+- Gólem Centinela obligatorio, salas laterales, torres, puentes, islas secundarias,
+  cofres Lootr, spawners y checkpoints.
+- La Llave del Dragón Esmeraltizada se esconde aleatoriamente en uno de ocho cofres.
+- El camino al altar permanece cerrado hasta derrotar al Gólem Centinela.
+- Altar de Perla Corrompida procedente de ArlightBosses 1.14.0.
+- La llave se consume únicamente cuando la invocación del dragón puede comenzar.
+- Isla de combate de radio aproximado 62, nueve pilares lejanos, coberturas y
+  rescate contra el vacío.
+- Se invoca directamente arlightbosses:amethyst_corrupted_ender_dragon.
+
+FINAL DE SOMITA
+- El dragón de Bingo no deja un huevo duplicado por su cuenta.
+- Después de su desvanecimiento, aparece un huevo temporal en la arena.
+- Somita llega por un portal, recoge visualmente el huevo y dice:
+  «Gracias, me servirá para mi desayuno.»
+- Después abre el portal de salida, se despide y desaparece.
+- Existe un seguro temporal que abre la salida aunque falle una parte visual.
+
+REQUISITOS
+- ArlightBosses 1.14.0 en servidor y clientes.
+- ArlightCore 1.17.0 instalado localmente para compilar.
+- Java 21 y Paper API 1.21.1.

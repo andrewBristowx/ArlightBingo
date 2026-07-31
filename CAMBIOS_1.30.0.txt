@@ -1,0 +1,13 @@
+ARLIGHTBINGO 1.30.0 - THREE-DIMENSION-TEMPLATES-PROTOTYPE
+
+- Conserva 1.29.1 como respaldo independiente.
+- Mejora el Overworld: cartógrafo en plataforma segura, ciudadela no rectangular,
+  distritos variados, más spawners y arena visible del Guardián de la Superficie.
+- Añade /bingo template overworld testboss.
+- Añade plantilla Nether con corrupción dorada, súper-bastión, mazmorra de dos niveles,
+  bóveda del jefe y cámara del portal.
+- Añade plantilla End con archipiélago de geodas, ciudadela central, satélites,
+  puentes rotos y arena final en forma de estrella.
+- Nether y End se construyen por chunks ya cargados mediante cola limitada;
+  no fuerzan generación ni lectura masiva de chunks.
+- Cofres y barriles mantienen loot tables compatibles con Lootr.

@@ -1,0 +1,13 @@
+ArlightBingo 1.35.3 — THREE-DIMENSION-CLONE-INTEGRITY-FIX
+
+- Un slot ya no se considera listo usando sólo el marcador del Overworld.
+- Se validan Overworld, Nether y End antes de registrar, adquirir o restaurar una arena.
+- Cada copia exige carpeta, ownership marker, runtime marker 1.35.3, origen correcto,
+  entorno correcto, level.dat, marcador funcional de plantilla y regiones copiadas.
+- WorldCreator no puede crear silenciosamente un Nether/End vacío cuando falta una copia.
+- Las copias viejas 1.35.2 quedan invalidadas y se reconstruyen desde las plantillas maestras.
+- Los mundos vanilla accidentales del pool, incluso sin marcador, se recuperan y reemplazan de forma controlada.
+- La reconstrucción de los mundos de partida no ejecuta Chunky ni modifica las plantillas.
+- La arena no inicia si las llegadas seguras del Nether o End no tienen suelo y espacio libre.
+- Los portales se bloquean cuando el mundo o el destino de plantilla no está disponible.
+- Una partida restaurada con un slot incompleto se cancela de forma segura.

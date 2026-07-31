@@ -1,0 +1,14 @@
+ARLIGHTBINGO 1.6.1 - PRUEBA
+
+1. Compila con: mvn clean package
+2. Usa target/ArlightBingo-1.6.1.jar.
+3. Conserva Chunky instalado y ejecuta /bingo world prepare.
+4. Mientras Chunky prepara los tres mundos debe aparecer una barra con consejos.
+5. En una partida, completa la mazmorra del Overworld y derrota al zombi con netherita.
+6. Verifica que el portal al Nether se desbloquee y lleve siempre a la misma mazmorra.
+7. Derrota al guardian del Nether y comprueba que se abra el portal al End.
+8. Vence al dragon y comprueba la torre final, sus cofres, elytra y cabeza de dragon.
+
+Los bordes predeterminados coinciden con Chunky: 512 Overworld, 256 Nether y 256 End.
+La barra muestra fases, no el porcentaje exacto de chunks, porque Chunky solo comunica
+al plugin cuando termina cada dimension.

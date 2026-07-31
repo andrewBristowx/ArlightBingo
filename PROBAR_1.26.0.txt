@@ -1,0 +1,29 @@
+PRUEBA RECOMENDADA — ARLIGHTBINGO 1.26.0
+==========================================
+
+INSTALACIÓN
+1. Compila con Java 21: Maven > Lifecycle > clean y package.
+2. Instala el JAR en /plugins y elimina versiones viejas de ArlightBingo.
+3. Instala ArlightBosses 1.19.0 en /mods del servidor y de todos los clientes.
+4. Sustituye o combina config.yml con config-ArlightBingo-1.26.0-REFERENCE-DRIVEN-LIVING-CITIES.yml.
+5. Borra/regenera el trío de mundos de prueba. Una arena creada con 1.25 conserva estructuras antiguas.
+6. Reinicia completamente; no uses /reload.
+
+RECORRIDO
+- Inicia una partida desde cero y espera a que termine Chunky.
+- Overworld: revisa calles diagonales, interiores, alcantarillas, granjas y transición con montañas.
+- Rompe un spawner en supervivencia: debe desaparecer, dar XP y poder liberar el sector.
+- Confirma que altar, cofres de misión, accesos al jefe y portales no se puedan destruir.
+- Cruza al Nether en supervivencia; vuelve al Overworld; entra al End también en supervivencia.
+- Nether: comprueba que el borde no aparezca cerca de la ciudad y que haya puentes/alturas/distritos.
+- End: vuela alrededor y debajo de la isla custom; no debe existir la isla antigua.
+- Verifica que el Guardián del Vacío sea el jefe de la ciudadela.
+- Abre cofres y barriles vanilla con dos jugadores: Lootr debe entregar inventario personal.
+- Abre y cierra los cofres custom: deben conservarse, animarse y no mostrar mensajes de /setblock.
+- Completa el final: el huevo debe verse grande, delante del cuerpo de Somita, con el portal visible.
+
+PRUEBA DE REGRESIÓN
+- Scoreboard y cartón no deben desaparecer.
+- Los objetivos de jefes/esbirros deben seguir puntuando.
+- Los jugadores deben volver a legos al terminar.
+- No debe existir pérdida o mezcla de inventarios entre lobby y Bingo.

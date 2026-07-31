@@ -1,0 +1,7 @@
+1. Apaga el servidor.
+2. Sustituye el JAR por ArlightBingo 1.35.7.
+3. Conserva las tres plantillas maestras.
+4. Borra bingo_arena_1, bingo_arena_1_nether y bingo_arena_1_the_end.
+5. Inicia el servidor y espera a que el pool termine.
+6. Inicia una partida y comprueba Nether y End.
+7. En consola, el runtime debe indicar version 1.35.7-dimension-region-priority-1.

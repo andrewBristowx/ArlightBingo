@@ -1,0 +1,10 @@
+ARLIGHTBINGO 1.12.2 - AVISO DE PREPARACIÓN
+
+- Cartel compacto solo para jugadores que no participan en Bingo.
+- Participantes conservan la pantalla cinematográfica completa.
+- Aparece únicamente cuando una partida necesita preparar una arena.
+- Preparaciones manuales no lo muestran por defecto.
+- Se oculta al terminar, fallar, cancelar o apagar el plugin.
+- Jugadores que entran al servidor durante la preparación lo reciben automáticamente.
+- Posición, escala y fundidos configurables.
+- Conserva Multiverse y el fix seguro de delays de spawners.

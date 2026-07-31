@@ -1,0 +1,10 @@
+PRUEBA ARLIGHTBINGO 1.36.3
+
+1. Compila con Maven Lifecycle -> package.
+2. Apaga el servidor y deja sólo ArlightBingo-1.36.3.jar en plugins/.
+3. Conserva bingo_template, bingo_template_nether y bingo_template_end.
+4. Borra bingo_arena_1, bingo_arena_1_nether y bingo_arena_1_the_end si aún existen.
+5. Inicia el servidor, entra y ejecuta /bingo join y /bingo start.
+6. En latest.log debe aparecer: Clonado en frío completado ... datos críticos verificados.
+7. No debe volver a aparecer el error Esperado 49 archivos / copiado 51 archivos por metadatos extra.
+8. Revisa con /bingo campaign tpnether y /bingo campaign tpend.

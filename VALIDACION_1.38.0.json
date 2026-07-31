@@ -1,0 +1,17 @@
+{
+  "version": "1.38.0",
+  "xml": "ok",
+  "yaml": "ok",
+  "java_syntax_parse": "ok_until_external_dependencies",
+  "arlightbosses_entity_ids": [
+    "arlightbosses:emerald_creeper_minion",
+    "arlightbosses:emerald_golem_sentinel_minion",
+    "arlightbosses:emerald_ravager_cub_minion",
+    "arlightbosses:emerald_skeleton_archer_minion",
+    "arlightbosses:emerald_zombie_minion",
+    "arlightbosses:mossbound_spider_minion"
+  ],
+  "missing_entity_ids": [],
+  "runtime_files": [],
+  "full_build": "not_executed_missing_maven_and_external_dependencies"
+}

@@ -1,0 +1,8 @@
+ARLIGHTBINGO 1.9.1
+
+- acquire() ya no falla cuando no existe una arena preparada.
+- Inicia automáticamente la preparación del siguiente slot disponible con Chunky.
+- La futura de inicio espera a que termine la preparación antes de teletransportar.
+- La pantalla de preparación permanece visible durante el proceso.
+- prepare-on-startup y prepare-next-during-match vienen activados por defecto.
+- Mantiene el comando /bingo world prepare como opción administrativa manual.

@@ -1,0 +1,12 @@
+{
+  "version": "1.39.0",
+  "base": "1.38.0",
+  "templateRevision": "1.39.0-linear-district-campaign-v2",
+  "chunkyRepeated": false,
+  "oldTemplateAutoUpgrade": true,
+  "newCapitalOffsetOnMigration": 420,
+  "districts": ["residential", "commercial", "military"],
+  "physicalRoads": true,
+  "arlightBossesSpawners": true,
+  "jarCompiled": false
+}

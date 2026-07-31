@@ -1,0 +1,30 @@
+PRUEBA FUNCIONAL — ARLIGHTBINGO 1.32.2
+======================================
+
+1. Apaga el servidor y reemplaza únicamente el JAR.
+   La config.yml de 1.32.1 continúa siendo válida.
+
+2. Inicia el servidor y ejecuta dentro del juego:
+   /bingo template all status
+
+3. Las tres dimensiones deben mostrar COMPLETE.
+   No ejecutes generate force sobre una dimensión que ya esté completa.
+
+4. Sin teletransportarte a una plantilla, ejecuta:
+   /bingo world prepare
+
+5. La consola debe pasar de:
+   Preparando pool de Bingo 1/1...
+   a:
+   Arena del pool 1 lista desde las tres plantillas maestras.
+
+6. Si una dimensión sigue sin estar completa, el nuevo error mostrará:
+   - su estado;
+   - READY o MISSING;
+   - las rutas exactas que fueron revisadas.
+
+7. Si el estado es FINALIZING o PREGENERATING, espera y vuelve a consultar
+   status. No regeneres las demás dimensiones.
+
+8. Inicia una partida y confirma que el grupo aparece en la copia del
+   Overworld y que los portales llevan a las copias del Nether y End.

@@ -1,0 +1,1 @@
+ArlightBingo 1.39.1 SERVER-HANG-WATCHDOG-FIX

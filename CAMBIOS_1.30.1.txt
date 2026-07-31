@@ -1,0 +1,14 @@
+ArlightBingo 1.30.1 - SEQUENTIAL-TEMPLATE-GENERATION
+
+- Corrige el error de compilacion de EndTemplateManager: Material.PURPUR_WALL no existe en Paper 1.21.1.
+  Se reemplazo por Material.END_STONE_BRICK_WALL.
+- Agrega /bingo template all generate [force].
+- La secuencia genera una sola dimension a la vez:
+  1. Overworld
+  2. Nether, solo cuando Overworld llega a COMPLETE
+  3. End, solo cuando Nether llega a COMPLETE
+- Si una dimension falla o se cancela, la secuencia se detiene y no inicia la siguiente.
+- Agrega /bingo template all cancel.
+- /bingo template all status muestra la etapa automatica y el estado individual de los tres mundos.
+- Mantiene los comandos individuales de cada dimension.
+- No modifica ni elimina la fuente 1.30.0.

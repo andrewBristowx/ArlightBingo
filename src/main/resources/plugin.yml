@@ -1,0 +1,21 @@
+name: ArlightBingo
+version: 1.39.1
+main: com.arlight.bingo.BingoPlugin
+api-version: '1.21'
+softdepend: [ArlightCore, Chunky, Lootr, Multiverse-Core, Multiverse-NetherPortals, Multiverse-Inventories]
+author: Arlight
+description: Minijuego de Bingo (items, bloques, mobs, logros y eventos modded) para el servidor Arlight
+
+commands:
+  bingo:
+    description: Comando principal del minijuego Bingo
+    usage: /bingo <start|stop|join|leave|team|card|screen|world|campaign|template|reload>
+    permission: arlightbingo.use
+
+permissions:
+  arlightbingo.use:
+    description: Permite usar el comando /bingo
+    default: true
+  arlightbingo.admin:
+    description: Permite administrar partidas, mundos y pruebas de campaña
+    default: op

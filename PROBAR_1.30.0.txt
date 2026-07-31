@@ -1,0 +1,21 @@
+PRUEBA 1.30.0
+
+1. Conserva el JAR y config 1.29.1 fuera de /plugins.
+2. Compila con Java 21 y Maven.
+3. Borra solo plantillas incompletas anteriores.
+4. Genera en este orden, esperando a que Chunky termine cada una:
+   /bingo template overworld generate force
+   /bingo template nether generate force
+   /bingo template end generate force
+5. Estado conjunto: /bingo template all status
+6. Teletransporte:
+   /bingo template overworld tp
+   /bingo template nether tp
+   /bingo template end tp
+7. Prueba de jefes:
+   /bingo template overworld testboss
+   /bingo template nether testboss
+   /bingo template end testboss
+
+IMPORTANTE: Nether y End terminan de dibujar cada zona conforme sus chunks se cargan.
+Espera unos segundos al llegar o al volar a una zona nueva.

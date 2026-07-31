@@ -1,0 +1,9 @@
+PRUEBA 1.39.0
+
+1. Conserva respaldo de bingo_template_overworld.
+2. Instala el JAR y reinicia. La consola debe indicar que aplica la revisión 1.39.0 sin Chunky.
+3. Espera a que /bingo template status marque COMPLETE.
+4. Inicia una arena NUEVA; las copias viejas no cambian.
+5. Comprueba /bingo campaign tp village, residential, commercial, military, citadel.
+6. Verifica que la capital sea rectangular y que los distritos estén conectados por calzadas.
+7. No borres manualmente la plantilla ni ejecutes Chunky.

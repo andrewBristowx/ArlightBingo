@@ -1,0 +1,15 @@
+VALIDACIÓN 1.29.0
+=================
+
+- XML pom.xml: pendiente de compilación Maven externa.
+- plugin.yml: validado como YAML.
+- config.yml: validado como YAML.
+- Todos los Java: analizados por el parser de javac con Java 21, sin errores sintácticos.
+- OverworldTemplateManager usa org.bukkit.loot.Lootable.
+- Tablas de botín usadas existen en Paper API 1.21.1.
+- Planificación de corrupción dividida en varios ticks.
+- Colocación final dividida por blocks-per-tick.
+- El reset no permite borrar el mundo mientras Chunky siga trabajando.
+
+LIMITACIÓN
+No se realizó compilación completa en este entorno porque Maven y las dependencias binarias de Paper no están instaladas localmente. Requiere `mvn clean package` en el equipo de compilación.

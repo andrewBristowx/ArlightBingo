@@ -1,0 +1,36 @@
+ARLIGHTBINGO 1.6.1 - POOL CHUNKY Y BOTIN ADAPTATIVO
+================================================
+
+1. Compila con Java 21:
+   mvn clean package
+
+2. Instala target/ArlightBingo-1.6.1.jar y conserva una copia de seguridad
+   de plugins/ArlightBingo y de tus mundos.
+
+3. Inicia el servidor. En la consola debe aparecer:
+   "Preparando pool de Bingo 1/2"
+   y después "Arena del pool 1 lista para jugar".
+
+4. La primera preparación puede tardar varios minutos. No inicies Bingo hasta que
+   aparezca el mensaje de arena lista. Las siguientes partidas deben arrancar usando
+   una arena ya preparada.
+
+5. Mundos creados:
+   bingo_arena_1, bingo_arena_1_nether, bingo_arena_1_the_end
+   bingo_arena_2, bingo_arena_2_nether, bingo_arena_2_the_end
+
+6. Comprueba en una partida:
+   - inicio sin una pausa grande de generación;
+   - portal Overworld -> Nether y regreso;
+   - portal al End y regreso;
+   - inventario conservado entre las tres dimensiones;
+   - al terminar, todos vuelven al lobby;
+   - la consola comienza a preparar nuevamente la arena usada.
+
+MULTIVERSE-INVENTORIES
+Esta versión no modifica grupos automáticamente. Si separas inventarios por mundo,
+incluye manualmente cada trío de mundos del pool en un mismo grupo.
+
+AJUSTES
+Los radios están en config.yml, dentro de world-pool.pregeneration.
+Empieza con 512/256/256. Si el servidor se mantiene estable, puedes aumentarlos.

@@ -1,0 +1,11 @@
+ArlightBingo 1.35.1 — NETHER LOCK PERSISTENCE FIX
+
+- Corrige la cerradura ígnea que desaparecía después de reconstruir su chunk.
+- La cerradura se coloca al FINAL del callback del chunk, después de la limpieza.
+- Añade un segundo pase dos ticks después para registrar correctamente su BlockEntity.
+- Verifica el bloque base y sus propiedades reales de ArlightBosses:
+  facing=north, lock_state=locked/opening/opened.
+- Si ArlightBosses no expone el bloque, mantiene un Respawn Anchor funcional como respaldo.
+- Repara base sólida y espacio libre sobre la cerradura.
+- El runtime de la partida repara la cerradura antes de aceptar la llave.
+- No cambia semilla, no borra mundos y no repite Chunky.

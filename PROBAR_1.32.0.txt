@@ -1,0 +1,45 @@
+PRUEBA FUNCIONAL — ARLIGHTBINGO 1.32.0
+======================================
+
+1. Compila con Java 21 y Maven:
+   mvn clean package
+
+2. Reemplaza plugins/ArlightBingo.jar y actualiza config.yml.
+
+3. Regenera obligatoriamente las tres plantillas:
+   /bingo template all generate force
+
+4. Espera a que /bingo template all status muestre COMPLETE en las tres.
+   - Nether debe pasar por FINALIZING.
+   - No debe anunciarse completo antes de terminar todos sus chunks.
+
+5. Overworld:
+   - Usa /bingo template overworld tp.
+   - Confirma que el aldeano y Somita están en plataformas abiertas.
+   - Haz clic derecho al Cartógrafo: debe dar X/Z y una brújula.
+   - Revisa casas, cuatro portones y continuidad de la muralla.
+   - Confirma que el anfiteatro de jefes no cambió.
+
+6. Partida real:
+   - Ejecuta /bingo world prepare o inicia una partida sin slot listo.
+   - El estado debe decir "desde plantillas", no "con Chunky".
+   - Los jugadores deben aparecer en la copia del pueblo inicial.
+   - Comprueba que los mundos usados se llaman bingo_arena_1,
+     bingo_arena_1_nether y bingo_arena_1_the_end (o el base-name configurado).
+
+7. Campaña:
+   - Mata al Guardián de la superficie y cruza el portal del Overworld.
+   - Encuentra la Llave Ígnea, abre la puerta y derrota al jefe Nether.
+   - Cruza al End, derrota al Guardián del Vacío de la ciudadela central,
+     recoge la Llave del Dragón y abre la puerta del puente.
+   - Activa el altar de la arena estelar y derrota al dragón.
+
+8. Reinicio seguro:
+   - Durante FINALIZING del Nether, reinicia una vez el servidor de pruebas.
+   - La construcción debe reanudarse y completar sin anunciarse antes de tiempo.
+
+IMPORTANTE
+- No inicies una partida mientras alguien esté dentro de un mundo plantilla:
+  la copia se detendrá para evitar capturar cambios a medio guardar.
+- Si falta una plantilla COMPLETE, la partida vuelve a WAITING y la consola
+  indica que debe ejecutarse /bingo template all generate force.

@@ -1,0 +1,16 @@
+ArlightBingo 1.14.0 - OVERWORLD SIEGE CASTLE (FASE DE PRUEBA)
+
+- Amplía el castillo del Overworld con patio exterior de asedio.
+- Añade camino seguro y visible desde la plataforma de llegada.
+- Añade dos torres exteriores explorables.
+- Añade dos campamentos enemigos decorados.
+- Añade barricadas, luces, marcadores de ruta y cuatro cofres laterales.
+- Añade spawners de entrada con zombis, creepers, esqueletos y arañas personalizados.
+- Amplía los grupos de mobs de los pisos internos.
+- No modifica todavía la fortaleza del Nether ni el castillo flotante del End.
+
+Prueba recomendada:
+1. Iniciar una arena nueva para que se regenere el mundo.
+2. Entrar al castillo del Overworld por la plataforma segura.
+3. Verificar camino, patio, torres, cofres y spawners.
+4. Reportar tamaño, dificultad, rutas o zonas que deban cambiarse.

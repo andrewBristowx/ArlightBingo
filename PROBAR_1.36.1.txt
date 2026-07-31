@@ -1,0 +1,6 @@
+1. Apaga el servidor y sustituye el JAR.
+2. Conserva bingo_template, bingo_template_nether y bingo_template_end.
+3. Borra bingo_arena_1, bingo_arena_1_nether y bingo_arena_1_the_end.
+4. Inicia el servidor y espera una arena nueva.
+5. Confirma en consola los mensajes "guardada y descargada" y "cargada nuevamente".
+6. Prueba /bingo campaign tpnether y /bingo campaign tpend.

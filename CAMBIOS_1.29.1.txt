@@ -1,0 +1,14 @@
+ArlightBingo 1.29.1 SAFE-LAZY-CORRUPTION-TEMPLATE
+
+CORRECCION DEL CRASH
+- Se elimina el recorrido global de miles de chunks dentro de planGlobalCorruptionBatch.
+- La corrupcion ahora se genera de forma determinista solo al cargarse un chunk.
+- Bingo no usa getChunkAt/loadChunk para decorar el mapa.
+- La brujula del aldeano no consulta la altura de la dungeon ni fuerza ese chunk.
+- La construccion principal usa limite de bloques y limite de milisegundos por tick.
+- Se reduce el valor por defecto de 1800 a 500 bloques por tick.
+
+IMPORTANTE
+- Borrar el mundo bingo_template_overworld incompleto antes de probar.
+- Usar /bingo template overworld generate force.
+- Mantener ArlightBingo 1.28.1 como respaldo.

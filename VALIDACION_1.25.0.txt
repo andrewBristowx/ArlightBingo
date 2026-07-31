@@ -1,0 +1,18 @@
+ARLIGHTBINGO 1.25.0 - VALIDACION ESTATICA
+
+Revisado:
+- 55 archivos Java con delimitadores/comentarios/cadenas equilibrados.
+- config.yml, plugin.yml y YAML adicionales parseados correctamente.
+- pom.xml parseado correctamente.
+- Portales detectados alrededor del volumen completo del jugador.
+- Reintento de teletransporte compatible con Arclight.
+- Jefe de ciudadela forzado a arlightbosses:void_guardian.
+- Borde minimo: Overworld 2400, Nether 3200, End 2400.
+- Portal final creado junto a la arena y visible con obeliscos/particulas.
+- Animacion final: huevo reducido y adelantado respecto al torso de Somita.
+- Cofres custom animados sin ejecutar /setblock en cada apertura.
+- Barrels/cofres vanilla con tablas reales y registro de botin personal.
+- Pasadas adicionales de ambientacion y fusion con terreno para las tres dimensiones.
+
+Limitacion del entorno:
+No hay Maven instalado ni dependencias Paper/ArlightCore disponibles, por lo que el empaquetado final debe ejecutarse localmente con mvn clean package.

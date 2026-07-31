@@ -1,0 +1,43 @@
+ARLIGHTBINGO 1.29.0 - OVERWORLD-TEMPLATE-PROTOTYPE
+=================================================
+
+RAMA DE PRUEBA SEPARADA
+- Conserva ArlightBingo 1.28.1 SAFE-CHUNK-PREP como respaldo estable.
+- No activa todavía el mapa plantilla automáticamente en partidas reales.
+- Crea un mundo maestro independiente para revisar el diseño completo.
+
+MUNDO PLANTILLA
+- Nuevo comando: /bingo template overworld generate [force]
+- Mundo por defecto: bingo_template_overworld.
+- Semilla fija y borde de 3072 x 3072.
+- Chunky pregenera el mapa antes de modificarlo.
+- Colocación de bloques por lotes configurables para evitar ticks gigantes.
+- La planificación de corrupción global también se divide entre varios ticks.
+
+CONTENIDO DEL OVERWORLD
+- Pueblo inicial inspirado en aldeas vanilla.
+- Somita aparece en la plaza de spawn.
+- Cartógrafo invulnerable junto a la campana.
+- Al hacer clic entrega las coordenadas de la Ciudadela y una brújula.
+- Corrupción de musgo y esmeralda distribuida por todo el mapa.
+- Cristales verdes, raíces, minas, torres, fortines y cofres secundarios.
+- Tres asentamientos fortificados antes de la ciudadela principal.
+- Ciudadela de la Esmeralda Musgosa y anfiteatro del jefe.
+- Conserva terreno, biomas, cuevas y estructuras vanilla para completar Bingo explorando.
+- Las zonas custom usan enemigos de ArlightBosses; los biomas normales conservan mobs vanilla.
+
+LOOTR
+- Cofres y barriles custom se crean con loot tables reales de Minecraft.
+- Lootr puede personalizarlos sin ejecutar /lootr custom-map.
+- Los cofres de estructuras vanilla conservan sus loot tables naturales.
+- Los bloques custom animados de ArlightBosses todavía requieren integración mod-side con LootrAPI.
+- Los Vaults no se consideran nativamente compatibles hasta comprobar soporte oficial.
+
+COMANDOS
+- /bingo template overworld generate
+- /bingo template overworld generate force
+- /bingo template overworld status
+- /bingo template overworld cancel
+- /bingo template overworld reset
+- /bingo template overworld tp
+- /bingo template overworld lootr

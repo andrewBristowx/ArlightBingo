@@ -1,0 +1,72 @@
+PRUEBA FUNCIONAL — ARLIGHTBINGO 1.34.0
+======================================
+
+ANTES DE INSTALAR
+1. Conserva una copia de las carpetas de las tres plantillas.
+2. Sustituye únicamente el JAR de ArlightBingo.
+3. Usa el config.yml incluido o añade las claves nuevas al existente.
+4. Reinicia completamente el servidor. No uses /reload.
+
+AUDITORÍA INICIAL
+5. Ejecuta:
+   /bingo template all audit
+
+6. Revisa que cada dimensión muestre su carpeta real y sus marcadores.
+   Nether y End antiguos pueden aparecer con revisión estructural ausente
+   o anterior durante la actualización.
+
+OVERWORLD INTERRUMPIDO
+7. Para continuar sólo las estructuras custom del mundo existente:
+   /bingo template overworld resume
+
+8. Confirma en consola que indica explícitamente:
+   - Chunky NO se repetirá.
+   - El mundo NO se borrará.
+
+9. Consulta el progreso con:
+   /bingo template overworld status
+
+NETHER
+10. Si la plantilla es antigua, 1.34.0 debe iniciar su actualización segura
+    automáticamente. También puede iniciarse manualmente con:
+    /bingo template nether resume
+
+11. Revisa con:
+    /bingo template nether tp
+
+12. Confirma:
+    - no hay fortalezas/bastiones/estructuras modded atravesando la zona;
+    - el mercado, la forja y las pasarelas hacen el bastión más denso;
+    - los pisos y edificios tienen cimentación y contrafuertes.
+
+END
+13. Actualiza o continúa con:
+    /bingo template end resume
+
+14. Revisa con:
+    /bingo template end tp
+
+15. Confirma:
+    - edificios y torres no tienen huecos visibles bajo sus bases;
+    - puentes sobre islas llegan al terreno;
+    - puentes sobre vacío usan contrapesos decorativos;
+    - no aparecen columnas abruptamente cortadas.
+
+FINAL
+16. Espera a que las tres dimensiones muestren COMPLETE:
+    /bingo template all status
+
+17. Repite:
+    /bingo template all audit
+
+18. Prepara una arena sin regenerar las plantillas:
+    /bingo world prepare
+
+19. Inicia una partida y verifica portales, progresión, cofres Lootr,
+    jefes y podio universal de 1.33.0.
+
+RECUPERACIÓN
+- Si cancelas o el servidor se reinicia, NO uses reset ni generate force.
+- Usa el comando resume de la dimensión afectada.
+- `reset` y `generate force` son destructivos y sólo deben utilizarse para
+  crear una plantilla completamente nueva.

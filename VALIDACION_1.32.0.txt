@@ -1,0 +1,26 @@
+VALIDACIÓN — ARLIGHTBINGO 1.32.0
+================================
+
+RESULTADOS
+- Los 62 archivos Java pasan análisis sintáctico completo con java-parser 3.0.1.
+- config.yml y plugin.yml cargan como YAML válido.
+- pom.xml carga como XML válido.
+- pom.xml y plugin.yml declaran la versión 1.32.0.
+- Las opciones template-worlds.matches están activadas y requieren las tres
+  plantillas completas.
+- Nether y End conservan un intervalo de finalización de 2 ticks.
+- Se verificaron los marcadores de spawn, NPC, jefes, llaves, puertas, altar,
+  dragón, portales y salida utilizados por la campaña de las copias.
+- Se verificó el flujo completo plantilla maestra -> copia desechable -> mundo
+  cargado -> NPC -> campaña -> teletransporte de participantes.
+- El método que construye el anfiteatro de jefes del Overworld es idéntico al de
+  la 1.31.0.
+- La geometría constructiva del End es idéntica a la 1.31.0; sólo cambian sus
+  marcadores funcionales y la versión interna.
+- El ZIP fuente pasa la prueba integral de entradas de unzip.
+
+LÍMITE DEL ENTORNO
+- No se produjo un JAR: este entorno no incluye javac ni Maven y sólo dispone de
+  un JRE Java 17. El proyecto requiere Java 21, Paper 1.21.1 y la dependencia
+  local ArlightCore.
+- La prueba final dentro de Arclight debe seguir PROBAR_1.32.0.txt.

@@ -1,0 +1,9 @@
+ARLIGHTBINGO 1.9.2
+
+- Eliminada la BossBar superior de preparación; queda únicamente la barra real de la interfaz del cliente.
+- Eliminados los títulos y mensajes de chat del contador final para evitar el 5-4-3-2-1 duplicado.
+- La cuenta regresiva final y ¡COMIENZA! se envían únicamente a ArlightChatClient.
+- El inicio de partida llama explícitamente al flujo automático equivalente a /bingo world prepare.
+- Si no hay arena lista, Chunky prepara Overworld, Nether y End y la partida espera hasta finalizar.
+- La pantalla de preparación permanece activa durante la cuenta regresiva y se cierra después del inicio.
+- La preparación de la siguiente arena durante una partida sigue en segundo plano y ya no abre la pantalla de carga a todos.

@@ -1,0 +1,7 @@
+ArlightBingo 1.9.0
+- Canal arlightbingo:preparation para la pantalla completa del cliente.
+- Pantalla de preparación con fase, consejo, ilustración y barra de progreso.
+- Cambio de consejo cada 5 segundos mientras Chunky prepara la arena.
+- Cuenta regresiva 5-4-3-2-1 mostrada en overlay y títulos.
+- El overlay se cierra automáticamente al comenzar o si falla la preparación.
+- Bossbar vanilla permanece como respaldo para jugadores sin el mod cliente.

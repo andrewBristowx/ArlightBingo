@@ -1,0 +1,5 @@
+ARLIGHTBINGO 1.23.1 - CLEAR METHOD COMPILE FIX
+
+- Corrige el error de compilación en OverworldInfestedCity.java, línea 532.
+- Reemplaza la llamada inexistente clear(at, 0, 2) por clearAbove(at, 0, 2).
+- Conserva todo el sistema de cofres personales, progresión de botín y campaña de la versión 1.23.0.

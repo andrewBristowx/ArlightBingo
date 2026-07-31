@@ -1,0 +1,11 @@
+ARLIGHTBINGO 1.11.0 — COLA PRIVADA, CHAT AISLADO Y CARTÓN CLIENTE
+
+- La pantalla de preparación solo se envía a jugadores inscritos en la partida.
+- Las preparaciones manuales o en segundo plano ya no abren interfaces a todo el servidor.
+- Los mensajes de cuenta regresiva, preparación, errores y progreso se limitan a participantes.
+- El chat normal de Bingo queda aislado del chat exterior en ambos sentidos.
+- Nuevo canal arlightbingo:card para sincronizar el cartón con ArlightChatClient.
+- Cartón lateral con objetos reales, progreso y casillas completadas.
+- Click derecho en el cartón abre la interfaz moderna; Shift + click mantiene la GUI clásica.
+- /bingo card abre la interfaz moderna y /bingo cardclassic abre el respaldo Bukkit.
+- El cartón se actualiza al ganar progreso, completar objetivos y finalizar la partida.

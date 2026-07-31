@@ -1,0 +1,20 @@
+ARLIGHTBINGO 1.6.1 - PRUEBA DEL BOTIN ADAPTATIVO
+================================================
+
+1. Instala Lootr en servidor y clientes.
+2. Usa una arena nueva preparada con /bingo world prepare.
+3. Comienza una partida y revisa el cartón con /bingo card.
+4. Derrota al dragón y entra en la torre del End.
+5. Abre los cofres una sola vez con cada jugador.
+
+RESULTADO ESPERADO
+- Lootr muestra un inventario individual.
+- Algunos cofres incluyen ayuda para objetivos ITEM_COLLECT del End.
+- No entrega objetivos de crafteo, bloques, entidades ni avances.
+- El primer cofre del piso final entrega una élitra y una cabeza de dragón.
+- El segundo cofre final no vuelve a duplicar esas dos recompensas.
+
+CONFIGURACION
+La clasificación se controla en dungeon-loot.dimension-keywords.
+Para objetos de mods agrega una parte reconocible de su identificador a nether o end.
+Los identificadores que no coincidan se consideran del Overworld.

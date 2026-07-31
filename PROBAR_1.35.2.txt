@@ -1,0 +1,12 @@
+PRUEBA ARLIGHTBINGO 1.35.2
+
+1. Instala primero ArlightCore 1.20.0 y después ArlightBingo 1.35.2.
+2. Conserva bingo_arena_1, bingo_arena_1_nether y bingo_arena_1_the_end.
+3. No ejecutes /bingo world prepare otra vez si el pool ya estaba listo.
+4. Ejecuta /bingo template all audit.
+5. Únete e inicia una partida con un jugador.
+6. No deben repetirse mensajes /mv import ni "World already exists" para el mismo trío.
+7. El jugador debe entrar después de la estabilización de Multiverse y conservar respawn en legos.
+8. Reinicia estando en un clon antiguo: al entrar debe regresar a legos sin spam de excepciones.
+9. Comprueba /bingo campaign tp lock y la cerradura del Nether.
+10. Detén la partida y confirma restauración de inventario y retorno al lobby.

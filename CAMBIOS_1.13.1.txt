@@ -1,0 +1,12 @@
+ARLIGHTBINGO 1.13.1 HOTFIX
+
+- /bingo join ya no teletransporta por defecto.
+- Nueva opción arena-world.teleport-on-join (false por defecto).
+- El teletransporte a la arena al comenzar continúa funcionando.
+- Desactivada la pregeneración interna síncrona con World#getChunkAt.
+- El pool sigue usando Chunky para Overworld, Nether y End.
+- Defaults seguros si config.yml está dañado: world-border y pregeneración apagados; world-pool encendido.
+- Evita el watchdog observado en WorldBorderManager.java:354.
+
+IMPORTANTE PARA TU CONFIG ACTUAL
+client-card-ui: debe comenzar en la columna 1, sin espacios delante.

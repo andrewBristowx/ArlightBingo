@@ -1,0 +1,15 @@
+VALIDACIÓN REALIZADA — ARLIGHTBINGO 1.26.0
+============================================
+
+- Todos los archivos JSON del proyecto: sintaxis válida.
+- Todos los YAML del proyecto, incluido config.yml: sintaxis válida con SafeLoader.
+- pom.xml: XML válido.
+- Archivos Java modificados: pasados por la fase de análisis sintáctico de javac 21;
+  no se detectaron llaves, paréntesis, sentencias o finales de archivo mal formados.
+- Se revisó que el nuevo código no dependa de mapas/schematics de terceros.
+
+LIMITACIÓN DEL ENTORNO
+- No se pudo ejecutar Maven aquí porque el contenedor no incluye Maven ni las dependencias
+  Bukkit/Spigot y no permite descargar binarios de compilación. Por eso se entrega el proyecto
+  fuente listo para compilar en IntelliJ con Java 21. La prueba definitiva de API debe realizarse
+  con Maven > clean > package en tu PC.

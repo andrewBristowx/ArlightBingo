@@ -1,0 +1,6 @@
+1. Compilar con Maven/IntelliJ.
+2. Apagar el servidor y reemplazar únicamente el JAR de ArlightBingo.
+3. Borrar las copias bingo_arena_1, bingo_arena_1_nether y bingo_arena_1_the_end.
+4. Conservar las tres plantillas maestras.
+5. Iniciar, usar /bingo join y /bingo start.
+6. Confirmar que aparezca el aviso de reparación automática del End y que la partida continúe.

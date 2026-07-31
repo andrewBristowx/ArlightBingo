@@ -1,0 +1,275 @@
+# ArlightBingo 1.36.5 - configuración modular
+end-dungeon:
+  enabled: true
+  search-min-radius: 72
+  search-max-radius: 112
+  floors: 5
+  spawners-per-floor: 2
+  supply-loot-tables:
+  - minecraft:chests/simple_dungeon
+  - minecraft:chests/stronghold_corridor
+  final-loot-table: minecraft:chests/end_city_treasure
+dungeon-loot:
+  enabled: true
+  objective-items-percentage: 40
+  maximum-objectives-per-chest: 3
+  maximum-required-portion: 0.5
+  tier-supplies:
+    enabled: true
+  final-rewards:
+    elytra: 1
+    dragon-head: 1
+  dimension-keywords:
+    nether:
+    - nether
+    - blaze
+    - ghast
+    - magma
+    - piglin
+    - wither
+    - quartz
+    - soul_
+    - crimson
+    - warped
+    - basalt
+    - blackstone
+    end:
+    - end_
+    - chorus
+    - shulker
+    - elytra
+    - dragon
+    - purpur
+  custom-chests:
+    enabled: true
+    blocks:
+      overworld:
+        common: arlightbosses:copper_treasure_chest
+        rare: arlightbosses:iron_treasure_chest
+        epic: arlightbosses:pony_treasure_chest
+        legendary: arlightbosses:diamond_treasure_chest
+      nether:
+        common: arlightbosses:iron_treasure_chest
+        rare: arlightbosses:pony_treasure_chest
+        epic: arlightbosses:diamond_treasure_chest
+        legendary: arlightbosses:diamond_treasure_chest
+      end:
+        common: arlightbosses:pony_treasure_chest
+        rare: arlightbosses:diamond_treasure_chest
+        epic: arlightbosses:netherite_treasure_chest
+        legendary: arlightbosses:netherite_treasure_chest
+  progression-equipment:
+    enabled: true
+  goal-rewards:
+    enabled: true
+    maximum-per-player-per-dimension: 1
+    chance:
+      epic: 15.0
+      legendary: 35.0
+    allowed-advancements:
+    - minecraft:story/smelt_iron
+    - minecraft:story/iron_tools
+    - minecraft:story/obtain_armor
+    - minecraft:story/enchant_item
+    - minecraft:adventure/shoot_arrow
+    - minecraft:adventure/trade
+    - minecraft:nether/find_fortress
+    - minecraft:nether/obtain_blaze_rod
+    - minecraft:nether/brew_potion
+    - minecraft:nether/ride_strider
+    - minecraft:nether/loot_bastion
+    - minecraft:end/find_end_city
+    - minecraft:end/elytra
+    - minecraft:husbandry/plant_seed
+    denied-advancements:
+    - minecraft:end/kill_dragon
+    - minecraft:nether/summon_wither
+    - minecraft:nether/create_beacon
+    - minecraft:adventure/kill_all_mobs
+  rare-modded-rewards:
+    enabled: true
+    maximum-per-player: 1
+    pools:
+      overworld: []
+      nether:
+      - id: iceandfire:dragonsteel_fire_ingot
+        chance: 1.5
+        min: 1
+        max: 1
+      end:
+      - id: iceandfire:dragonsteel_fire_helmet
+        chance: 1.0
+        min: 1
+        max: 1
+      - id: iceandfire:dragonsteel_ice_chestplate
+        chance: 0.8
+        min: 1
+        max: 1
+      - id: iceandfire:dragonscale_red_leggings
+        chance: 1.2
+        min: 1
+        max: 1
+bosses:
+  scaling:
+    enabled: true
+    health-per-extra-player: 55.0
+    damage-per-extra-player: 1.5
+  default-follow-range: 36.0
+  default-particle-intensity: 1.0
+  phases:
+    second-phase-health: 0.6
+    final-phase-health: 0.25
+  overworld:
+    base-health: 320.0
+    base-damage: 11.0
+    follow-range: 34.0
+    attack-reach: 4.7
+    particle-intensity: 1.0
+    bossbar-color: GREEN
+    bossbar-overlay: NOTCHED_10
+  nether:
+    base-health: 450.0
+    base-damage: 15.0
+    follow-range: 38.0
+    attack-reach: 5.2
+    particle-intensity: 1.2
+    bossbar-color: RED
+    bossbar-overlay: NOTCHED_12
+  end:
+    base-health: 600.0
+    base-damage: 18.0
+    follow-range: 42.0
+    attack-reach: 5.7
+    particle-intensity: 1.35
+    bossbar-color: PURPLE
+    bossbar-overlay: NOTCHED_20
+dungeon-spawners:
+  enabled: true
+  activation-range: 16
+  spawn-range: 4
+  spawn-interval-seconds: 15
+  spawn-delay-variance-seconds: 5
+  initial-delay-ticks: 40
+  spawn-count: 1
+  max-nearby-per-spawner: 2
+  scaling-enabled: true
+  minion-base-health: 30.0
+  minion-base-damage: 5.0
+  health-per-extra-player: 4.0
+  damage-per-extra-player: 0.35
+  follow-range: 24.0
+  attack-reach: 2.6
+  particle-intensity: 0.75
+  count-scaling:
+    enabled: true
+    normal-group-min-players: 2
+    normal-group-extra-nearby: 1
+    large-group-min-players: 5
+    large-group-extra-nearby: 2
+    large-group-extra-spawn: 1
+dimension-dungeons:
+  enabled: true
+  floors: 5
+  spawners-per-floor: 2
+  world-borders:
+    overworld: 2800
+    nether: 4096
+    end: 2800
+  overworld:
+    dungeon-x: 72
+    dungeon-z: 0
+  nether:
+    dungeon-x: 64
+    dungeon-y: 70
+    dungeon-z: 0
+nether-citadel:
+  clear-volume: true
+  spawners-per-floor: 2
+  mob-groups:
+    entrance:
+    - gilded_piglin_minion
+    - gilded_wither_skeleton_vanguard_minion
+    barracks:
+    - gilded_piglin_minion
+    - gilded_wither_skeleton_vanguard_minion
+    forge:
+    - gilded_wither_skeleton_vanguard_minion
+    - gilded_blaze_wraith_minion
+    courtyard:
+    - gilded_hoglin_rider_minion
+    - gilded_piglin_minion
+    lava-tunnels:
+    - molten_strider_minion
+    - gilded_blaze_wraith_minion
+    high-towers:
+    - gilded_blaze_wraith_minion
+    interior:
+    - gilded_piglin_minion
+    - gilded_wither_skeleton_vanguard_minion
+    - gilded_hoglin_rider_minion
+    elite:
+    - gilded_wither_skeleton_vanguard_minion
+    - gilded_hoglin_rider_minion
+    - gilded_blaze_wraith_minion
+    boss-support:
+    - gilded_wither_skeleton_vanguard_minion
+    - gilded_blaze_wraith_minion
+end-citadel:
+  clear-volume: false
+  height-above-terrain: 18
+  spawners-per-floor: 2
+  mob-groups:
+    outer-islands:
+    - amethyst_phantom_minion
+    - amethyst_eye_minion
+    gate:
+    - void_enderman_sentinel_minion
+    - amethyst_shulker_minion
+    chorus-gardens:
+    - void_enderman_minion
+    - corrupted_ender_mite_minion
+    crystal-courts:
+    - amethyst_guardian_shard_minion
+    - amethyst_eye_minion
+    - amethyst_shulker_minion
+    interior:
+    - void_enderman_minion
+    - amethyst_shulker_minion
+    - corrupted_ender_mite_minion
+    elite:
+    - void_enderman_sentinel_minion
+    - amethyst_phantom_minion
+    - amethyst_guardian_shard_minion
+    boss-support:
+    - void_enderman_sentinel_minion
+    - amethyst_guardian_shard_minion
+overworld-city:
+  spawn-offset-z: -72
+  terrain:
+    max-fill-depth: 18
+    blend-radius: 24
+    search-radius: 192
+    search-step: 64
+    max-candidates: 9
+    city-safety-margin: 192
+  remove-legacy-floating-spawn: true
+overworld-castle:
+  enabled: true
+  safe-path-markers: true
+  lootr:
+    enabled: true
+  mob-groups:
+    entrance:
+    - emerald_zombie_minion
+    - emerald_skeleton_archer_minion
+    interior:
+    - emerald_zombie_minion
+    - mossbound_spider_minion
+    ambush:
+    - emerald_creeper_minion
+    elite:
+    - emerald_ravager_cub_minion
+    - emerald_golem_sentinel_minion
+    boss-support:
+    - emerald_skeleton_archer_minion
+    - emerald_golem_sentinel_minion

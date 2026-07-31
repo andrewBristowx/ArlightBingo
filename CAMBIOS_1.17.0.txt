@@ -1,0 +1,27 @@
+ARLIGHTBINGO 1.17.0 - INFESTED CITY + SPAWN INTEGRATION
+
+1. CIUDAD INFESTADA
+- Amplía la fortaleza a una ciudad amurallada de aproximadamente 125 x 133 bloques.
+- Añade plaza de spawn, mercado, calles, viviendas, herrería, almacén, enfermería, capilla, cementerio, barracas, ruinas, torres y alcantarillas.
+- El castillo 1.16.0 se conserva como ciudadela central y objetivo vertical.
+
+2. PRIORIDAD SOBRE EL TERRENO
+- Fuerza la carga/generación de todos los chunks de la huella antes de colocar bloques.
+- Calcula la altura usando la mediana de una cuadrícula, ignorando árboles y agua.
+- Nivela el suelo, rellena lagos/desniveles y elimina árboles/colinas de la huella.
+- Evita que árboles o decoración vanilla atraviesen edificios.
+
+3. SPAWN INTEGRADO
+- El punto de aparición se coloca dentro de la plaza sur segura.
+- La plataforma provisional deja de generarse en 0,100,0.
+- Se limpia la plataforma flotante antigua si todavía existe.
+
+4. CORRECCIONES DE RECORRIDO
+- Las escaleras de las torres abren el hueco después de colocar el piso.
+- Los tramos interiores tienen hueco continuo de cuatro bloques de altura.
+- Se movieron cofres que coincidían con huecos de escalera.
+- Todo cofre recibe un bloque de soporte y dos bloques libres encima.
+
+5. ENEMIGOS Y BOTÍN
+- Diez nuevos spawners reales distribuidos por barrios, cementerio, barracas, ruinas y torres.
+- Seis cofres Lootr adicionales por la ciudad con rarezas común, rara y épica.

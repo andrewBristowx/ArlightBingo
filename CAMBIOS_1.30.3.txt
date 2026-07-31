@@ -1,0 +1,12 @@
+ArlightBingo 1.30.3 END-EAGER-FINALIZATION
+
+- El End ya no se marca COMPLETE justo después de Chunky.
+- Se añade la fase FINALIZING.
+- Tras la pregeneración, Bingo carga de uno en uno únicamente los chunks que contienen islas, puentes, ciudadela o arena.
+- Cada chunk se construye con la cola segura y se descarga al terminar.
+- El marcador final se escribe solamente cuando todo el archipiélago quedó construido.
+- /bingo template end tp no permite entrar a una plantilla incompleta.
+- /bingo template all generate force espera la finalización real del End.
+- Se conserva una reparación perezosa únicamente para daños manuales posteriores.
+- Se evita borrar aire en todo el radio del End: solo se limpia la isla vanilla central.
+- La cola cuenta escrituras reales y descarta operaciones sin cambios dentro del presupuesto de tiempo.

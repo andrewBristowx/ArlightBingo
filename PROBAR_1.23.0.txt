@@ -1,0 +1,34 @@
+PRUEBA ARLIGHTBINGO 1.23.0 + ARLIGHTBOSSES 1.16.0
+
+1. Compila e instala ArlightBosses 1.16.0 en cliente y servidor.
+2. Compila ArlightBingo 1.23.0 y regenera los mundos de Bingo.
+3. Inicia una partida nueva.
+
+COFRES PERSONALES
+- Overworld: cobre, hierro, Pony y diamante.
+- Nether: hierro, Pony y diamante.
+- End: Pony, diamante y netherita.
+- Dos jugadores deben poder abrir el mismo bloque y recibir inventarios diferentes.
+- Un jugador que reabra un cofre debe ver únicamente lo que dejó dentro.
+- No debe poder guardar objetos propios dentro del cofre.
+
+PROGRESIÓN
+- Overworld: los cofres raros/finales deben entregar equipo de hierro.
+- Nether: los cofres raros/finales deben entregar equipo de diamante y resistencia al fuego.
+- End: los cofres épicos/finales deben entregar piezas de netherita.
+
+OBJETIVOS DEL BINGO
+- Los cofres siguen aportando parte de objetivos ITEM_COLLECT.
+- Un cofre épico tiene 15% y uno legendario 35% de conceder un objetivo permitido.
+- Nunca debe completar matar jefes, matar entidades o romper bloques.
+- Los avances permitidos y bloqueados se editan en config.yml.
+
+OBJETOS DE MODS
+- Edita dungeon-loot.rare-modded-rewards.pools.
+- Cada entrada usa id, chance, min y max.
+- Si un ID no existe, se omite sin detener la partida.
+- maximum-per-player evita entregar varias piezas legendarias a la misma persona.
+
+IMPORTANTE
+Los cofres candidatos que contienen la Llave Ígnea o la Llave del Dragón siguen siendo
+contenedores compartidos, no personales. Esto evita que Lootr duplique la llave de misión.
