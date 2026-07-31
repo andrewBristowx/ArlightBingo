@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.43.0
+name: Compilar ArlightBingo 1.44.0
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
       - main
       - 'feature/**'
       - 'import/**'
+      - 'agent/**'
 
 permissions:
   contents: read
@@ -29,18 +30,26 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verificar fuente 1.43.0
+      - name: Verificar fuente 1.44.0
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '<version>1.43.0</version>' pom.xml
-          grep -q '^version: 1.43.0$' src/main/resources/plugin.yml
-          grep -q '^1.43.0$' BUILD_VERSION.txt
-          grep -q '^ArlightBingo 1.43.0 LIVING-OCCUPIED-VILLAGES$' SOURCE_VERSION.txt
-          grep -q '1.43.0-living-occupied-villages' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
-          grep -q 'buildInvadedCapitalV3' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
-          grep -q 'class OverworldVillageSafety' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
-          grep -q 'buildVillageBakery' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
+          grep -q '<version>1.44.0</version>' pom.xml
+          grep -q '^version: 1.44.0$' src/main/resources/plugin.yml
+          grep -q '^1.44.0$' BUILD_VERSION.txt
+          grep -q '^ArlightBingo 1.44.0 OVERWORLD-LAYOUT-REPAIR$' SOURCE_VERSION.txt
+          grep -q 'REPAIR_DONE = "arlight-overworld-layout-1.44.0.done"' \
+            src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
+          grep -q 'supportAndDryPlot' \
+            src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
+          grep -q 'connectEntrance' \
+            src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
+          grep -q 'repairRoofScars' \
+            src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
+          grep -q 'buildInvadedCapitalV3' \
+            src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
+          grep -q 'buildVillageBakery' \
+            src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
 
       - name: Descargar ArlightCore 1.20.0 canónico
         uses: actions/checkout@v4
@@ -69,19 +78,50 @@ jobs:
           mkdir -p dist
           find target -maxdepth 1 -type f -name '*.jar' \
             ! -name '*-sources.jar' ! -name '*-javadoc.jar' \
+            ! -name 'original-*.jar' \
             -exec cp {} dist/ \;
-          test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
-          unzip -p dist/ArlightBingo-1.43.0.jar plugin.yml | grep -q '^version: 1.43.0$'
-          unzip -l dist/ArlightBingo-1.43.0.jar | grep -q 'OverworldIslandGenerator.class'
-          unzip -l dist/ArlightBingo-1.43.0.jar | grep -q 'OverworldVillageSafety.class'
-          javap -classpath dist/ArlightBingo-1.43.0.jar -p \
+          test -f dist/ArlightBingo-1.44.0.jar
+          unzip -p dist/ArlightBingo-1.44.0.jar plugin.yml | grep -q '^version: 1.44.0$'
+          unzip -l dist/ArlightBingo-1.44.0.jar | grep -q 'OverworldIslandGenerator.class'
+          unzip -l dist/ArlightBingo-1.44.0.jar | grep -q 'OverworldVillageSafety.class'
+          javap -classpath dist/ArlightBingo-1.44.0.jar -p \
+            'com.arlight.bingo.listeners.OverworldVillageSafety$LayoutRepairJob' \
+            | grep -q 'repairPlot'
+          javap -classpath dist/ArlightBingo-1.44.0.jar -p \
             'com.arlight.bingo.template.OverworldTemplateManager$OverworldTemplateBuilder' \
             | grep -q 'buildInvadedCapitalV3'
           ls -lh dist
 
-      - name: Subir JAR compilado
+      - name: Empaquetar fuente y hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          DELIVERY='ArlightBingo-1.44.0-OVERWORLD-LAYOUT-REPAIR'
+          mkdir -p "package/${DELIVERY}-SOURCE"
+          rsync -a \
+            --exclude '.git/' \
+            --exclude 'arlight-core/' \
+            --exclude 'target/' \
+            --exclude 'dist/' \
+            --exclude 'package/' \
+            ./ "package/${DELIVERY}-SOURCE/"
+          cd package
+          zip -qr "${DELIVERY}-SOURCE.zip" "${DELIVERY}-SOURCE"
+          cp ../dist/ArlightBingo-1.44.0.jar .
+          sha256sum ArlightBingo-1.44.0.jar "${DELIVERY}-SOURCE.zip" \
+            > ArlightBingo-1.44.0-SHA256.txt
+          unzip -t "${DELIVERY}-SOURCE.zip"
+          sha256sum -c ArlightBingo-1.44.0-SHA256.txt
+          rm -rf "${DELIVERY}-SOURCE"
+          ls -lh
+
+      - name: Subir entrega completa
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.43.0-JAR
-          path: dist/*.jar
+          name: ArlightBingo-1.44.0-DELIVERY
+          path: |
+            package/ArlightBingo-1.44.0.jar
+            package/ArlightBingo-1.44.0-OVERWORLD-LAYOUT-REPAIR-SOURCE.zip
+            package/ArlightBingo-1.44.0-SHA256.txt
           if-no-files-found: error
+          retention-days: 90
