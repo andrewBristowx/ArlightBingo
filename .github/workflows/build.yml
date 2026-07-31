@@ -1,8 +1,7 @@
-name: Importar fuente y compilar
+name: Compilar ArlightBingo
 
 on:
   workflow_dispatch:
-  pull_request:
   push:
     paths:
       - '.github/workflows/build.yml'
@@ -13,86 +12,49 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 70
 
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+
+      - name: Registrar ejecución
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/run-info
+          printf '%s\n' "$GITHUB_RUN_ID" > .github/run-info/LAST_RUN_ID.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/run-info/LAST_RUN_ID.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Registrar build ${GITHUB_RUN_ID}"
+            git push origin HEAD:main
+          fi
 
       - name: Configurar Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
+          cache: maven
 
-      - name: Descargar fuente estable 1.39.1
+      - name: Instalar ArlightCore 1.20.0
         shell: bash
         run: |
           set -euo pipefail
-          FILE_ID='1fpcxezwEqioNv-3tUZNpbSqLJFD_7gdo'
-          curl -L --fail --retry 3 \
-            "https://drive.usercontent.google.com/download?id=${FILE_ID}&export=download&confirm=t" \
-            -o /tmp/source.zip
-          unzip -t /tmp/source.zip
-          rm -rf /tmp/source-extracted
-          mkdir -p /tmp/source-extracted
-          unzip -q /tmp/source.zip -d /tmp/source-extracted
-
-      - name: Importar fuente al repositorio
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT_FILE="$(find /tmp/source-extracted -maxdepth 5 -type f -name pom.xml | head -n 1)"
-          if [ -z "$ROOT_FILE" ]; then
-            echo 'No se encontró pom.xml en el ZIP.' >&2
-            exit 1
-          fi
-          ROOT="$(dirname "$ROOT_FILE")"
-          rsync -a --delete --exclude '.git/' --exclude '.github/' "$ROOT/" ./
-          printf '%s\n' 'ArlightBingo 1.39.1 SERVER-HANG-WATCHDOG-FIX' > SOURCE_VERSION.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          if ! git diff --cached --quiet; then
-            git commit -m 'Importar ArlightBingo 1.39.1'
-            BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
-            git push origin "HEAD:${BRANCH}"
-          fi
-
-      - name: Instalar dependencia ArlightCore 1.20.0
-        shell: bash
-        run: |
-          set -euo pipefail
-          CORE_ID='1ZTvzmN3bwT5Xe56dLvfjcI4ISDN0lsPB'
-          curl -L --fail --retry 3 \
-            "https://drive.usercontent.google.com/download?id=${CORE_ID}&export=download&confirm=t" \
-            -o /tmp/arlightcore.zip
-          rm -rf /tmp/arlightcore
-          mkdir -p /tmp/arlightcore
-          unzip -q /tmp/arlightcore.zip -d /tmp/arlightcore
-          CORE_POM="$(find /tmp/arlightcore -maxdepth 5 -type f -name pom.xml | head -n 1)"
-          if [ -z "$CORE_POM" ]; then
-            echo 'No se encontró pom.xml de ArlightCore.' >&2
-            exit 1
-          fi
-          mvn -B -U -f "$CORE_POM" -DskipTests clean install
+          git clone --depth 1 https://github.com/andrewBristowx/ArlightCore.git /tmp/ArlightCore
+          mvn -B -U -DskipTests -f /tmp/ArlightCore/pom.xml clean install
 
       - name: Compilar con Maven
-        shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -U clean package
+        run: mvn -B -U -DskipTests clean package
 
       - name: Reunir JAR
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          find target -maxdepth 1 -type f -name '*.jar' \
-            ! -name '*-sources.jar' ! -name '*-javadoc.jar' \
-            -exec cp {} dist/ \;
+          find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' -exec cp {} dist/ \;
           test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
           ls -lh dist
 
@@ -102,5 +64,4 @@ jobs:
           name: ArlightBingo-1.39.1-JAR
           path: dist/*.jar
           if-no-files-found: error
-
-# Trigger 2026-07-30
+          retention-days: 30
