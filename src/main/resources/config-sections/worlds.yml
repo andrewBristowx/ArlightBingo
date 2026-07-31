@@ -81,6 +81,8 @@ template-worlds:
     lootr-mode: LOOT_TABLES
     dungeon-extra-spawners: 18
     layout:
+      # 1.42.0 conserva las anclas de la isla aprobada, pero reemplaza por completo
+      # las construcciones colocadas en ellas.
       village-x: -230
       village-z: 0
       city-x: 230
