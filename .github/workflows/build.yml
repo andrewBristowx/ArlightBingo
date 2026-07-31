@@ -2,6 +2,7 @@ name: Importar fuente y compilar
 
 on:
   workflow_dispatch:
+  pull_request:
   push:
     paths:
       - '.github/workflows/build.yml'
@@ -17,13 +18,14 @@ jobs:
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
 
       - name: Configurar Java 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
 
       - name: Descargar fuente estable 1.39.1
         shell: bash
@@ -48,17 +50,15 @@ jobs:
             exit 1
           fi
           ROOT="$(dirname "$ROOT_FILE")"
-          rsync -a --delete \
-            --exclude '.git/' \
-            --exclude '.github/' \
-            "$ROOT/" ./
+          rsync -a --delete --exclude '.git/' --exclude '.github/' "$ROOT/" ./
           printf '%s\n' 'ArlightBingo 1.39.1 SERVER-HANG-WATCHDOG-FIX' > SOURCE_VERSION.txt
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           if ! git diff --cached --quiet; then
             git commit -m 'Importar ArlightBingo 1.39.1'
-            git push
+            BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+            git push origin "HEAD:${BRANCH}"
           fi
 
       - name: Compilar con Maven
