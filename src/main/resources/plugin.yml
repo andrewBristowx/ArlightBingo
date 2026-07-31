@@ -1,5 +1,5 @@
 name: ArlightBingo
-version: 1.39.1
+version: 1.40.0
 main: com.arlight.bingo.BingoPlugin
 api-version: '1.21'
 softdepend: [ArlightCore, Chunky, Lootr, Multiverse-Core, Multiverse-NetherPortals, Multiverse-Inventories]
