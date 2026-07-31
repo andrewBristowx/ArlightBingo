@@ -56,7 +56,7 @@ import java.util.function.Consumer;
  * futura la carpeta se copiará; no se volverán a construir millones de bloques.
  *
  * La generación se divide en dos fases:
- *  1) Chunky pregenera el mundo vanilla completo dentro del borde.
+ *  1) Chunky pregenera la isla determinista completa dentro del borde.
  *  2) Este constructor añade pueblo, corrupción, minas, fortines y ciudadela
  *     por lotes pequeños en el hilo del servidor.
  */
@@ -69,8 +69,8 @@ public final class OverworldTemplateManager implements Listener {
 
     private static final String MARKER = "arlight-overworld-template.properties";
     private static final String IN_PROGRESS_MARKER = "arlight-overworld-template-building.properties";
-    private static final String VERSION = "1.40.0-safe-revisions-zone-a";
-    private static final String STRUCTURE_REVISION = "1.40.0-zone-a-irregular-village-safe-revision";
+    private static final String VERSION = "1.41.0-integrated-overworld-island";
+    private static final String STRUCTURE_REVISION = "1.41.0-island-zone-a-integrated-terrain";
     private static final String SOMITA_TAG = "arlightbingo_template_somita";
     private static final String GUIDE_TAG = "arlightbingo_template_guide";
     private static final String VILLAGE_LIFE_TAG = "arlightbingo_village_life";
@@ -245,11 +245,22 @@ public final class OverworldTemplateManager implements Listener {
         progress = 0.01D;
 
         long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        boolean islandMode = plugin.getConfig().getBoolean(
+                "template-worlds.overworld.island.enabled", true);
+        int islandRadius = Math.max(420, plugin.getConfig().getInt(
+                "template-worlds.overworld.island.land-radius", 500));
+        int seaLevel = plugin.getConfig().getInt(
+                "template-worlds.overworld.island.sea-level", 62);
+        int oceanMargin = Math.max(96, plugin.getConfig().getInt(
+                "template-worlds.overworld.island.ocean-margin", 160));
         WorldCreator creator = new WorldCreator(name)
                 .environment(World.Environment.NORMAL)
                 .type(WorldType.NORMAL)
                 .seed(seed)
-                .generateStructures(true);
+                .generateStructures(!islandMode);
+        if (islandMode) {
+            creator.generator(new OverworldIslandGenerator(seed, islandRadius, seaLevel));
+        }
         World world = creator.createWorld();
         if (world == null) {
             fail("Bukkit no pudo crear el mundo plantilla.");
@@ -257,7 +268,9 @@ public final class OverworldTemplateManager implements Listener {
             return false;
         }
 
-        int radius = Math.max(512, plugin.getConfig().getInt("template-worlds.overworld.radius", 1536));
+        int radius = islandMode
+                ? islandRadius + oceanMargin
+                : Math.max(512, plugin.getConfig().getInt("template-worlds.overworld.radius", 1536));
         world.getWorldBorder().setCenter(0.0D, 0.0D);
         world.getWorldBorder().setSize(radius * 2.0D);
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
@@ -269,7 +282,8 @@ public final class OverworldTemplateManager implements Listener {
         world.setAutoSave(true);
 
         stage = Stage.PREGENERATING;
-        detail = "Chunky pregenerando " + (radius * 2) + "×" + (radius * 2) + " bloques";
+        detail = "Chunky pregenerando " + (islandMode ? "isla " : "Overworld ")
+                + (radius * 2) + "×" + (radius * 2) + " bloques";
         progress = 0.03D;
         sender.sendMessage(ChatColor.GREEN + "Revisión " + prepared.revision()
                 + " creada. Chunky empezó a pregenerar el Overworld limpio.");
@@ -678,12 +692,15 @@ public final class OverworldTemplateManager implements Listener {
         String revision = TemplateAuditUtil.readProperty(marker, "structureRevision");
         String zoneAStatus = TemplateAuditUtil.readProperty(marker, "zoneAStatus");
         String templateRevision = TemplateAuditUtil.readProperty(marker, "templateRevision");
+        String terrainMode = TemplateAuditUtil.readProperty(marker, "terrainMode");
         sender.sendMessage(ChatColor.GRAY + "- revisión-estructural=" + ChatColor.WHITE
                 + (revision == null ? "ausente" : revision) + " (esperada " + STRUCTURE_REVISION + ")");
         sender.sendMessage(ChatColor.GRAY + "- revisión-plantilla=" + ChatColor.WHITE
                 + (templateRevision == null ? "ausente" : templateRevision));
         sender.sendMessage(ChatColor.GRAY + "- zona-a=" + ChatColor.WHITE
                 + (zoneAStatus == null ? "incompleta" : zoneAStatus));
+        sender.sendMessage(ChatColor.GRAY + "- terreno=" + ChatColor.WHITE
+                + (terrainMode == null ? "legacy/desconocido" : terrainMode));
         sender.sendMessage(ChatColor.GRAY + "- anclas-zona-a=" + ChatColor.WHITE
                 + TemplateAuditUtil.missingProperties(marker, "village", "guide", "somita",
                 "zoneABounds", "dungeon"));
@@ -797,6 +814,11 @@ public final class OverworldTemplateManager implements Listener {
                 + "boss=" + result.dungeonCenter().getBlockX() + "," + (result.dungeonCenter().getBlockY() + 2) + "," + (result.dungeonCenter().getBlockZ() + 130) + "\n"
                 + "portal=" + portal.getX() + "," + portal.getY() + "," + portal.getZ() + "\n"
                 + "structureRevision=" + STRUCTURE_REVISION + "\n"
+                + "terrainMode=" + (plugin.getConfig().getBoolean(
+                "template-worlds.overworld.island.enabled", true) ? "integrated_island" : "legacy_vanilla") + "\n"
+                + "islandRadius=" + plugin.getConfig().getInt(
+                "template-worlds.overworld.island.land-radius", 500) + "\n"
+                + "externalStructures=false\n"
                 + "zoneAStatus=complete\n"
                 + "zoneABounds=" + (result.villageCenter().getBlockX() - 85) + ","
                 + (result.villageCenter().getBlockZ() - 75) + ","
@@ -819,12 +841,19 @@ public final class OverworldTemplateManager implements Listener {
         if (world != null) return world;
         Path folder = TemplateMarkerLookup.activeFolder(plugin, worldName());
         if (!Files.isDirectory(folder)) return null;
-        return new WorldCreator(worldName())
+        boolean islandMode = plugin.getConfig().getBoolean(
+                "template-worlds.overworld.island.enabled", true);
+        WorldCreator creator = new WorldCreator(worldName())
                 .environment(World.Environment.NORMAL)
                 .type(WorldType.NORMAL)
                 .seed(seed)
-                .generateStructures(true)
-                .createWorld();
+                .generateStructures(!islandMode);
+        if (islandMode) {
+            creator.generator(new OverworldIslandGenerator(seed,
+                    plugin.getConfig().getInt("template-worlds.overworld.island.land-radius", 500),
+                    plugin.getConfig().getInt("template-worlds.overworld.island.sea-level", 62)));
+        }
+        return creator.createWorld();
     }
 
     private Path inProgressMarkerPath() {
@@ -1101,7 +1130,7 @@ public final class OverworldTemplateManager implements Listener {
                             // La 1.39.0 no vuelve a pintar la capital lineal encima de la
                             // fortaleza circular antigua. La desplaza dentro del área ya
                             // pregenerada y actualiza el marcador al terminar. Chunky no se repite.
-                            dungeon = preferredDungeonCenter.clone().add(0, 0, 420);
+                            dungeon = preferredDungeonCenter.clone();
                             buildSpawnVillage(village);
                             progressConsumer.accept(new Progress(0.34D,
                                     "reforzando terreno y aplicando el pueblo profesional sin mover la seed"));

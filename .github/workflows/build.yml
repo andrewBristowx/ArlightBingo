@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.40.0
+name: Compilar ArlightBingo 1.41.0
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ on:
       - 'import/**'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -29,31 +29,27 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verificar fuente 1.40.0
+      - name: Verificar fuente 1.41.0
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '<version>1.40.0</version>' pom.xml
-          grep -q '^version: 1.40.0$' src/main/resources/plugin.yml
-          grep -q '^1.40.0$' BUILD_VERSION.txt
+          grep -q '<version>1.41.0</version>' pom.xml
+          grep -q '^version: 1.41.0$' src/main/resources/plugin.yml
+          grep -q '^1.41.0$' BUILD_VERSION.txt
+
+      - name: Descargar ArlightCore 1.20.0 canónico
+        uses: actions/checkout@v4
+        with:
+          repository: andrewBristowx/ArlightCore
+          ref: 597c130a5d5450ac92e02430def406ef22512bc9
+          path: arlight-core
 
       - name: Instalar dependencia ArlightCore 1.20.0
         shell: bash
         run: |
           set -euo pipefail
-          CORE_ID='1ZTvzmN3bwT5Xe56dLvfjcI4ISDN0lsPB'
-          curl -L --fail --retry 3 \
-            "https://drive.usercontent.google.com/download?id=${CORE_ID}&export=download&confirm=t" \
-            -o /tmp/arlightcore.zip
-          rm -rf /tmp/arlightcore
-          mkdir -p /tmp/arlightcore
-          unzip -q /tmp/arlightcore.zip -d /tmp/arlightcore
-          CORE_POM="$(find /tmp/arlightcore -maxdepth 5 -type f -name pom.xml | head -n 1)"
-          if [ -z "$CORE_POM" ]; then
-            echo 'No se encontró pom.xml de ArlightCore.' >&2
-            exit 1
-          fi
-          mvn -B -U -f "$CORE_POM" -DskipTests clean install
+          grep -q '<version>1.20.0</version>' arlight-core/pom.xml
+          mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
 
       - name: Compilar con Maven
         shell: bash
@@ -70,11 +66,13 @@ jobs:
             ! -name '*-sources.jar' ! -name '*-javadoc.jar' \
             -exec cp {} dist/ \;
           test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
+          unzip -p dist/ArlightBingo-1.41.0.jar plugin.yml | grep -q '^version: 1.41.0$'
+          unzip -l dist/ArlightBingo-1.41.0.jar | grep -q 'OverworldIslandGenerator.class'
           ls -lh dist
 
       - name: Subir JAR compilado
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.40.0-JAR
+          name: ArlightBingo-1.41.0-JAR
           path: dist/*.jar
           if-no-files-found: error
