@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.41.0
+name: Compilar ArlightBingo 1.42.0
 
 on:
   workflow_dispatch:
@@ -29,13 +29,15 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verificar fuente 1.41.0
+      - name: Verificar fuente 1.42.0
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '<version>1.41.0</version>' pom.xml
-          grep -q '^version: 1.41.0$' src/main/resources/plugin.yml
-          grep -q '^1.41.0$' BUILD_VERSION.txt
+          grep -q '<version>1.42.0</version>' pom.xml
+          grep -q '^version: 1.42.0$' src/main/resources/plugin.yml
+          grep -q '^1.42.0$' BUILD_VERSION.txt
+          grep -q '1.42.0-invaded-island-capital' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
+          grep -q 'buildInvadedCapitalV3' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
 
       - name: Descargar ArlightCore 1.20.0 canónico
         uses: actions/checkout@v4
@@ -66,13 +68,16 @@ jobs:
             ! -name '*-sources.jar' ! -name '*-javadoc.jar' \
             -exec cp {} dist/ \;
           test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
-          unzip -p dist/ArlightBingo-1.41.0.jar plugin.yml | grep -q '^version: 1.41.0$'
-          unzip -l dist/ArlightBingo-1.41.0.jar | grep -q 'OverworldIslandGenerator.class'
+          unzip -p dist/ArlightBingo-1.42.0.jar plugin.yml | grep -q '^version: 1.42.0$'
+          unzip -l dist/ArlightBingo-1.42.0.jar | grep -q 'OverworldIslandGenerator.class'
+          javap -classpath dist/ArlightBingo-1.42.0.jar -p \
+            'com.arlight.bingo.template.OverworldTemplateManager$OverworldTemplateBuilder' \
+            | grep -q 'buildInvadedCapitalV3'
           ls -lh dist
 
       - name: Subir JAR compilado
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.41.0-JAR
+          name: ArlightBingo-1.42.0-JAR
           path: dist/*.jar
           if-no-files-found: error
