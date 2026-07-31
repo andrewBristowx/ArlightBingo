@@ -20,6 +20,7 @@ import com.arlight.bingo.util.CardNetwork;
 import com.arlight.bingo.util.BingoWaitingNetwork;
 import com.arlight.bingo.util.SomitaGuideNetwork;
 import com.arlight.bingo.listeners.BingoChatListener;
+import com.arlight.bingo.listeners.OverworldVillageSafety;
 import com.arlight.bingo.template.OverworldTemplateManager;
 import com.arlight.bingo.template.NetherTemplateManager;
 import com.arlight.bingo.template.EndTemplateManager;
@@ -75,6 +76,7 @@ public class BingoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(overworldTemplateManager, this);
         getServer().getPluginManager().registerEvents(netherTemplateManager, this);
         getServer().getPluginManager().registerEvents(endTemplateManager, this);
+        getServer().getPluginManager().registerEvents(new OverworldVillageSafety(this), this);
         overworldTemplateManager.resumeIfNeeded();
         netherTemplateManager.resumeIfNeeded();
         endTemplateManager.resumeIfNeeded();
@@ -212,6 +214,9 @@ public class BingoPlugin extends JavaPlugin {
         getConfig().addDefault("template-worlds.overworld.zone-a.irregular-boundary", true);
         getConfig().addDefault("template-worlds.overworld.zone-a.functional-interiors", true);
         getConfig().addDefault("template-worlds.overworld.zone-a.visible-route-to-zone-b", true);
+        getConfig().addDefault("template-worlds.overworld.safe-village.enabled", true);
+        getConfig().addDefault("template-worlds.overworld.safe-village.radius", 112);
+        getConfig().addDefault("template-worlds.overworld.safe-village.purge-interval-ticks", 40L);
 
         getConfig().addDefault("template-worlds.revisions.keep-latest", 3);
         getConfig().addDefault("template-worlds.revisions.require-explicit-promotion", true);

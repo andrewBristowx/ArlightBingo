@@ -57,7 +57,7 @@ import java.util.function.Consumer;
  *
  * La generación se divide en dos fases:
  *  1) Chunky pregenera la isla determinista completa dentro del borde.
- *  2) Este constructor añade el refugio y la capital invadida de 1.42.0
+ *  2) Este constructor añade el refugio y los pueblos ocupados de 1.43.0
  *     por lotes pequeños en el hilo del servidor.
  */
 public final class OverworldTemplateManager implements Listener {
@@ -69,8 +69,8 @@ public final class OverworldTemplateManager implements Listener {
 
     private static final String MARKER = "arlight-overworld-template.properties";
     private static final String IN_PROGRESS_MARKER = "arlight-overworld-template-building.properties";
-    private static final String VERSION = "1.42.0-invaded-island-capital";
-    private static final String STRUCTURE_REVISION = "1.42.0-overworld-new-architecture-pass-1";
+    private static final String VERSION = "1.43.0-living-occupied-villages";
+    private static final String STRUCTURE_REVISION = "1.43.0-organic-roads-safe-lit-villages-1";
     private static final String SOMITA_TAG = "arlightbingo_template_somita";
     private static final String GUIDE_TAG = "arlightbingo_template_guide";
     private static final String VILLAGE_LIFE_TAG = "arlightbingo_village_life";
@@ -123,7 +123,7 @@ public final class OverworldTemplateManager implements Listener {
                 String interruptedVersion = TemplateAuditUtil.readProperty(inProgress, "version");
                 plugin.getLogger().warning("Existe una revisión Overworld interrumpida de "
                         + (interruptedVersion == null ? "una versión desconocida" : interruptedVersion)
-                        + ". Bingo 1.42.0 no la mezclará con la arquitectura nueva; usa reset y genera una revisión limpia.");
+                        + ". Bingo 1.43.0 no la mezclará con los pueblos nuevos; usa reset y genera una revisión limpia.");
             }
             if (isReadyForMatches()) {
                 stage = Stage.COMPLETE;
@@ -163,7 +163,7 @@ public final class OverworldTemplateManager implements Listener {
             sender.sendMessage(ChatColor.RED + "La revisión interrumpida pertenece a "
                     + (interruptedVersion == null ? "una versión desconocida" : interruptedVersion)
                     + ". Para impedir que edificios antiguos se mezclen con los nuevos, usa "
-                    + "/bingo template overworld reset y genera una revisión limpia de 1.42.0.");
+                    + "/bingo template overworld reset y genera una revisión limpia de 1.43.0.");
             return false;
         }
         Path folder = TemplateMarkerLookup.activeFolder(plugin, worldName());
@@ -831,6 +831,10 @@ public final class OverworldTemplateManager implements Listener {
                 + "templateRevision=" + revisions.workingRevision() + "\n"
                 + "templateState=ready\n"
                 + "village=" + result.villageCenter().getBlockX() + "," + result.villageCenter().getBlockY() + "," + result.villageCenter().getBlockZ() + "\n"
+                + "villageSafe=" + plugin.getConfig().getBoolean(
+                "template-worlds.overworld.safe-village.enabled", true) + "\n"
+                + "villageSafeRadius=" + plugin.getConfig().getInt(
+                "template-worlds.overworld.safe-village.radius", 112) + "\n"
                 + "guide=" + guide.getX() + "," + guide.getY() + "," + guide.getZ() + "\n"
                 + "somita=" + somita.getX() + "," + somita.getY() + "," + somita.getZ() + "\n"
                 + "dungeon=" + result.dungeonCenter().getBlockX() + "," + result.dungeonCenter().getBlockY() + "," + result.dungeonCenter().getBlockZ() + "\n"
@@ -843,7 +847,9 @@ public final class OverworldTemplateManager implements Listener {
                 "template-worlds.overworld.island.land-radius", 500) + "\n"
                 + "externalStructures=false\n"
                 + "zoneAStatus=complete\n"
-                + "capitalArchitecture=invaded_city_v3\n"
+                + "capitalArchitecture=occupied_villages_v4\n"
+                + "roadNetwork=organic_accessible_v4\n"
+                + "lighting=complete_safe_routes_v1\n"
                 + "legacyStructures=false\n"
                 + "zoneABounds=" + (result.villageCenter().getBlockX() - 85) + ","
                 + (result.villageCenter().getBlockZ() - 75) + ","
@@ -1359,32 +1365,43 @@ public final class OverworldTemplateManager implements Listener {
             return world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
         }
 
-        /**
-         * Refugio de entrada de 1.42.0. No reutiliza el poblado de la campaña anterior:
-         * cada edificio tiene una función, una silueta y un nivel de terreno propios.
-         */
+        /** Refugio vivo de 1.43.0: edificios distintos, calles accesibles y luz completa. */
         private void buildSpawnVillage(Location center) {
             int cx = center.getBlockX();
             int cz = center.getBlockZ();
             int base = medianHeight(cx, cz, 28);
 
-            terraceCircle(cx, base, cz, 27, Material.POLISHED_ANDESITE, Material.MOSSY_COBBLESTONE);
+            terraceCircle(cx, base, cz, 22, Material.POLISHED_ANDESITE, Material.MOSSY_COBBLESTONE);
             road(cx - 82, cz + 10, cx + 88, cz + 4, 7, Material.COBBLESTONE);
             road(cx + 3, cz + 15, cx + 3, cz - 76, 5, Material.DIRT_PATH);
-            road(cx - 56, cz + 48, cx + 48, cz - 50, 4, Material.COARSE_DIRT);
+            road(cx - 58, cz + 49, cx + 51, cz - 51, 4, Material.COARSE_DIRT);
 
             buildRefugeGatehouse(cx - 72, cz + 8, false);
+            // La zona norte conserva dos casas del lenguaje arquitectónico aprobado.
+            // El resto son edificios de planta, altura y función distintas.
             buildRefugeBuilding(cx - 42, cz - 26, 21, 15, 2, false, "east", 0);
-            buildRefugeBuilding(cx - 45, cz + 35, 19, 13, 1, true, "east", 1);
             buildRefugeBuilding(cx + 42, cz - 31, 23, 15, 2, true, "west", 2);
-            buildRefugeBuilding(cx + 48, cz + 35, 25, 17, 2, false, "west", 3);
-            buildRefugeBuilding(cx + 8, cz - 55, 27, 17, 2, true, "south", 4);
+            buildVillageInn(cx - 45, cz + 37);
+            buildVillageBarn(cx + 49, cz + 39);
+            buildVillageWorkshop(cx + 61, cz + 8);
+            buildVillageArchive(cx - 56, cz + 49);
+            buildVillageBakery(cx + 7, cz + 61);
             buildRefugeMarketArcade(cx + 6, base + 1, cz + 2);
+            buildWellAndBell(cx - 12, base + 1, cz + 5);
             buildRefugeWatchPost(cx - 18, cz + 60, 0);
             buildRefugeWatchPost(cx + 31, cz + 63, 1);
             buildFarm(cx - 62, cz - 55, 17, 13);
             buildFarm(cx + 62, cz - 60, 15, 11);
-            buildZoneAOrchard(cx - 9, base, cz + 72);
+            buildZoneAOrchard(cx + 4, base, cz + 82);
+
+            // Cada entrada desemboca en una calle; no hay edificios aislados sobre la ladera.
+            road(cx - 31, cz - 26, cx - 12, cz - 5, 3, Material.DIRT_PATH);
+            road(cx + 30, cz - 31, cx + 13, cz - 6, 3, Material.COBBLESTONE);
+            road(cx - 45, cz + 28, cx - 18, cz + 13, 3, Material.DIRT_PATH);
+            road(cx + 49, cz + 31, cx + 25, cz + 13, 4, Material.COARSE_DIRT);
+            road(cx + 61, cz - 1, cx + 35, cz + 5, 3, Material.COBBLESTONE);
+            road(cx - 56, cz + 38, cx - 28, cz + 18, 3, Material.DIRT_PATH);
+            road(cx + 7, cz + 54, cx + 5, cz + 22, 3, Material.DIRT_PATH);
 
             // Límite bajo e irregular: protege el refugio sin formar la antigua caja gris.
             int[][] boundary = {
@@ -1417,6 +1434,8 @@ public final class OverworldTemplateManager implements Listener {
             int somitaZ = cz + 11;
             buildGuidePedestal(guideX, base + 1, guideZ, Material.CHISELED_STONE_BRICKS);
             buildGuidePedestal(somitaX, base + 1, somitaZ, Material.MOSSY_COBBLESTONE);
+            decorateVillagePublicSpace(cx, base, cz);
+            illuminateSafeVillage(cx, base, cz, 104);
 
             afterBlocks.add(() -> {
                 cleanupTemplateEntities(world);
@@ -1603,6 +1622,8 @@ public final class OverworldTemplateManager implements Listener {
                     cz - halfZ - 1, cz + halfZ + 1, y + wallHeight + 1,
                     ridgeAlongZ, role);
             furnishRefugeBuilding(cx, y, cz, halfX, halfZ, role);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void furnishRefugeBuilding(int cx, int y, int cz, int halfX, int halfZ, int role) {
@@ -1783,6 +1804,8 @@ public final class OverworldTemplateManager implements Listener {
             }
             placeLootContainer(new Location(world, cx - 3, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
             placeLootContainer(new Location(world, cx + 3, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageCottage(int cx, int cz, int style, boolean smithy) {
@@ -1836,6 +1859,8 @@ public final class OverworldTemplateManager implements Listener {
             add(cx - 2, y + 1, cz, smithy ? Material.BLAST_FURNACE : Material.CRAFTING_TABLE);
             add(cx + 2, y + 1, cz, smithy ? Material.ANVIL : Material.BARREL);
             placeLootContainer(new Location(world, cx, y + 1, cz + 2), smithy ? LootTables.VILLAGE_WEAPONSMITH : LootTables.VILLAGE_PLAINS_HOUSE, false);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageBarn(int cx, int cz) {
@@ -1854,6 +1879,8 @@ public final class OverworldTemplateManager implements Listener {
             villageGabledRoof(cx - 12, cx + 12, cz - 9, cz + 9, y + 8, false, 6);
             placeLootContainer(new Location(world, cx - 4, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
             placeLootContainer(new Location(world, cx + 4, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
+            addData(cx, y + 4, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageWorkshop(int cx, int cz) {
@@ -1909,6 +1936,10 @@ public final class OverworldTemplateManager implements Listener {
             add(cx + 8, y + 6, cz + 4, Material.CHEST);
             placeLootContainer(new Location(world, cx - 8, y + 1, cz + 3), LootTables.VILLAGE_BUTCHER, true);
             placeLootContainer(new Location(world, cx + 8, y + 6, cz + 4), LootTables.VILLAGE_PLAINS_HOUSE, false);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
+            addData(cx, y + 7, cz, Material.LIGHT,
+                    "minecraft:light[level=14,waterlogged=false]");
         }
 
         /** Archivo/capilla que funciona como punto de orientación y sala de exploración. */
@@ -1939,6 +1970,56 @@ public final class OverworldTemplateManager implements Listener {
             add(cx, y + 6, cz, Material.LANTERN);
             placeLootContainer(new Location(world, cx - 4, y + 1, cz + 7), LootTables.STRONGHOLD_LIBRARY, false);
             placeLootContainer(new Location(world, cx + 4, y + 1, cz + 7), LootTables.VILLAGE_CARTOGRAPHER, true);
+            addData(cx, y + 4, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
+        }
+
+        /** Panadería con horno exterior y puesto propio; no comparte la silueta de la posada. */
+        private void buildVillageBakery(int cx, int cz) {
+            buildVillageCottage(cx, cz, 8, false);
+            int y = localBuildY(cx, cz, 13, 11);
+            for (int x = cx - 7; x <= cx - 3; x++) {
+                add(x, y + 1, cz - 7, Material.BRICKS);
+            }
+            add(cx - 5, y + 2, cz - 7, Material.SMOKER);
+            add(cx - 5, y + 3, cz - 7, Material.BRICK_STAIRS);
+            add(cx - 9, y + 1, cz - 3, Material.HAY_BLOCK);
+            add(cx - 9, y + 1, cz, Material.BARREL);
+            for (int x = cx + 4; x <= cx + 10; x++) {
+                add(x, y + 3, cz - 5, (x & 1) == 0 ? Material.YELLOW_WOOL : Material.WHITE_WOOL);
+            }
+            for (int x : new int[]{cx + 4, cx + 10}) {
+                add(x, y + 1, cz - 5, Material.OAK_FENCE);
+                add(x, y + 2, cz - 5, Material.OAK_FENCE);
+            }
+            add(cx + 7, y + 1, cz - 5, Material.CRAFTING_TABLE);
+            add(cx + 8, y + 1, cz - 5, Material.CAKE);
+        }
+
+        /** Iluminación perimetral visible; las calles añaden además luz invisible continua. */
+        private void illuminateSafeVillage(int cx, int base, int cz, int radius) {
+            for (int degrees = 0; degrees < 360; degrees += 24) {
+                double angle = Math.toRadians(degrees);
+                int x = cx + (int) Math.round(Math.cos(angle) * (radius - 8));
+                int z = cz + (int) Math.round(Math.sin(angle) * (radius - 8));
+                int y = Math.max(base - 5, Math.min(base + 7, terrainSurfaceY(x, z) - 1));
+                add(x, y + 1, z, Material.COBBLESTONE_WALL);
+                add(x, y + 2, z, Material.SPRUCE_FENCE);
+                add(x, y + 3, z, Material.LANTERN);
+                addData(x, y + 5, z, Material.LIGHT,
+                        "minecraft:light[level=15,waterlogged=false]");
+            }
+            int[][] publicLights = {
+                    {-16,-8}, {16,-8}, {-19,17}, {20,18}, {0,29},
+                    {0,-28}, {-37,4}, {38,3}, {-55,-38}, {55,-40}
+            };
+            for (int[] point : publicLights) {
+                int x = cx + point[0];
+                int z = cz + point[1];
+                int y = Math.max(base - 4, Math.min(base + 6, terrainSurfaceY(x, z) - 1));
+                addData(x, y + 3, z, Material.LIGHT,
+                        "minecraft:light[level=15,waterlogged=false]");
+            }
         }
 
         /** Detalles de plaza, descanso, iluminación y pequeñas recompensas visuales. */
@@ -2268,16 +2349,18 @@ public final class OverworldTemplateManager implements Listener {
             int cx = center.getBlockX();
             int cz = center.getBlockZ();
             int y = localBuildY(cx, cz, 47, 42);
-            terraceCircle(cx, y, cz, 46, Material.COBBLESTONE, Material.MOSSY_COBBLESTONE);
+            terraceCircle(cx, y, cz, 20, Material.COBBLESTONE, Material.MOSSY_COBBLESTONE);
             buildIrregularDistrictBoundaryV3(cx, cz, 46, 38, 1);
             road(cx, cz - 44, cx, cz + 42, 6, Material.MOSSY_COBBLESTONE);
             road(cx - 41, cz - 8, cx + 39, cz + 10, 5, Material.COBBLESTONE);
 
             buildRefugeBuilding(cx - 27, cz - 22, 19, 13, 2, false, "east", 3);
-            buildRefugeBuilding(cx + 24, cz - 24, 21, 15, 2, true, "west", 1);
-            buildRefugeBuilding(cx - 25, cz + 21, 17, 13, 1, true, "east", 4);
-            buildRefugeBuilding(cx + 24, cz + 23, 23, 15, 2, false, "west", 0);
+            buildVillageArchive(cx + 25, cz - 25);
+            buildRuinedHouse(cx - 27, cz + 23, 15, 11, 14301);
+            buildVillageInn(cx + 25, cz + 24);
+            buildVillageCottage(cx + 3, cz + 36, 5, false);
             buildRefugeMarketArcade(cx + 3, y + 1, cz + 3);
+            decorateOccupiedVillage(cx, y, cz, 0);
             buildDistrictProgressionV3(cx, y, cz, 0,
                     LootTables.VILLAGE_PLAINS_HOUSE);
         }
@@ -2286,16 +2369,18 @@ public final class OverworldTemplateManager implements Listener {
             int cx = center.getBlockX();
             int cz = center.getBlockZ();
             int y = localBuildY(cx, cz, 52, 44);
-            terraceCircle(cx, y, cz, 50, Material.POLISHED_ANDESITE, Material.COBBLESTONE);
+            terraceCircle(cx, y, cz, 23, Material.POLISHED_ANDESITE, Material.COBBLESTONE);
             buildIrregularDistrictBoundaryV3(cx, cz, 50, 41, 2);
             road(cx, cz - 47, cx, cz + 45, 7, Material.POLISHED_ANDESITE);
             road(cx - 46, cz - 9, cx + 45, cz + 7, 6, Material.COBBLESTONE);
 
             buildGrandMarketHallV3(cx, y, cz - 7);
             buildCapitalHallV3(cx - 31, cz + 23, 23, 17, 13, 0);
-            buildCapitalHallV3(cx + 32, cz + 25, 25, 19, 14, 1);
-            buildRefugeBuilding(cx - 34, cz - 30, 19, 13, 2, false, "east", 3);
-            buildRefugeBuilding(cx + 35, cz - 31, 21, 13, 2, true, "west", 2);
+            buildVillageInn(cx + 32, cz + 26);
+            buildStorehouse(cx - 35, cz - 30);
+            buildVillageWorkshop(cx + 35, cz - 31);
+            buildVillageBakery(cx + 4, cz + 36);
+            decorateOccupiedVillage(cx, y, cz, 1);
             buildDistrictProgressionV3(cx, y, cz, 1, LootTables.STRONGHOLD_CROSSING);
         }
 
@@ -2303,18 +2388,88 @@ public final class OverworldTemplateManager implements Listener {
             int cx = center.getBlockX();
             int cz = center.getBlockZ();
             int y = localBuildY(cx, cz, 55, 47);
-            terraceCircle(cx, y, cz, 53, Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
+            terraceCircle(cx, y, cz, 25, Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
             buildIrregularDistrictBoundaryV3(cx, cz, 54, 44, 3);
             road(cx, cz - 50, cx, cz + 49, 8, Material.STONE_BRICKS);
             road(cx - 49, cz + 5, cx + 48, cz + 5, 6, Material.MOSSY_STONE_BRICKS);
 
             buildCapitalHallV3(cx - 31, cz - 21, 25, 17, 14, 3);
             buildCapitalHallV3(cx + 31, cz - 21, 25, 17, 14, 5);
-            buildCapitalHallV3(cx - 32, cz + 27, 23, 17, 13, 4);
-            buildCapitalHallV3(cx + 32, cz + 28, 23, 17, 15, 2);
+            buildVillageBarn(cx - 32, cz + 27);
+            buildStorehouse(cx + 32, cz + 28);
+            buildMineEntrance(cx, cz + 39, true);
             buildRefugeWatchPost(cx - 48, cz + 3, 30);
             buildRefugeWatchPost(cx + 48, cz + 4, 31);
+            decorateOccupiedVillage(cx, y, cz, 2);
             buildDistrictProgressionV3(cx, y, cz, 2, LootTables.PILLAGER_OUTPOST);
+        }
+
+        /**
+         * Convierte cada distrito en un pueblo que existía antes de la invasión: hay
+         * campamentos, barricadas, carros abandonados, jaulas y corrupción sobre una
+         * arquitectura civil, no cuatro arenas de combate idénticas.
+         */
+        private void decorateOccupiedVillage(int cx, int base, int cz, int district) {
+            int[][] barricades = {{-14,-5}, {15,7}, {-6,18}, {8,-20}};
+            for (int i = 0; i < barricades.length; i++) {
+                int x = cx + barricades[i][0];
+                int z = cz + barricades[i][1];
+                int y = terrainSurfaceY(x, z) - 1;
+                boolean alongX = ((i + district) & 1) == 0;
+                for (int offset = -3; offset <= 3; offset++) {
+                    int bx = x + (alongX ? offset : 0);
+                    int bz = z + (alongX ? 0 : offset);
+                    int sy = terrainSurfaceY(bx, bz) - 1;
+                    add(bx, sy + 1, bz, (offset & 1) == 0
+                            ? Material.SPRUCE_FENCE : Material.DARK_OAK_PLANKS);
+                    if (Math.abs(offset) == 2) add(bx, sy + 2, bz, Material.IRON_BARS);
+                }
+                add(x, y + 1, z, Material.GREEN_BANNER);
+            }
+
+            int tentX = cx + (district == 1 ? 18 : -17);
+            int tentZ = cz + (district == 2 ? -2 : 15);
+            int tentY = localBuildY(tentX, tentZ, 6, 5);
+            preparePlot(tentX, tentY, tentZ, 6, 5);
+            for (int x = tentX - 5; x <= tentX + 5; x++) {
+                for (int z = tentZ - 4; z <= tentZ + 4; z++) {
+                    add(x, tentY, z, Material.COARSE_DIRT);
+                    if (Math.abs(x - tentX) == 5 || Math.abs(z - tentZ) == 4) {
+                        int canopy = 4 - Math.min(3, Math.abs(x - tentX) / 2);
+                        add(x, tentY + canopy, z, ((x + z + district) & 1) == 0
+                                ? Material.GREEN_WOOL : Material.BLACK_WOOL);
+                    }
+                }
+            }
+            add(tentX, tentY + 1, tentZ, Material.SOUL_CAMPFIRE);
+            add(tentX - 3, tentY + 1, tentZ + 1, Material.BARREL);
+            add(tentX + 3, tentY + 1, tentZ + 1, Material.CRAFTING_TABLE);
+            addData(tentX, tentY + 3, tentZ, Material.LIGHT,
+                    "minecraft:light[level=12,waterlogged=false]");
+
+            int cartX = cx + (district - 1) * 9;
+            int cartZ = cz - 29;
+            int cartY = terrainSurfaceY(cartX, cartZ) - 1;
+            for (int x = cartX - 3; x <= cartX + 3; x++) {
+                add(x, cartY + 1, cartZ, Material.SPRUCE_PLANKS);
+            }
+            add(cartX - 3, cartY + 1, cartZ - 1, Material.DARK_OAK_TRAPDOOR);
+            add(cartX + 3, cartY + 1, cartZ - 1, Material.DARK_OAK_TRAPDOOR);
+            add(cartX, cartY + 2, cartZ, Material.COBWEB);
+            add(cartX + 1, cartY + 2, cartZ, Material.MOSS_BLOCK);
+
+            int cageX = cx - 8 + district * 7;
+            int cageZ = cz + 31;
+            int cageY = terrainSurfaceY(cageX, cageZ) - 1;
+            for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) {
+                add(cageX + dx, cageY, cageZ + dz, Material.STONE_BRICKS);
+                if (Math.abs(dx) == 2 || Math.abs(dz) == 2) {
+                    add(cageX + dx, cageY + 1, cageZ + dz, Material.IRON_BARS);
+                    add(cageX + dx, cageY + 2, cageZ + dz, Material.IRON_BARS);
+                }
+            }
+            mossPatch(cx + 30 - district * 12, base, cz - 8 + district * 7,
+                    7, new Random(143000L + district * 997L));
         }
 
         private void buildIrregularDistrictBoundaryV3(int cx, int cz, int rx, int rz, int salt) {
@@ -2693,7 +2848,7 @@ public final class OverworldTemplateManager implements Listener {
             }
         }
 
-        /** Conservado sin llamadas; 1.42.0 nunca lo coloca en una revisión nueva. */
+        /** Conservado sin llamadas; 1.43.0 nunca lo coloca en una revisión nueva. */
         @SuppressWarnings("unused")
         private void buildLegacyDungeonRegion(Location center) {
             int cx = center.getBlockX();
@@ -3488,18 +3643,27 @@ public final class OverworldTemplateManager implements Listener {
         private void preparePlot(int cx, int y, int cz, int halfX, int halfZ) {
             for (int x = cx - halfX; x <= cx + halfX; x++) for (int z = cz - halfZ; z <= cz + halfZ; z++) {
                 int current = surfaceY(x, z) - 1;
-                if (current < y) {
+                int edgeDistance = Math.min(halfX - Math.abs(x - cx), halfZ - Math.abs(z - cz));
+                // El último bloque es una transición de terreno, no el borde recto de una losa.
+                int target = edgeDistance == 0
+                        ? y + Math.max(-1, Math.min(1, current - y)) : y;
+                if (current < target) {
                     // La versión anterior rellenaba solo seis bloques y dejaba plataformas
                     // suspendidas sobre laderas. Ahora toda la diferencia se integra al terreno.
-                    for (int yy = current + 1; yy <= y; yy++) {
+                    for (int yy = current + 1; yy <= target; yy++) {
                         boolean face = x == cx - halfX || x == cx + halfX || z == cz - halfZ || z == cz + halfZ;
-                        Material material = yy == y ? Material.STONE
+                        Material material = yy == target
+                                ? (edgeDistance == 0
+                                ? (((x * 3 + z) & 5) == 0 ? Material.MOSS_BLOCK : Material.COARSE_DIRT)
+                                : Material.STONE)
                                 : (face && (yy + x + z) % 7 == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
                         add(x, yy, z, material);
                     }
                 } else {
-                    for (int yy = y + 1; yy <= Math.min(current + 12, world.getMaxHeight() - 2); yy++) add(x, yy, z, Material.AIR);
-                    add(x, y, z, Material.STONE);
+                    for (int yy = target + 1; yy <= Math.min(current + 12, world.getMaxHeight() - 2); yy++) add(x, yy, z, Material.AIR);
+                    add(x, target, z, edgeDistance == 0
+                            ? (((x + z) & 3) == 0 ? Material.MOSS_BLOCK : Material.COARSE_DIRT)
+                            : Material.STONE);
                 }
             }
         }
@@ -3524,35 +3688,78 @@ public final class OverworldTemplateManager implements Listener {
         }
 
         private void road(int x1, int z1, int x2, int z2, int width, Material material) {
-            int dx = Math.abs(x2 - x1), dz = Math.abs(z2 - z1);
-            int sx = x1 < x2 ? 1 : -1;
-            int sz = z1 < z2 ? 1 : -1;
-            int err = dx - dz;
-            int x = x1, z = z1;
-            int lastY = terrainSurfaceY(x, z) - 1;
-            while (true) {
-                int natural = surfaceY(x, z) - 1;
-                int y = Math.max(lastY - 1, Math.min(lastY + 1, natural));
-                lastY = y;
-                for (int wx = -width / 2; wx <= width / 2; wx++) for (int wz = -width / 2; wz <= width / 2; wz++) {
-                    if (Math.abs(wx) + Math.abs(wz) > width / 2 + 1) continue;
-                    int bx = x + wx, bz = z + wz;
+            int deltaX = x2 - x1;
+            int deltaZ = z2 - z1;
+            int steps = Math.max(Math.abs(deltaX), Math.abs(deltaZ));
+            if (steps == 0) return;
+            double length = Math.hypot(deltaX, deltaZ);
+            double perpendicularX = -deltaZ / length;
+            double perpendicularZ = deltaX / length;
+            int hash = Math.floorMod(x1 * 31 + z1 * 17 + x2 * 13 + z2 * 7, 2);
+            double bend = steps < 18 ? 0.0D : Math.min(9.0D, steps / 11.0D) * (hash == 0 ? -1.0D : 1.0D);
+
+            int previousX = x1;
+            int previousZ = z1;
+            int previousY = terrainSurfaceY(x1, z1) - 1;
+            for (int step = 0; step <= steps; step++) {
+                double t = step / (double) steps;
+                double arc = Math.sin(Math.PI * t) * bend;
+                int x = (int) Math.round(x1 + deltaX * t + perpendicularX * arc);
+                int z = (int) Math.round(z1 + deltaZ * t + perpendicularZ * arc);
+                if (step > 0 && x == previousX && z == previousZ) continue;
+
+                int natural = terrainSurfaceY(x, z) - 1;
+                int y = step == 0 ? natural : Math.max(previousY - 1, Math.min(previousY + 1, natural));
+                int moveX = Integer.compare(x, previousX);
+                int moveZ = Integer.compare(z, previousZ);
+                boolean mostlyX = Math.abs(x - previousX) >= Math.abs(z - previousZ);
+                boolean heightChange = step > 0 && y != previousY;
+                String facing = cardinalFacing(heightChange && y < previousY ? -moveX : moveX,
+                        heightChange && y < previousY ? -moveZ : moveZ);
+
+                for (int offset = -width / 2; offset <= width / 2; offset++) {
+                    int bx = mostlyX ? x : x + offset;
+                    int bz = mostlyX ? z + offset : z;
                     int belowRoad = terrainSurfaceY(bx, bz) - 1;
-                    if (belowRoad < y) {
-                        for (int fy = belowRoad + 1; fy < y; fy++) {
-                            add(bx, fy, bz, ((fy + bx + bz) & 7) == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
-                        }
+                    for (int fillY = belowRoad + 1; fillY < y; fillY++) {
+                        add(bx, fillY, bz, ((fillY + bx + bz) & 7) == 0
+                                ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
                     }
-                    add(bx, y, bz, ((bx + bz) % 8 == 0) ? Material.MOSSY_COBBLESTONE : material);
-                    add(bx, y + 1, bz, Material.AIR);
-                    add(bx, y + 2, bz, Material.AIR);
-                    add(bx, y + 3, bz, Material.AIR);
+                    if (heightChange) {
+                        Material stairs = material == Material.DIRT_PATH || material == Material.COARSE_DIRT
+                                ? Material.COBBLESTONE_STAIRS : Material.STONE_BRICK_STAIRS;
+                        addData(bx, y, bz, stairs, "minecraft:" + stairs.name().toLowerCase(Locale.ROOT)
+                                + "[facing=" + facing + ",half=bottom,shape=straight,waterlogged=false]");
+                    } else {
+                        Material roadBlock = Math.floorMod(bx * 5 + bz * 3, 13) == 0
+                                ? Material.MOSSY_COBBLESTONE : material;
+                        add(bx, y, bz, roadBlock);
+                    }
+                    for (int clearY = y + 1; clearY <= y + 4; clearY++) add(bx, clearY, bz, Material.AIR);
                 }
-                if (x == x2 && z == z2) break;
-                int e2 = 2 * err;
-                if (e2 > -dz) { err -= dz; x += sx; }
-                if (e2 < dx) { err += dx; z += sz; }
+
+                if (step % 7 == 0) {
+                    addData(x, y + 3, z, Material.LIGHT,
+                            "minecraft:light[level=15,waterlogged=false]");
+                }
+                if (step > 0 && step < steps && step % 19 == 0) {
+                    int side = width / 2 + 2;
+                    int lampX = mostlyX ? x : x + side;
+                    int lampZ = mostlyX ? z + side : z;
+                    int lampY = Math.max(y, terrainSurfaceY(lampX, lampZ) - 1);
+                    add(lampX, lampY + 1, lampZ, Material.COBBLESTONE_WALL);
+                    add(lampX, lampY + 2, lampZ, Material.SPRUCE_FENCE);
+                    add(lampX, lampY + 3, lampZ, Material.LANTERN);
+                }
+                previousX = x;
+                previousY = y;
+                previousZ = z;
             }
+        }
+
+        private String cardinalFacing(int dx, int dz) {
+            if (Math.abs(dx) >= Math.abs(dz)) return dx >= 0 ? "east" : "west";
+            return dz >= 0 ? "south" : "north";
         }
 
         private void fenceRectangle(int cx, int y, int cz, int halfX, int halfZ, Material fence) {

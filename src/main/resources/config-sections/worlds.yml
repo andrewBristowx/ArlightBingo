@@ -81,8 +81,8 @@ template-worlds:
     lootr-mode: LOOT_TABLES
     dungeon-extra-spawners: 18
     layout:
-      # 1.42.0 conserva las anclas de la isla aprobada, pero reemplaza por completo
-      # las construcciones colocadas en ellas.
+      # 1.43.0 conserva las anclas de la isla aprobada y rehace pueblos, caminos,
+      # accesos, iluminación e integración con el relieve.
       village-x: -230
       village-z: 0
       city-x: 230
@@ -94,6 +94,10 @@ template-worlds:
       irregular-boundary: true
       functional-interiors: true
       visible-route-to-zone-b: true
+    safe-village:
+      enabled: true
+      radius: 112
+      purge-interval-ticks: 40
   nether:
     enabled: true
     name: bingo_template_nether
