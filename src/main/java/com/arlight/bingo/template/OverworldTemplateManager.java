@@ -69,14 +69,15 @@ public final class OverworldTemplateManager implements Listener {
 
     private static final String MARKER = "arlight-overworld-template.properties";
     private static final String IN_PROGRESS_MARKER = "arlight-overworld-template-building.properties";
-    private static final String VERSION = "1.39.1-overworld-playable-city-v2-hang-fix";
-    private static final String STRUCTURE_REVISION = "1.39.1-linear-district-campaign-v2-safe-planning";
+    private static final String VERSION = "1.40.0-safe-revisions-zone-a";
+    private static final String STRUCTURE_REVISION = "1.40.0-zone-a-irregular-village-safe-revision";
     private static final String SOMITA_TAG = "arlightbingo_template_somita";
     private static final String GUIDE_TAG = "arlightbingo_template_guide";
     private static final String VILLAGE_LIFE_TAG = "arlightbingo_village_life";
 
     private final BingoPlugin plugin;
     private final ChunkyBridge chunky;
+    private final TemplateRevisionManager revisions;
     private final NamespacedKey guideKey;
     private final NamespacedKey dungeonXKey;
     private final NamespacedKey dungeonZKey;
@@ -94,10 +95,12 @@ public final class OverworldTemplateManager implements Listener {
     public OverworldTemplateManager(BingoPlugin plugin) {
         this.plugin = plugin;
         this.chunky = new ChunkyBridge(plugin);
+        this.revisions = new TemplateRevisionManager(plugin);
         this.guideKey = new NamespacedKey(plugin, "template_guide_villager");
         this.dungeonXKey = new NamespacedKey(plugin, "template_dungeon_x");
         this.dungeonZKey = new NamespacedKey(plugin, "template_dungeon_z");
         this.corruptionChunkKey = new NamespacedKey(plugin, "template_corruption_chunk_v2");
+        this.revisions.bootstrapOverworld(worldName(), "legacy-1.39.1");
     }
 
     public String worldName() {
@@ -107,23 +110,17 @@ public final class OverworldTemplateManager implements Listener {
     public void resumeIfNeeded() {
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (isBusy()) return;
-            if (isCompleteOnDisk()) {
+            if (revisions.hasWorkingRevision()
+                    && TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER).isPresent()) {
+                plugin.getLogger().warning("Se detectó una revisión Overworld interrumpida después de Chunky. "
+                        + "Reanudando únicamente la construcción custom.");
+                resume(Bukkit.getConsoleSender());
+                return;
+            }
+            if (isReadyForMatches()) {
                 stage = Stage.COMPLETE;
                 progress = 1.0D;
-                detail = "plantilla completa y disponible para copiar a partidas";
-                return;
-            }
-            if (TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER).isPresent()) {
-                plugin.getLogger().warning("Se detectó una plantilla Overworld interrumpida después de Chunky. Reanudando solo la construcción custom.");
-                resume(Bukkit.getConsoleSender());
-                return;
-            }
-            // Existe una plantilla completa de una revisión anterior, pero su versión
-            // ya no coincide con la capital jugable V2. Se reutilizan sus chunks y seed:
-            // únicamente se ejecuta la fase custom, sin repetir Chunky ni borrar el mundo.
-            if (TemplateMarkerLookup.findMarker(plugin, worldName(), MARKER).isPresent()) {
-                plugin.getLogger().warning("Plantilla Overworld anterior detectada. Aplicando automáticamente la revisión jugable 1.39.0 sin repetir Chunky.");
-                resume(Bukkit.getConsoleSender());
+                detail = "revisión estable disponible; no se modifica automáticamente";
             }
         });
     }
@@ -141,9 +138,16 @@ public final class OverworldTemplateManager implements Listener {
         if (isCompleteOnDisk()) {
             stage = Stage.COMPLETE;
             progress = 1.0D;
-            detail = "plantilla completa y disponible para copiar a partidas";
-            sender.sendMessage(ChatColor.GREEN + "La plantilla Overworld ya está completa; no se ejecutó Chunky ni se modificó el mundo.");
+            detail = "revisión candidata completa y lista para auditar";
+            sender.sendMessage(ChatColor.GREEN + "La revisión candidata ya está completa; audítala y usa promote.");
             return true;
+        }
+        if (!revisions.hasWorkingRevision()
+                || TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER).isEmpty()) {
+            sender.sendMessage(ChatColor.RED + "No existe una revisión interrumpida reanudable. "
+                    + "No se aplicarán estructuras nuevas sobre la estable; crea una revisión limpia con "
+                    + "/bingo template overworld generate <revision>.");
+            return false;
         }
         Path folder = TemplateMarkerLookup.activeFolder(plugin, worldName());
         if (!Files.isDirectory(folder)) {
@@ -189,15 +193,29 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     public boolean isReadyForMatches() {
-        return stage == Stage.COMPLETE || isCompleteOnDisk();
+        String activeWorld = revisions.activeOverworldWorld(worldName());
+        return Files.isRegularFile(TemplateMarkerLookup.activeFolder(plugin, activeWorld).resolve(MARKER));
     }
 
     public String markerDiagnostic() {
-        return (isCompleteOnDisk() ? "READY" : "MISSING")
-                + " [" + TemplateMarkerLookup.checkedFolders(plugin, worldName()) + "]";
+        String activeWorld = revisions.activeOverworldWorld(worldName());
+        boolean ready = Files.isRegularFile(TemplateMarkerLookup.activeFolder(plugin, activeWorld).resolve(MARKER));
+        return (ready ? "READY" : "MISSING") + " [estable=" + revisions.activeRevision()
+                + ", mundo=" + activeWorld + "]";
     }
 
     public synchronized boolean generate(CommandSender sender, boolean force) {
+        String revision = revisions.automaticRevisionId();
+        if (!force && (isReadyForMatches() || Files.exists(
+                plugin.getServer().getWorldContainer().toPath().resolve(worldName())))) {
+            sender.sendMessage(ChatColor.YELLOW + "Ya existe una plantilla estable. "
+                    + "Crea una revisión limpia con /bingo template overworld generate <revision>.");
+            return false;
+        }
+        return generate(sender, revision);
+    }
+
+    public synchronized boolean generate(CommandSender sender, String revisionId) {
         if (!plugin.getConfig().getBoolean("template-worlds.overworld.enabled", true)) {
             sender.sendMessage(ChatColor.RED + "La plantilla Overworld está desactivada en config.yml.");
             return false;
@@ -207,18 +225,23 @@ public final class OverworldTemplateManager implements Listener {
             return false;
         }
 
-        String name = worldName();
-        World loaded = Bukkit.getWorld(name);
-        Path folder = plugin.getServer().getWorldContainer().toPath().resolve(name);
-        if ((loaded != null || Files.exists(folder)) && !force) {
-            sender.sendMessage(ChatColor.YELLOW + "La plantilla '" + name + "' ya existe. Usa /bingo template overworld generate force para reemplazarla.");
+        TemplateRevisionManager.BeginResult prepared =
+                revisions.beginOverworldRevision(sender, revisionId, worldName());
+        if (!prepared.success()) {
+            sender.sendMessage(ChatColor.RED + prepared.message());
             return false;
         }
 
-        if (force && !deleteExisting(name, sender)) return false;
+        String name = worldName();
+        if (Bukkit.getWorld(name) != null || Files.exists(
+                plugin.getServer().getWorldContainer().toPath().resolve(name))) {
+            revisions.markOverworldFailed("la carpeta limpia no quedó disponible");
+            sender.sendMessage(ChatColor.RED + "No se pudo liberar el nombre del mundo para la revisión limpia.");
+            return false;
+        }
 
         stage = Stage.CREATING_WORLD;
-        detail = "creando mundo vanilla base";
+        detail = "creando revisión limpia " + prepared.revision();
         progress = 0.01D;
 
         long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
@@ -248,7 +271,8 @@ public final class OverworldTemplateManager implements Listener {
         stage = Stage.PREGENERATING;
         detail = "Chunky pregenerando " + (radius * 2) + "×" + (radius * 2) + " bloques";
         progress = 0.03D;
-        sender.sendMessage(ChatColor.GREEN + "Plantilla creada. Chunky empezó a pregenerar el Overworld; después se construirá por lotes.");
+        sender.sendMessage(ChatColor.GREEN + "Revisión " + prepared.revision()
+                + " creada. Chunky empezó a pregenerar el Overworld limpio.");
 
         int tileRadius = plugin.getConfig().getInt(
                 "template-worlds.safety.chunky-tile-radius", 384);
@@ -335,12 +359,14 @@ public final class OverworldTemplateManager implements Listener {
                         fail("La estructura terminó, pero no se pudo guardar su marcador COMPLETE.");
                         return;
                     }
+                    revisions.markOverworldReady(VERSION,
+                            world.getWorldFolder().toPath().resolve(MARKER));
                     deleteInProgressMarker();
                     stage = Stage.COMPLETE;
-                    detail = "plantilla completa y lista para revisar";
+                    detail = "revisión READY; pendiente de audit y promote";
                     progress = 1.0D;
                     Bukkit.broadcast(ChatColor.GREEN
-                                    + "[Bingo] Plantilla Overworld completada. Usa /bingo template overworld tp para revisarla.",
+                                    + "[Bingo] Revisión Overworld READY. Revísala con tp/audit y luego usa promote.",
                             "arlightbingo.admin");
                 }));
     }
@@ -373,8 +399,14 @@ public final class OverworldTemplateManager implements Listener {
             sender.sendMessage(ChatColor.RED + "La plantilla o Chunky siguen trabajando. Espera a que termine antes de borrar el mundo.");
             return false;
         }
+        if (!revisions.hasWorkingRevision()) {
+            sender.sendMessage(ChatColor.RED + "No hay una revisión de trabajo que descartar. "
+                    + "La plantilla estable no se borra con reset.");
+            return false;
+        }
         boolean ok = deleteExisting(worldName(), sender);
         if (ok) {
+            revisions.discardWorkingAfterReset();
             stage = Stage.IDLE;
             detail = "sin iniciar";
             progress = 0.0D;
@@ -421,15 +453,20 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     public boolean teleport(Player player) {
-        World world = Bukkit.getWorld(worldName());
-        if (world == null && Files.isDirectory(TemplateMarkerLookup.activeFolder(plugin, worldName()))) {
+        String reviewWorldName = reviewWorldName();
+        World world = Bukkit.getWorld(reviewWorldName);
+        if (world == null && Files.isDirectory(TemplateMarkerLookup.activeFolder(plugin, reviewWorldName))) {
             long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
-            world = new WorldCreator(worldName()).environment(World.Environment.NORMAL)
+            world = new WorldCreator(reviewWorldName).environment(World.Environment.NORMAL)
                     .type(WorldType.NORMAL).seed(seed).generateStructures(true).createWorld();
         }
         if (world == null) return false;
-        if (villageCenter == null) villageCenter = readMarkerLocation(world, "village");
-        if (dungeonCenter == null) dungeonCenter = readMarkerLocation(world, "dungeon");
+        if (villageCenter == null || villageCenter.getWorld() != world) {
+            villageCenter = readMarkerLocation(world, "village");
+        }
+        if (dungeonCenter == null || dungeonCenter.getWorld() != world) {
+            dungeonCenter = readMarkerLocation(world, "dungeon");
+        }
         installMatchActors(world);
         Location target = villageCenter != null ? villageCenter.clone().add(0.5, 1.0, 0.5) : world.getSpawnLocation();
         return player.teleport(target);
@@ -591,9 +628,10 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     public boolean testBoss(Player player) {
-        World world = Bukkit.getWorld(worldName());
+        World world = Bukkit.getWorld(reviewWorldName());
         if (world == null || !templateMarkerExists(world)) return false;
-        Location dungeonLocation = dungeonCenter != null ? dungeonCenter.clone() : readMarkerLocation(world, "dungeon");
+        Location dungeonLocation = dungeonCenter != null && dungeonCenter.getWorld() == world
+                ? dungeonCenter.clone() : readMarkerLocation(world, "dungeon");
         if (dungeonLocation == null) return false;
         Location markedBoss = readMarkerLocation(world, "boss");
         Location arena = markedBoss != null
@@ -630,19 +668,75 @@ public final class OverworldTemplateManager implements Listener {
 
     public void audit(CommandSender sender) {
         long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        String auditedWorld = reviewWorldName();
         sender.sendMessage(ChatColor.GREEN + "=== Auditoría plantilla Overworld ===");
-        for (String line : TemplateAuditUtil.audit(plugin, worldName(), MARKER, IN_PROGRESS_MARKER,
+        for (String line : TemplateAuditUtil.audit(plugin, auditedWorld, MARKER, IN_PROGRESS_MARKER,
                 VERSION, World.Environment.NORMAL, seed)) {
             sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + line);
         }
-        Path marker = TemplateMarkerLookup.findMarker(plugin, worldName(), MARKER).orElse(null);
+        Path marker = TemplateMarkerLookup.findMarker(plugin, auditedWorld, MARKER).orElse(null);
         String revision = TemplateAuditUtil.readProperty(marker, "structureRevision");
+        String zoneAStatus = TemplateAuditUtil.readProperty(marker, "zoneAStatus");
+        String templateRevision = TemplateAuditUtil.readProperty(marker, "templateRevision");
         sender.sendMessage(ChatColor.GRAY + "- revisión-estructural=" + ChatColor.WHITE
                 + (revision == null ? "ausente" : revision) + " (esperada " + STRUCTURE_REVISION + ")");
+        sender.sendMessage(ChatColor.GRAY + "- revisión-plantilla=" + ChatColor.WHITE
+                + (templateRevision == null ? "ausente" : templateRevision));
+        sender.sendMessage(ChatColor.GRAY + "- zona-a=" + ChatColor.WHITE
+                + (zoneAStatus == null ? "incompleta" : zoneAStatus));
+        sender.sendMessage(ChatColor.GRAY + "- anclas-zona-a=" + ChatColor.WHITE
+                + TemplateAuditUtil.missingProperties(marker, "village", "guide", "somita",
+                "zoneABounds", "dungeon"));
         sender.sendMessage(ChatColor.GRAY + "- integración-terreno=" + ChatColor.WHITE
                 + "cimientos completos, muros de contención y caminos apoyados");
         sender.sendMessage(ChatColor.GRAY + "- estado-runtime=" + ChatColor.WHITE + status());
         sender.sendMessage(ChatColor.GRAY + "- diagnóstico-marker=" + ChatColor.WHITE + markerDiagnostic());
+        for (String line : revisions.overworldAuditLines(worldName())) {
+            sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + line);
+        }
+    }
+
+    public void revisions(CommandSender sender) {
+        sender.sendMessage(ChatColor.GREEN + "=== Revisiones Overworld ===");
+        for (String line : revisions.overworldRevisionLines()) {
+            sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + line);
+        }
+    }
+
+    public boolean promote(CommandSender sender, String revision) {
+        return revisions.promoteOverworld(sender, revision, VERSION);
+    }
+
+    public boolean rollback(CommandSender sender, String revision) {
+        return revisions.rollbackOverworld(sender, revision);
+    }
+
+    public boolean forceStage(CommandSender sender, String revision, String stageName) {
+        if (!"custom".equalsIgnoreCase(stageName) && !"building".equalsIgnoreCase(stageName)) {
+            sender.sendMessage(ChatColor.RED + "La única etapa forzable de forma segura es custom.");
+            return false;
+        }
+        if (!revisions.forceOverworldCustomStage(sender, revision, worldName())) return false;
+        Path completeMarker = TemplateMarkerLookup.activeFolder(plugin, worldName()).resolve(MARKER);
+        try {
+            Files.deleteIfExists(completeMarker);
+            TemplateMarkerLookup.forgetMarker(plugin, worldName(), MARKER);
+        } catch (IOException error) {
+            sender.sendMessage(ChatColor.RED + "No se pudo preparar la repetición de la etapa custom: "
+                    + error.getMessage());
+            return false;
+        }
+        long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        World world = loadExistingWorld(seed);
+        if (world == null || !writeInProgressMarker(world, "forced_custom")) {
+            sender.sendMessage(ChatColor.RED + "No se pudo escribir el punto de reanudación forzado.");
+            return false;
+        }
+        return resume(sender);
+    }
+
+    public String workingRevision() {
+        return revisions.workingRevision();
     }
 
     public Stage stage() {
@@ -685,6 +779,7 @@ public final class OverworldTemplateManager implements Listener {
     private void fail(String message) {
         stage = Stage.FAILED;
         detail = message == null ? "error desconocido" : message;
+        revisions.markOverworldFailed(detail);
     }
 
     private boolean writeMarker(World world, BuildResult result) {
@@ -693,6 +788,8 @@ public final class OverworldTemplateManager implements Listener {
         Location somita = result.villageCenter().clone().add(13.5D, 1.0D, -3.5D);
         Location portal = result.dungeonCenter().clone().add(0.0D, 2.0D, 202.0D);
         String text = "version=" + VERSION + "\n"
+                + "templateRevision=" + revisions.workingRevision() + "\n"
+                + "templateState=ready\n"
                 + "village=" + result.villageCenter().getBlockX() + "," + result.villageCenter().getBlockY() + "," + result.villageCenter().getBlockZ() + "\n"
                 + "guide=" + guide.getX() + "," + guide.getY() + "," + guide.getZ() + "\n"
                 + "somita=" + somita.getX() + "," + somita.getY() + "," + somita.getZ() + "\n"
@@ -700,6 +797,11 @@ public final class OverworldTemplateManager implements Listener {
                 + "boss=" + result.dungeonCenter().getBlockX() + "," + (result.dungeonCenter().getBlockY() + 2) + "," + (result.dungeonCenter().getBlockZ() + 130) + "\n"
                 + "portal=" + portal.getX() + "," + portal.getY() + "," + portal.getZ() + "\n"
                 + "structureRevision=" + STRUCTURE_REVISION + "\n"
+                + "zoneAStatus=complete\n"
+                + "zoneABounds=" + (result.villageCenter().getBlockX() - 85) + ","
+                + (result.villageCenter().getBlockZ() - 75) + ","
+                + (result.villageCenter().getBlockX() + 85) + ","
+                + (result.villageCenter().getBlockZ() + 80) + "\n"
                 + "lootrMode=loot_tables\n";
         try {
             world.save();
@@ -732,6 +834,7 @@ public final class OverworldTemplateManager implements Listener {
     private boolean writeInProgressMarker(World world, String stateName) {
         Path file = world.getWorldFolder().toPath().resolve(IN_PROGRESS_MARKER);
         String text = "version=" + VERSION + "\n"
+                + "templateRevision=" + revisions.workingRevision() + "\n"
                 + "state=" + stateName + "\n"
                 + "seed=" + world.getSeed() + "\n"
                 + "chunkyComplete=true\n";
@@ -758,6 +861,14 @@ public final class OverworldTemplateManager implements Listener {
     private int safetyLoadedChunkLimit() {
         return Math.max(64, plugin.getConfig().getInt(
                 "template-worlds.safety.max-loaded-chunks-between-batches", 1024));
+    }
+
+    private String reviewWorldName() {
+        if (revisions.hasWorkingRevision()
+                && Files.isDirectory(TemplateMarkerLookup.activeFolder(plugin, worldName()))) {
+            return worldName();
+        }
+        return revisions.activeOverworldWorld(worldName());
     }
 
     private long safetyDrainInterval() {
@@ -824,8 +935,7 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     private boolean templateMarkerExists(World world) {
-        return TemplateMarkerLookup.hasVersion(
-                plugin, world.getName(), MARKER, VERSION);
+        return Files.isRegularFile(world.getWorldFolder().toPath().resolve(MARKER));
     }
 
     private void decorateLoadedTemplateChunk(Chunk chunk) {
@@ -1229,6 +1339,18 @@ public final class OverworldTemplateManager implements Listener {
             buildFarm(cx + 57, cz - 41, 17, 13);
             buildMineEntrance(cx + 72, cz - 16, false);
             decorateVillagePublicSpace(cx, base, cz);
+            if (plugin.getConfig().getBoolean(
+                    "template-worlds.overworld.zone-a.enabled", true)) {
+                buildZoneAOrchard(cx - 27, base, cz + 65);
+                if (plugin.getConfig().getBoolean(
+                        "template-worlds.overworld.zone-a.irregular-boundary", true)) {
+                    buildZoneAIrregularBoundary(cx, base, cz);
+                }
+                if (plugin.getConfig().getBoolean(
+                        "template-worlds.overworld.zone-a.visible-route-to-zone-b", true)) {
+                    buildZoneAExitRoute(cx, base, cz);
+                }
+            }
 
             // Plataforma segura del jugador. El spawn nunca vuelve a caer dentro de la fuente.
             int spawnX = cx + 3, spawnZ = cz + 15;
@@ -1477,6 +1599,114 @@ public final class OverworldTemplateManager implements Listener {
             for (int[] p : new int[][]{{-2,-18},{2,-18},{0,-16},{0,-20}}) {
                 add(cx + p[0], base + 1, cz + p[1], Material.FLOWER_POT);
             }
+        }
+
+        /**
+         * Huerto comunal de forma irregular. Además de decorar, entrega una zona
+         * tranquila entre la posada y la salida sin crear otro patio vacío.
+         */
+        private void buildZoneAOrchard(int cx, int base, int cz) {
+            int[][] trees = {{-8,-5},{0,-8},{8,-4},{-6,5},{5,6}};
+            for (int[] tree : trees) {
+                int x = cx + tree[0], z = cz + tree[1];
+                int y = Math.max(base, terrainSurfaceY(x, z) - 1);
+                for (int yy = 1; yy <= 4; yy++) add(x, y + yy, z, Material.OAK_LOG);
+                for (int ox = -2; ox <= 2; ox++) for (int oz = -2; oz <= 2; oz++) {
+                    for (int oy = 3; oy <= 5; oy++) {
+                        if (Math.abs(ox) + Math.abs(oz) + Math.abs(oy - 4) > 5) continue;
+                        add(x + ox, y + oy, z + oz, Material.OAK_LEAVES);
+                    }
+                }
+            }
+            for (int x = cx - 11; x <= cx + 11; x++) {
+                int yNorth = Math.max(base, terrainSurfaceY(x, cz - 10) - 1);
+                int ySouth = Math.max(base, terrainSurfaceY(x, cz + 10) - 1);
+                if ((x - cx) % 5 != 0) {
+                    add(x, yNorth + 1, cz - 10, Material.OAK_FENCE);
+                    add(x, ySouth + 1, cz + 10, Material.OAK_FENCE);
+                }
+            }
+            for (int z = cz - 9; z <= cz + 9; z++) {
+                int yWest = Math.max(base, terrainSurfaceY(cx - 11, z) - 1);
+                if ((z - cz) % 4 != 0) add(cx - 11, yWest + 1, z, Material.OAK_FENCE);
+            }
+            int tableY = Math.max(base, terrainSurfaceY(cx, cz) - 1);
+            add(cx, tableY + 1, cz, Material.COMPOSTER);
+            add(cx + 2, tableY + 1, cz, Material.BARREL);
+            add(cx - 2, tableY + 1, cz, Material.BEE_NEST);
+        }
+
+        /**
+         * Límite natural por tramos: muros bajos, cercas y huecos. Deliberadamente
+         * no forma un rectángulo cerrado ni pretende comportarse como una muralla.
+         */
+        private void buildZoneAIrregularBoundary(int cx, int base, int cz) {
+            int[][] segments = {
+                    {-76,-22,-70,20}, {-66,35,-48,63}, {-40,72,-8,78},
+                    {12,78,39,70}, {58,58,75,31}, {78,16,80,-8},
+                    {73,-28,58,-55}, {42,-68,14,-74}, {-9,-75,-35,-68},
+                    {-51,-60,-70,-42}
+            };
+            for (int index = 0; index < segments.length; index++) {
+                int[] segment = segments[index];
+                lowBoundarySegment(cx + segment[0], cz + segment[1],
+                        cx + segment[2], cz + segment[3], base, index);
+            }
+        }
+
+        private void lowBoundarySegment(int x1, int z1, int x2, int z2,
+                                        int minimumY, int salt) {
+            int dx = Math.abs(x2 - x1), dz = Math.abs(z2 - z1);
+            int sx = x1 < x2 ? 1 : -1;
+            int sz = z1 < z2 ? 1 : -1;
+            int err = dx - dz;
+            int x = x1, z = z1, step = 0;
+            while (true) {
+                int y = Math.max(minimumY - 2, terrainSurfaceY(x, z) - 1);
+                Material material = (step + salt) % 7 == 0
+                        ? Material.MOSSY_COBBLESTONE_WALL
+                        : ((step + salt) % 3 == 0 ? Material.SPRUCE_FENCE
+                        : Material.COBBLESTONE_WALL);
+                if ((step + salt) % 11 != 0) add(x, y + 1, z, material);
+                if ((step + salt) % 17 == 0) add(x, y + 2, z, Material.LANTERN);
+                if (x == x2 && z == z2) break;
+                int e2 = 2 * err;
+                if (e2 > -dz) { err -= dz; x += sx; }
+                if (e2 < dx) { err += dx; z += sz; }
+                step++;
+            }
+        }
+
+        /**
+         * La ruta este sale de la aldea con una curva suave, un pequeño pórtico y
+         * una baliza visible. La Zona B podrá continuar desde el último punto.
+         */
+        private void buildZoneAExitRoute(int cx, int base, int cz) {
+            road(cx + 66, cz + 12, cx + 91, cz + 17, 5, Material.DIRT_PATH);
+            road(cx + 91, cz + 17, cx + 116, cz + 10, 5, Material.COARSE_DIRT);
+            road(cx + 116, cz + 10, cx + 142, cz + 19, 5, Material.DIRT_PATH);
+
+            int gateX = cx + 82, gateZ = cz + 15;
+            for (int side : new int[]{-1, 1}) {
+                int z = gateZ + side * 5;
+                for (int yy = 0; yy <= 5; yy++) {
+                    add(gateX, base + 1 + yy, z,
+                            yy == 0 ? Material.MOSSY_STONE_BRICKS : Material.STRIPPED_SPRUCE_LOG);
+                }
+                add(gateX, base + 7, z, Material.LANTERN);
+            }
+            for (int z = gateZ - 4; z <= gateZ + 4; z++) {
+                add(gateX, base + 6, z, Material.DARK_OAK_SLAB);
+            }
+
+            int beaconX = cx + 137, beaconZ = cz + 18;
+            int beaconY = Math.max(base, terrainSurfaceY(beaconX, beaconZ) - 1);
+            for (int yy = 1; yy <= 8; yy++) {
+                add(beaconX, beaconY + yy, beaconZ,
+                        yy % 3 == 0 ? Material.CHISELED_STONE_BRICKS : Material.COBBLESTONE);
+            }
+            add(beaconX, beaconY + 9, beaconZ, Material.CAMPFIRE);
+            add(beaconX - 1, beaconY + 2, beaconZ, Material.OAK_SIGN);
         }
 
         private void villageWallBlock(int x, int y, int z, int layer) {
