@@ -57,7 +57,7 @@ import java.util.function.Consumer;
  *
  * La generación se divide en dos fases:
  *  1) Chunky pregenera la isla determinista completa dentro del borde.
- *  2) Este constructor añade pueblo, corrupción, minas, fortines y ciudadela
+ *  2) Este constructor añade el refugio y los pueblos ocupados de 1.43.0
  *     por lotes pequeños en el hilo del servidor.
  */
 public final class OverworldTemplateManager implements Listener {
@@ -69,8 +69,8 @@ public final class OverworldTemplateManager implements Listener {
 
     private static final String MARKER = "arlight-overworld-template.properties";
     private static final String IN_PROGRESS_MARKER = "arlight-overworld-template-building.properties";
-    private static final String VERSION = "1.41.0-integrated-overworld-island";
-    private static final String STRUCTURE_REVISION = "1.41.0-island-zone-a-integrated-terrain";
+    private static final String VERSION = "1.43.0-living-occupied-villages";
+    private static final String STRUCTURE_REVISION = "1.43.0-organic-roads-safe-lit-villages-1";
     private static final String SOMITA_TAG = "arlightbingo_template_somita";
     private static final String GUIDE_TAG = "arlightbingo_template_guide";
     private static final String VILLAGE_LIFE_TAG = "arlightbingo_village_life";
@@ -110,12 +110,20 @@ public final class OverworldTemplateManager implements Listener {
     public void resumeIfNeeded() {
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (isBusy()) return;
-            if (revisions.hasWorkingRevision()
-                    && TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER).isPresent()) {
+            Path inProgress = TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER)
+                    .orElse(null);
+            if (revisions.hasWorkingRevision() && inProgress != null
+                    && VERSION.equals(TemplateAuditUtil.readProperty(inProgress, "version"))) {
                 plugin.getLogger().warning("Se detectó una revisión Overworld interrumpida después de Chunky. "
                         + "Reanudando únicamente la construcción custom.");
                 resume(Bukkit.getConsoleSender());
                 return;
+            }
+            if (revisions.hasWorkingRevision() && inProgress != null) {
+                String interruptedVersion = TemplateAuditUtil.readProperty(inProgress, "version");
+                plugin.getLogger().warning("Existe una revisión Overworld interrumpida de "
+                        + (interruptedVersion == null ? "una versión desconocida" : interruptedVersion)
+                        + ". Bingo 1.43.0 no la mezclará con los pueblos nuevos; usa reset y genera una revisión limpia.");
             }
             if (isReadyForMatches()) {
                 stage = Stage.COMPLETE;
@@ -142,11 +150,20 @@ public final class OverworldTemplateManager implements Listener {
             sender.sendMessage(ChatColor.GREEN + "La revisión candidata ya está completa; audítala y usa promote.");
             return true;
         }
-        if (!revisions.hasWorkingRevision()
-                || TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER).isEmpty()) {
+        Path inProgress = TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER)
+                .orElse(null);
+        if (!revisions.hasWorkingRevision() || inProgress == null) {
             sender.sendMessage(ChatColor.RED + "No existe una revisión interrumpida reanudable. "
                     + "No se aplicarán estructuras nuevas sobre la estable; crea una revisión limpia con "
                     + "/bingo template overworld generate <revision>.");
+            return false;
+        }
+        String interruptedVersion = TemplateAuditUtil.readProperty(inProgress, "version");
+        if (!VERSION.equals(interruptedVersion)) {
+            sender.sendMessage(ChatColor.RED + "La revisión interrumpida pertenece a "
+                    + (interruptedVersion == null ? "una versión desconocida" : interruptedVersion)
+                    + ". Para impedir que edificios antiguos se mezclen con los nuevos, usa "
+                    + "/bingo template overworld reset y genera una revisión limpia de 1.43.0.");
             return false;
         }
         Path folder = TemplateMarkerLookup.activeFolder(plugin, worldName());
@@ -324,7 +341,7 @@ public final class OverworldTemplateManager implements Listener {
             return;
         }
         stage = Stage.PLANNING;
-        detail = "calculando pueblo, ciudadela, minas y corrupción";
+        detail = "planificando refugio, distritos y capital invadida";
         progress = 0.20D;
         Location savedVillageSpawn = readMarkerLocation(world, "village");
         Location savedDungeon = readMarkerLocation(world, "dungeon");
@@ -693,6 +710,8 @@ public final class OverworldTemplateManager implements Listener {
         String zoneAStatus = TemplateAuditUtil.readProperty(marker, "zoneAStatus");
         String templateRevision = TemplateAuditUtil.readProperty(marker, "templateRevision");
         String terrainMode = TemplateAuditUtil.readProperty(marker, "terrainMode");
+        String capitalArchitecture = TemplateAuditUtil.readProperty(marker, "capitalArchitecture");
+        String legacyStructures = TemplateAuditUtil.readProperty(marker, "legacyStructures");
         sender.sendMessage(ChatColor.GRAY + "- revisión-estructural=" + ChatColor.WHITE
                 + (revision == null ? "ausente" : revision) + " (esperada " + STRUCTURE_REVISION + ")");
         sender.sendMessage(ChatColor.GRAY + "- revisión-plantilla=" + ChatColor.WHITE
@@ -701,6 +720,10 @@ public final class OverworldTemplateManager implements Listener {
                 + (zoneAStatus == null ? "incompleta" : zoneAStatus));
         sender.sendMessage(ChatColor.GRAY + "- terreno=" + ChatColor.WHITE
                 + (terrainMode == null ? "legacy/desconocido" : terrainMode));
+        sender.sendMessage(ChatColor.GRAY + "- arquitectura-capital=" + ChatColor.WHITE
+                + (capitalArchitecture == null ? "ausente" : capitalArchitecture));
+        sender.sendMessage(ChatColor.GRAY + "- estructuras-heredadas=" + ChatColor.WHITE
+                + (legacyStructures == null ? "desconocido" : legacyStructures));
         sender.sendMessage(ChatColor.GRAY + "- anclas-zona-a=" + ChatColor.WHITE
                 + TemplateAuditUtil.missingProperties(marker, "village", "guide", "somita",
                 "zoneABounds", "dungeon"));
@@ -808,10 +831,14 @@ public final class OverworldTemplateManager implements Listener {
                 + "templateRevision=" + revisions.workingRevision() + "\n"
                 + "templateState=ready\n"
                 + "village=" + result.villageCenter().getBlockX() + "," + result.villageCenter().getBlockY() + "," + result.villageCenter().getBlockZ() + "\n"
+                + "villageSafe=" + plugin.getConfig().getBoolean(
+                "template-worlds.overworld.safe-village.enabled", true) + "\n"
+                + "villageSafeRadius=" + plugin.getConfig().getInt(
+                "template-worlds.overworld.safe-village.radius", 112) + "\n"
                 + "guide=" + guide.getX() + "," + guide.getY() + "," + guide.getZ() + "\n"
                 + "somita=" + somita.getX() + "," + somita.getY() + "," + somita.getZ() + "\n"
                 + "dungeon=" + result.dungeonCenter().getBlockX() + "," + result.dungeonCenter().getBlockY() + "," + result.dungeonCenter().getBlockZ() + "\n"
-                + "boss=" + result.dungeonCenter().getBlockX() + "," + (result.dungeonCenter().getBlockY() + 2) + "," + (result.dungeonCenter().getBlockZ() + 130) + "\n"
+                + "boss=" + result.dungeonCenter().getBlockX() + "," + (result.dungeonCenter().getBlockY() + 10) + "," + (result.dungeonCenter().getBlockZ() + 130) + "\n"
                 + "portal=" + portal.getX() + "," + portal.getY() + "," + portal.getZ() + "\n"
                 + "structureRevision=" + STRUCTURE_REVISION + "\n"
                 + "terrainMode=" + (plugin.getConfig().getBoolean(
@@ -820,6 +847,10 @@ public final class OverworldTemplateManager implements Listener {
                 "template-worlds.overworld.island.land-radius", 500) + "\n"
                 + "externalStructures=false\n"
                 + "zoneAStatus=complete\n"
+                + "capitalArchitecture=occupied_villages_v4\n"
+                + "roadNetwork=organic_accessible_v4\n"
+                + "lighting=complete_safe_routes_v1\n"
+                + "legacyStructures=false\n"
                 + "zoneABounds=" + (result.villageCenter().getBlockX() - 85) + ","
                 + (result.villageCenter().getBlockZ() - 75) + ","
                 + (result.villageCenter().getBlockX() + 85) + ","
@@ -1334,7 +1365,104 @@ public final class OverworldTemplateManager implements Listener {
             return world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
         }
 
+        /** Refugio vivo de 1.43.0: edificios distintos, calles accesibles y luz completa. */
         private void buildSpawnVillage(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int base = medianHeight(cx, cz, 28);
+
+            terraceCircle(cx, base, cz, 22, Material.POLISHED_ANDESITE, Material.MOSSY_COBBLESTONE);
+            road(cx - 82, cz + 10, cx + 88, cz + 4, 7, Material.COBBLESTONE);
+            road(cx + 3, cz + 15, cx + 3, cz - 76, 5, Material.DIRT_PATH);
+            road(cx - 58, cz + 49, cx + 51, cz - 51, 4, Material.COARSE_DIRT);
+
+            buildRefugeGatehouse(cx - 72, cz + 8, false);
+            // La zona norte conserva dos casas del lenguaje arquitectónico aprobado.
+            // El resto son edificios de planta, altura y función distintas.
+            buildRefugeBuilding(cx - 42, cz - 26, 21, 15, 2, false, "east", 0);
+            buildRefugeBuilding(cx + 42, cz - 31, 23, 15, 2, true, "west", 2);
+            buildVillageInn(cx - 45, cz + 37);
+            buildVillageBarn(cx + 49, cz + 39);
+            buildVillageWorkshop(cx + 61, cz + 8);
+            buildVillageArchive(cx - 56, cz + 49);
+            buildVillageBakery(cx + 7, cz + 61);
+            buildRefugeMarketArcade(cx + 6, base + 1, cz + 2);
+            buildWellAndBell(cx - 12, base + 1, cz + 5);
+            buildRefugeWatchPost(cx - 18, cz + 60, 0);
+            buildRefugeWatchPost(cx + 31, cz + 63, 1);
+            buildFarm(cx - 62, cz - 55, 17, 13);
+            buildFarm(cx + 62, cz - 60, 15, 11);
+            buildZoneAOrchard(cx + 4, base, cz + 82);
+
+            // Cada entrada desemboca en una calle; no hay edificios aislados sobre la ladera.
+            road(cx - 31, cz - 26, cx - 12, cz - 5, 3, Material.DIRT_PATH);
+            road(cx + 30, cz - 31, cx + 13, cz - 6, 3, Material.COBBLESTONE);
+            road(cx - 45, cz + 28, cx - 18, cz + 13, 3, Material.DIRT_PATH);
+            road(cx + 49, cz + 31, cx + 25, cz + 13, 4, Material.COARSE_DIRT);
+            road(cx + 61, cz - 1, cx + 35, cz + 5, 3, Material.COBBLESTONE);
+            road(cx - 56, cz + 38, cx - 28, cz + 18, 3, Material.DIRT_PATH);
+            road(cx + 7, cz + 54, cx + 5, cz + 22, 3, Material.DIRT_PATH);
+
+            // Límite bajo e irregular: protege el refugio sin formar la antigua caja gris.
+            int[][] boundary = {
+                    {-78,-18}, {-62,-64}, {-16,-82}, {38,-77}, {77,-45},
+                    {84,16}, {62,68}, {17,83}, {-40,76}, {-73,43}
+            };
+            for (int i = 0; i < boundary.length; i++) {
+                int[] a = boundary[i];
+                int[] b = boundary[(i + 1) % boundary.length];
+                boolean easternExit = a[0] > 70 && b[0] > 60;
+                if (!easternExit) buildAdaptiveWallSegment(cx + a[0], cz + a[1],
+                        cx + b[0], cz + b[1], 4, false);
+            }
+            road(cx + 74, cz + 8, cx + 128, cz + 5, 7, Material.MOSSY_COBBLESTONE);
+
+            int spawnX = cx + 3;
+            int spawnZ = cz + 15;
+            for (int x = spawnX - 4; x <= spawnX + 4; x++) {
+                for (int z = spawnZ - 4; z <= spawnZ + 4; z++) {
+                    add(x, base + 1, z, ((x + z) & 3) == 0
+                            ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_ANDESITE);
+                    for (int y = base + 2; y <= base + 8; y++) add(x, y, z, Material.AIR);
+                }
+            }
+            village = new Location(world, spawnX, base + 1, spawnZ);
+
+            int guideX = cx - 18;
+            int guideZ = cz + 9;
+            int somitaX = cx + 16;
+            int somitaZ = cz + 11;
+            buildGuidePedestal(guideX, base + 1, guideZ, Material.CHISELED_STONE_BRICKS);
+            buildGuidePedestal(somitaX, base + 1, somitaZ, Material.MOSSY_COBBLESTONE);
+            decorateVillagePublicSpace(cx, base, cz);
+            illuminateSafeVillage(cx, base, cz, 104);
+
+            afterBlocks.add(() -> {
+                cleanupTemplateEntities(world);
+                Location guideHome = new Location(world, guideX + 0.5D, base + 2.0D,
+                        guideZ + 0.5D, 270.0F, 0.0F);
+                Villager guide = world.spawn(guideHome, Villager.class, villager -> {
+                    villager.setAI(false);
+                    villager.setInvulnerable(true);
+                    villager.setPersistent(true);
+                    villager.setSilent(false);
+                    villager.setProfession(Villager.Profession.CARTOGRAPHER);
+                    villager.setVillagerType(Villager.Type.PLAINS);
+                    villager.setCustomName(ChatColor.GOLD + "Cartógrafo del Refugio");
+                    villager.setCustomNameVisible(true);
+                    villager.getPersistentDataContainer().set(guideKey, PersistentDataType.BYTE, (byte) 1);
+                    villager.getPersistentDataContainer().set(dungeonXKey, PersistentDataType.INTEGER,
+                            dungeon.getBlockX());
+                    villager.getPersistentDataContainer().set(dungeonZKey, PersistentDataType.INTEGER,
+                            dungeon.getBlockZ());
+                });
+                guide.addScoreboardTag(GUIDE_TAG);
+            });
+        }
+
+        /** Conservado sin llamadas para poder comparar una revisión 1.41.0 durante el desarrollo. */
+        @SuppressWarnings("unused")
+        private void buildLegacySpawnVillage(Location center) {
             int cx = center.getBlockX();
             int cz = center.getBlockZ();
             int base = medianHeight(cx, cz, 24);
@@ -1427,6 +1555,242 @@ public final class OverworldTemplateManager implements Listener {
             });
         }
 
+        private void buildGuidePedestal(int cx, int y, int cz, Material floor) {
+            for (int x = cx - 2; x <= cx + 2; x++) for (int z = cz - 2; z <= cz + 2; z++) {
+                add(x, y, z, ((x + z) & 1) == 0 ? floor : Material.POLISHED_ANDESITE);
+                for (int yy = y + 1; yy <= y + 6; yy++) add(x, yy, z, Material.AIR);
+            }
+            add(cx - 2, y + 1, cz - 2, Material.SPRUCE_FENCE);
+            add(cx - 2, y + 2, cz - 2, Material.LANTERN);
+        }
+
+        private void buildRefugeBuilding(int cx, int cz, int width, int depth, int floors,
+                                         boolean ridgeAlongZ, String entrance, int role) {
+            int halfX = width / 2;
+            int halfZ = depth / 2;
+            int y = localBuildY(cx, cz, halfX + 2, halfZ + 2);
+            preparePlot(cx, y, cz, halfX + 2, halfZ + 2);
+            int wallHeight = floors * 5 + 1;
+
+            for (int x = cx - halfX; x <= cx + halfX; x++) {
+                for (int z = cz - halfZ; z <= cz + halfZ; z++) {
+                    boolean edgeX = Math.abs(x - cx) == halfX;
+                    boolean edgeZ = Math.abs(z - cz) == halfZ;
+                    boolean wall = edgeX || edgeZ;
+                    add(x, y, z, ((x + z) & 7) == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
+                    for (int yy = 1; yy <= wallHeight; yy++) {
+                        if (!wall) {
+                            add(x, y + yy, z, Material.AIR);
+                            continue;
+                        }
+                        boolean doorway = switch (entrance) {
+                            case "north" -> z == cz - halfZ && Math.abs(x - cx) <= 1 && yy <= 3;
+                            case "east" -> x == cx + halfX && Math.abs(z - cz) <= 1 && yy <= 3;
+                            case "west" -> x == cx - halfX && Math.abs(z - cz) <= 1 && yy <= 3;
+                            default -> z == cz + halfZ && Math.abs(x - cx) <= 1 && yy <= 3;
+                        };
+                        if (doorway) {
+                            add(x, y + yy, z, Material.AIR);
+                            continue;
+                        }
+                        boolean frame = yy == 1 || yy == wallHeight || yy % 5 == 0
+                                || (edgeX && Math.floorMod(z - (cz - halfZ), 6) == 0)
+                                || (edgeZ && Math.floorMod(x - (cx - halfX), 6) == 0);
+                        boolean window = yy % 5 >= 2 && yy % 5 <= 3
+                                && ((edgeX && Math.floorMod(z - cz, 7) == 0)
+                                || (edgeZ && Math.floorMod(x - cx, 7) == 0));
+                        Material material = frame ? Material.STRIPPED_DARK_OAK_LOG
+                                : (window ? Material.LIGHT_BLUE_STAINED_GLASS_PANE
+                                : (((x * 17 + z * 7 + yy) & 15) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.WHITE_TERRACOTTA));
+                        add(x, y + yy, z, material);
+                    }
+                }
+            }
+
+            for (int floor = 1; floor < floors; floor++) {
+                int floorY = y + floor * 5;
+                for (int x = cx - halfX + 1; x <= cx + halfX - 1; x++) {
+                    for (int z = cz - halfZ + 1; z <= cz + halfZ - 1; z++) {
+                        if (Math.abs(x - cx) <= 1 && Math.abs(z - cz) <= 1) continue;
+                        add(x, floorY, z, Material.SPRUCE_PLANKS);
+                    }
+                }
+                for (int yy = floorY - 3; yy <= floorY; yy++) add(cx, yy, cz, Material.SCAFFOLDING);
+            }
+            villageGabledRoof(cx - halfX - 1, cx + halfX + 1,
+                    cz - halfZ - 1, cz + halfZ + 1, y + wallHeight + 1,
+                    ridgeAlongZ, role);
+            furnishRefugeBuilding(cx, y, cz, halfX, halfZ, role);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
+        }
+
+        private void furnishRefugeBuilding(int cx, int y, int cz, int halfX, int halfZ, int role) {
+            switch (role) {
+                case 0 -> {
+                    for (int dz = -halfZ + 2; dz <= halfZ - 2; dz += 3) {
+                        add(cx - halfX + 2, y + 1, cz + dz, Material.BOOKSHELF);
+                        add(cx + halfX - 2, y + 1, cz + dz, Material.BOOKSHELF);
+                        add(cx - halfX + 2, y + 2, cz + dz, Material.BOOKSHELF);
+                        add(cx + halfX - 2, y + 2, cz + dz, Material.BOOKSHELF);
+                    }
+                    add(cx, y + 1, cz, Material.LECTERN);
+                    add(cx, y + 1, cz + 3, Material.CARTOGRAPHY_TABLE);
+                    placeLootContainer(new Location(world, cx, y + 1, cz - 3),
+                            LootTables.STRONGHOLD_LIBRARY, false);
+                }
+                case 1 -> {
+                    for (int dx = -halfX + 2; dx <= halfX - 2; dx += 4) {
+                        add(cx + dx, y + 1, cz - 2, Material.WHITE_WOOL);
+                        add(cx + dx, y + 1, cz + 2, Material.WHITE_CARPET);
+                    }
+                    add(cx - 2, y + 1, cz, Material.BREWING_STAND);
+                    add(cx + 2, y + 1, cz, Material.CAULDRON);
+                    placeLootContainer(new Location(world, cx, y + 1, cz + halfZ - 2),
+                            LootTables.VILLAGE_PLAINS_HOUSE, true);
+                }
+                case 2 -> {
+                    add(cx - 3, y + 1, cz, Material.SMITHING_TABLE);
+                    add(cx, y + 1, cz, Material.ANVIL);
+                    add(cx + 3, y + 1, cz, Material.BLAST_FURNACE);
+                    add(cx + 3, y + 1, cz + 3, Material.STONECUTTER);
+                    placeLootContainer(new Location(world, cx - 3, y + 1, cz + 3),
+                            LootTables.VILLAGE_WEAPONSMITH, true);
+                }
+                case 3 -> {
+                    add(cx - 4, y + 1, cz, Material.SMOKER);
+                    add(cx, y + 1, cz, Material.CRAFTING_TABLE);
+                    add(cx + 4, y + 1, cz, Material.BARREL);
+                    add(cx - 4, y + 1, cz + 4, Material.HAY_BLOCK);
+                    add(cx + 4, y + 1, cz + 4, Material.HAY_BLOCK);
+                    placeLootContainer(new Location(world, cx, y + 1, cz + halfZ - 2),
+                            LootTables.VILLAGE_PLAINS_HOUSE, true);
+                }
+                default -> {
+                    add(cx - 4, y + 1, cz, Material.CARTOGRAPHY_TABLE);
+                    add(cx, y + 1, cz, Material.LECTERN);
+                    add(cx + 4, y + 1, cz, Material.CRAFTING_TABLE);
+                    placeLootContainer(new Location(world, cx, y + 1, cz + halfZ - 2),
+                            LootTables.PILLAGER_OUTPOST, false);
+                }
+            }
+            for (int[] lamp : new int[][]{{-halfX + 2,-halfZ + 2},{halfX - 2,-halfZ + 2},
+                    {-halfX + 2,halfZ - 2},{halfX - 2,halfZ - 2}}) {
+                add(cx + lamp[0], y + 2, cz + lamp[1], Material.LANTERN);
+            }
+        }
+
+        private void buildRefugeMarketArcade(int cx, int y, int cz) {
+            terraceCircle(cx, y - 1, cz, 15, Material.POLISHED_ANDESITE, Material.MOSSY_COBBLESTONE);
+            for (int arm = 0; arm < 4; arm++) {
+                boolean alongX = (arm & 1) == 0;
+                int side = arm < 2 ? -1 : 1;
+                int ox = alongX ? 0 : side * 11;
+                int oz = alongX ? side * 9 : 0;
+                for (int a = -8; a <= 8; a++) {
+                    int x = cx + ox + (alongX ? a : 0);
+                    int z = cz + oz + (alongX ? 0 : a);
+                    add(x, y, z, Material.SPRUCE_PLANKS);
+                    if (a % 4 == 0) {
+                        add(x, y + 1, z, Material.STRIPPED_SPRUCE_LOG);
+                        add(x, y + 2, z, Material.STRIPPED_SPRUCE_LOG);
+                        add(x, y + 3, z, Material.STRIPPED_SPRUCE_LOG);
+                    }
+                    add(x, y + 4, z, (a & 1) == 0 ? Material.RED_WOOL : Material.WHITE_WOOL);
+                }
+            }
+            add(cx, y, cz, Material.CHISELED_STONE_BRICKS);
+            add(cx, y + 1, cz, Material.BELL);
+            placeLootContainer(new Location(world, cx + 8, y + 1, cz + 7),
+                    LootTables.VILLAGE_PLAINS_HOUSE, true);
+        }
+
+        private void buildRefugeGatehouse(int cx, int cz, boolean northSouth) {
+            int y = localBuildY(cx, cz, 15, 9);
+            int gateHalf = 3;
+            for (int side : new int[]{-1, 1}) {
+                int tx = cx + (northSouth ? side * 10 : 0);
+                int tz = cz + (northSouth ? 0 : side * 10);
+                buildRefugeWatchPost(tx, tz, side + 5);
+            }
+            for (int a = -10; a <= 10; a++) for (int yy = 1; yy <= 9; yy++) {
+                int x = cx + (northSouth ? a : 0);
+                int z = cz + (northSouth ? 0 : a);
+                boolean opening = Math.abs(a) <= gateHalf && yy <= 6;
+                add(x, y + yy, z, opening ? Material.AIR
+                        : (yy == 5 ? Material.DARK_OAK_LOG : Material.STONE_BRICKS));
+            }
+            for (int a = -4; a <= 4; a++) {
+                int x = cx + (northSouth ? a : 0);
+                int z = cz + (northSouth ? 0 : a);
+                add(x, y + 9 + Math.abs(a) / 2, z, Material.DARK_OAK_SLAB);
+            }
+        }
+
+        private void buildRefugeWatchPost(int cx, int cz, int salt) {
+            int y = localBuildY(cx, cz, 6, 6);
+            preparePlot(cx, y, cz, 6, 6);
+            for (int x = cx - 5; x <= cx + 5; x++) for (int z = cz - 5; z <= cz + 5; z++) {
+                boolean wall = Math.abs(x - cx) == 5 || Math.abs(z - cz) == 5;
+                add(x, y, z, Material.COBBLESTONE);
+                if (wall) for (int yy = 1; yy <= 12 + Math.floorMod(salt, 4); yy++) {
+                    boolean slit = yy >= 5 && yy <= 7 && ((x + z) & 5) == 0;
+                    add(x, y + yy, z, slit ? Material.IRON_BARS
+                            : (((x + z + yy) & 11) == 0 ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
+                }
+            }
+            for (int layer = 0; layer <= 5; layer++) {
+                for (int x = cx - 6 + layer; x <= cx + 6 - layer; x++) {
+                    for (int z = cz - 6 + layer; z <= cz + 6 - layer; z++) {
+                        boolean edge = x == cx - 6 + layer || x == cx + 6 - layer
+                                || z == cz - 6 + layer || z == cz + 6 - layer;
+                        if (edge) add(x, y + 14 + layer, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            for (int yy = y + 1; yy <= y + 12; yy++) add(cx, yy, cz, Material.SCAFFOLDING);
+        }
+
+        private void buildAdaptiveWallSegment(int x1, int z1, int x2, int z2,
+                                              int height, boolean fortified) {
+            int dx = Math.abs(x2 - x1);
+            int dz = Math.abs(z2 - z1);
+            int sx = x1 < x2 ? 1 : -1;
+            int sz = z1 < z2 ? 1 : -1;
+            int err = dx - dz;
+            int x = x1;
+            int z = z1;
+            int step = 0;
+            while (true) {
+                int base = terrainSurfaceY(x, z) - 1;
+                int thickness = fortified ? 2 : 1;
+                for (int ox = -thickness; ox <= thickness; ox++) {
+                    for (int oz = -thickness; oz <= thickness; oz++) {
+                        if (Math.abs(ox) + Math.abs(oz) > thickness) continue;
+                        for (int yy = Math.max(world.getMinHeight() + 2, base - 5); yy <= base; yy++) {
+                            if (world.getBlockAt(x + ox, yy, z + oz).isEmpty()) {
+                                add(x + ox, yy, z + oz, Material.COBBLESTONE);
+                            }
+                        }
+                        for (int yy = 1; yy <= height; yy++) {
+                            add(x + ox, base + yy, z + oz,
+                                    ((x + z + yy) & 13) == 0
+                                            ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS);
+                        }
+                    }
+                }
+                if (step % (fortified ? 3 : 5) != 1) {
+                    add(x, base + height + 1, z, Material.STONE_BRICK_WALL);
+                }
+                if (x == x2 && z == z2) break;
+                int e2 = 2 * err;
+                if (e2 > -dz) { err -= dz; x += sx; }
+                if (e2 < dx) { err += dx; z += sz; }
+                step++;
+            }
+        }
+
         private void buildVillageMarket(int cx, int y, int cz) {
             for (int x = cx - 7; x <= cx + 7; x++) for (int z = cz - 5; z <= cz + 5; z++) {
                 add(x, y, z, ((x + z) & 5) == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
@@ -1440,6 +1804,8 @@ public final class OverworldTemplateManager implements Listener {
             }
             placeLootContainer(new Location(world, cx - 3, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
             placeLootContainer(new Location(world, cx + 3, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageCottage(int cx, int cz, int style, boolean smithy) {
@@ -1493,6 +1859,8 @@ public final class OverworldTemplateManager implements Listener {
             add(cx - 2, y + 1, cz, smithy ? Material.BLAST_FURNACE : Material.CRAFTING_TABLE);
             add(cx + 2, y + 1, cz, smithy ? Material.ANVIL : Material.BARREL);
             placeLootContainer(new Location(world, cx, y + 1, cz + 2), smithy ? LootTables.VILLAGE_WEAPONSMITH : LootTables.VILLAGE_PLAINS_HOUSE, false);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageBarn(int cx, int cz) {
@@ -1511,6 +1879,8 @@ public final class OverworldTemplateManager implements Listener {
             villageGabledRoof(cx - 12, cx + 12, cz - 9, cz + 9, y + 8, false, 6);
             placeLootContainer(new Location(world, cx - 4, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
             placeLootContainer(new Location(world, cx + 4, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
+            addData(cx, y + 4, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageWorkshop(int cx, int cz) {
@@ -1566,6 +1936,10 @@ public final class OverworldTemplateManager implements Listener {
             add(cx + 8, y + 6, cz + 4, Material.CHEST);
             placeLootContainer(new Location(world, cx - 8, y + 1, cz + 3), LootTables.VILLAGE_BUTCHER, true);
             placeLootContainer(new Location(world, cx + 8, y + 6, cz + 4), LootTables.VILLAGE_PLAINS_HOUSE, false);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
+            addData(cx, y + 7, cz, Material.LIGHT,
+                    "minecraft:light[level=14,waterlogged=false]");
         }
 
         /** Archivo/capilla que funciona como punto de orientación y sala de exploración. */
@@ -1596,6 +1970,56 @@ public final class OverworldTemplateManager implements Listener {
             add(cx, y + 6, cz, Material.LANTERN);
             placeLootContainer(new Location(world, cx - 4, y + 1, cz + 7), LootTables.STRONGHOLD_LIBRARY, false);
             placeLootContainer(new Location(world, cx + 4, y + 1, cz + 7), LootTables.VILLAGE_CARTOGRAPHER, true);
+            addData(cx, y + 4, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
+        }
+
+        /** Panadería con horno exterior y puesto propio; no comparte la silueta de la posada. */
+        private void buildVillageBakery(int cx, int cz) {
+            buildVillageCottage(cx, cz, 8, false);
+            int y = localBuildY(cx, cz, 13, 11);
+            for (int x = cx - 7; x <= cx - 3; x++) {
+                add(x, y + 1, cz - 7, Material.BRICKS);
+            }
+            add(cx - 5, y + 2, cz - 7, Material.SMOKER);
+            add(cx - 5, y + 3, cz - 7, Material.BRICK_STAIRS);
+            add(cx - 9, y + 1, cz - 3, Material.HAY_BLOCK);
+            add(cx - 9, y + 1, cz, Material.BARREL);
+            for (int x = cx + 4; x <= cx + 10; x++) {
+                add(x, y + 3, cz - 5, (x & 1) == 0 ? Material.YELLOW_WOOL : Material.WHITE_WOOL);
+            }
+            for (int x : new int[]{cx + 4, cx + 10}) {
+                add(x, y + 1, cz - 5, Material.OAK_FENCE);
+                add(x, y + 2, cz - 5, Material.OAK_FENCE);
+            }
+            add(cx + 7, y + 1, cz - 5, Material.CRAFTING_TABLE);
+            add(cx + 8, y + 1, cz - 5, Material.CAKE);
+        }
+
+        /** Iluminación perimetral visible; las calles añaden además luz invisible continua. */
+        private void illuminateSafeVillage(int cx, int base, int cz, int radius) {
+            for (int degrees = 0; degrees < 360; degrees += 24) {
+                double angle = Math.toRadians(degrees);
+                int x = cx + (int) Math.round(Math.cos(angle) * (radius - 8));
+                int z = cz + (int) Math.round(Math.sin(angle) * (radius - 8));
+                int y = Math.max(base - 5, Math.min(base + 7, terrainSurfaceY(x, z) - 1));
+                add(x, y + 1, z, Material.COBBLESTONE_WALL);
+                add(x, y + 2, z, Material.SPRUCE_FENCE);
+                add(x, y + 3, z, Material.LANTERN);
+                addData(x, y + 5, z, Material.LIGHT,
+                        "minecraft:light[level=15,waterlogged=false]");
+            }
+            int[][] publicLights = {
+                    {-16,-8}, {16,-8}, {-19,17}, {20,18}, {0,29},
+                    {0,-28}, {-37,4}, {38,3}, {-55,-38}, {55,-40}
+            };
+            for (int[] point : publicLights) {
+                int x = cx + point[0];
+                int z = cz + point[1];
+                int y = Math.max(base - 4, Math.min(base + 6, terrainSurfaceY(x, z) - 1));
+                addData(x, y + 3, z, Material.LIGHT,
+                        "minecraft:light[level=15,waterlogged=false]");
+            }
         }
 
         /** Detalles de plaza, descanso, iluminación y pequeñas recompensas visuales. */
@@ -1889,6 +2313,544 @@ public final class OverworldTemplateManager implements Listener {
         }
 
         private void buildDungeonRegion(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int base = medianHeight(cx, cz, 58);
+            dungeon = new Location(world, cx, base + 1, cz);
+
+            Location residential = new Location(world, cx - 170,
+                    surfaceY(cx - 170, cz + 100), cz + 100);
+            Location commercial = new Location(world, cx + 170,
+                    surfaceY(cx + 170, cz + 80), cz + 80);
+            Location military = new Location(world, cx,
+                    surfaceY(cx, cz - 190), cz - 190);
+
+            buildResidentialQuarterV3(residential);
+            buildCommercialQuarterV3(commercial);
+            buildMilitaryQuarterV3(military);
+
+            // Una única red de caminos conecta refugio, distritos y castillo.
+            road(village.getBlockX() + 78, village.getBlockZ() - 10,
+                    residential.getBlockX() - 42, residential.getBlockZ(), 7, Material.MOSSY_COBBLESTONE);
+            road(residential.getBlockX(), residential.getBlockZ() - 42,
+                    cx - 82, cz, 8, Material.COBBLESTONE);
+            road(commercial.getBlockX(), commercial.getBlockZ() - 42,
+                    cx + 78, cz + 18, 8, Material.POLISHED_ANDESITE);
+            road(military.getBlockX(), military.getBlockZ() + 46,
+                    cx, cz - 86, 9, Material.STONE_BRICKS);
+            road(cx - 82, cz, cx + 78, cz + 18, 7, Material.MOSSY_STONE_BRICKS);
+
+            prepareCitadelBiome(cx, cz, 112);
+            prepareBossBiome(cx, base + 10, cz + 130, 56);
+            buildInvadedCapitalV3(cx, cz, base);
+        }
+
+        private void buildResidentialQuarterV3(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int y = localBuildY(cx, cz, 47, 42);
+            terraceCircle(cx, y, cz, 20, Material.COBBLESTONE, Material.MOSSY_COBBLESTONE);
+            buildIrregularDistrictBoundaryV3(cx, cz, 46, 38, 1);
+            road(cx, cz - 44, cx, cz + 42, 6, Material.MOSSY_COBBLESTONE);
+            road(cx - 41, cz - 8, cx + 39, cz + 10, 5, Material.COBBLESTONE);
+
+            buildRefugeBuilding(cx - 27, cz - 22, 19, 13, 2, false, "east", 3);
+            buildVillageArchive(cx + 25, cz - 25);
+            buildRuinedHouse(cx - 27, cz + 23, 15, 11, 14301);
+            buildVillageInn(cx + 25, cz + 24);
+            buildVillageCottage(cx + 3, cz + 36, 5, false);
+            buildRefugeMarketArcade(cx + 3, y + 1, cz + 3);
+            decorateOccupiedVillage(cx, y, cz, 0);
+            buildDistrictProgressionV3(cx, y, cz, 0,
+                    LootTables.VILLAGE_PLAINS_HOUSE);
+        }
+
+        private void buildCommercialQuarterV3(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int y = localBuildY(cx, cz, 52, 44);
+            terraceCircle(cx, y, cz, 23, Material.POLISHED_ANDESITE, Material.COBBLESTONE);
+            buildIrregularDistrictBoundaryV3(cx, cz, 50, 41, 2);
+            road(cx, cz - 47, cx, cz + 45, 7, Material.POLISHED_ANDESITE);
+            road(cx - 46, cz - 9, cx + 45, cz + 7, 6, Material.COBBLESTONE);
+
+            buildGrandMarketHallV3(cx, y, cz - 7);
+            buildCapitalHallV3(cx - 31, cz + 23, 23, 17, 13, 0);
+            buildVillageInn(cx + 32, cz + 26);
+            buildStorehouse(cx - 35, cz - 30);
+            buildVillageWorkshop(cx + 35, cz - 31);
+            buildVillageBakery(cx + 4, cz + 36);
+            decorateOccupiedVillage(cx, y, cz, 1);
+            buildDistrictProgressionV3(cx, y, cz, 1, LootTables.STRONGHOLD_CROSSING);
+        }
+
+        private void buildMilitaryQuarterV3(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int y = localBuildY(cx, cz, 55, 47);
+            terraceCircle(cx, y, cz, 25, Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
+            buildIrregularDistrictBoundaryV3(cx, cz, 54, 44, 3);
+            road(cx, cz - 50, cx, cz + 49, 8, Material.STONE_BRICKS);
+            road(cx - 49, cz + 5, cx + 48, cz + 5, 6, Material.MOSSY_STONE_BRICKS);
+
+            buildCapitalHallV3(cx - 31, cz - 21, 25, 17, 14, 3);
+            buildCapitalHallV3(cx + 31, cz - 21, 25, 17, 14, 5);
+            buildVillageBarn(cx - 32, cz + 27);
+            buildStorehouse(cx + 32, cz + 28);
+            buildMineEntrance(cx, cz + 39, true);
+            buildRefugeWatchPost(cx - 48, cz + 3, 30);
+            buildRefugeWatchPost(cx + 48, cz + 4, 31);
+            decorateOccupiedVillage(cx, y, cz, 2);
+            buildDistrictProgressionV3(cx, y, cz, 2, LootTables.PILLAGER_OUTPOST);
+        }
+
+        /**
+         * Convierte cada distrito en un pueblo que existía antes de la invasión: hay
+         * campamentos, barricadas, carros abandonados, jaulas y corrupción sobre una
+         * arquitectura civil, no cuatro arenas de combate idénticas.
+         */
+        private void decorateOccupiedVillage(int cx, int base, int cz, int district) {
+            int[][] barricades = {{-14,-5}, {15,7}, {-6,18}, {8,-20}};
+            for (int i = 0; i < barricades.length; i++) {
+                int x = cx + barricades[i][0];
+                int z = cz + barricades[i][1];
+                int y = terrainSurfaceY(x, z) - 1;
+                boolean alongX = ((i + district) & 1) == 0;
+                for (int offset = -3; offset <= 3; offset++) {
+                    int bx = x + (alongX ? offset : 0);
+                    int bz = z + (alongX ? 0 : offset);
+                    int sy = terrainSurfaceY(bx, bz) - 1;
+                    add(bx, sy + 1, bz, (offset & 1) == 0
+                            ? Material.SPRUCE_FENCE : Material.DARK_OAK_PLANKS);
+                    if (Math.abs(offset) == 2) add(bx, sy + 2, bz, Material.IRON_BARS);
+                }
+                add(x, y + 1, z, Material.GREEN_BANNER);
+            }
+
+            int tentX = cx + (district == 1 ? 18 : -17);
+            int tentZ = cz + (district == 2 ? -2 : 15);
+            int tentY = localBuildY(tentX, tentZ, 6, 5);
+            preparePlot(tentX, tentY, tentZ, 6, 5);
+            for (int x = tentX - 5; x <= tentX + 5; x++) {
+                for (int z = tentZ - 4; z <= tentZ + 4; z++) {
+                    add(x, tentY, z, Material.COARSE_DIRT);
+                    if (Math.abs(x - tentX) == 5 || Math.abs(z - tentZ) == 4) {
+                        int canopy = 4 - Math.min(3, Math.abs(x - tentX) / 2);
+                        add(x, tentY + canopy, z, ((x + z + district) & 1) == 0
+                                ? Material.GREEN_WOOL : Material.BLACK_WOOL);
+                    }
+                }
+            }
+            add(tentX, tentY + 1, tentZ, Material.SOUL_CAMPFIRE);
+            add(tentX - 3, tentY + 1, tentZ + 1, Material.BARREL);
+            add(tentX + 3, tentY + 1, tentZ + 1, Material.CRAFTING_TABLE);
+            addData(tentX, tentY + 3, tentZ, Material.LIGHT,
+                    "minecraft:light[level=12,waterlogged=false]");
+
+            int cartX = cx + (district - 1) * 9;
+            int cartZ = cz - 29;
+            int cartY = terrainSurfaceY(cartX, cartZ) - 1;
+            for (int x = cartX - 3; x <= cartX + 3; x++) {
+                add(x, cartY + 1, cartZ, Material.SPRUCE_PLANKS);
+            }
+            add(cartX - 3, cartY + 1, cartZ - 1, Material.DARK_OAK_TRAPDOOR);
+            add(cartX + 3, cartY + 1, cartZ - 1, Material.DARK_OAK_TRAPDOOR);
+            add(cartX, cartY + 2, cartZ, Material.COBWEB);
+            add(cartX + 1, cartY + 2, cartZ, Material.MOSS_BLOCK);
+
+            int cageX = cx - 8 + district * 7;
+            int cageZ = cz + 31;
+            int cageY = terrainSurfaceY(cageX, cageZ) - 1;
+            for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) {
+                add(cageX + dx, cageY, cageZ + dz, Material.STONE_BRICKS);
+                if (Math.abs(dx) == 2 || Math.abs(dz) == 2) {
+                    add(cageX + dx, cageY + 1, cageZ + dz, Material.IRON_BARS);
+                    add(cageX + dx, cageY + 2, cageZ + dz, Material.IRON_BARS);
+                }
+            }
+            mossPatch(cx + 30 - district * 12, base, cz - 8 + district * 7,
+                    7, new Random(143000L + district * 997L));
+        }
+
+        private void buildIrregularDistrictBoundaryV3(int cx, int cz, int rx, int rz, int salt) {
+            int[][] points = {
+                    {-rx + 5,-rz + 8}, {-rx / 3,-rz - 3}, {rx / 2,-rz + 1}, {rx - 2,-rz / 2},
+                    {rx + 2,rz / 3}, {rx / 2,rz}, {-rx / 3,rz + 2}, {-rx,rz / 3}
+            };
+            for (int i = 0; i < points.length; i++) {
+                int[] a = points[i];
+                int[] b = points[(i + 1) % points.length];
+                boolean southGate = i == 0;
+                boolean northGate = i == 4;
+                if (!southGate && !northGate) {
+                    buildAdaptiveWallSegment(cx + a[0], cz + a[1], cx + b[0], cz + b[1],
+                            5 + Math.floorMod(salt + i, 2), false);
+                }
+            }
+            buildRefugeWatchPost(cx - rx + 5, cz - rz + 8, salt * 11);
+            buildRefugeWatchPost(cx + rx - 2, cz - rz / 2, salt * 11 + 1);
+            buildRefugeWatchPost(cx + rx / 2, cz + rz, salt * 11 + 2);
+        }
+
+        private void buildDistrictProgressionV3(int cx, int y, int cz, int district,
+                                                LootTables table) {
+            int pedestalZ = cz + 27;
+            terraceCircle(cx + 6, y + 1, pedestalZ, 6,
+                    Material.CHISELED_STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
+            placeLootContainer(new Location(world, cx + 6, y + 2, pedestalZ), table, true);
+            String[][] mobs = {
+                    {"arlightbosses:emerald_zombie_minion", "arlightbosses:emerald_creeper_minion",
+                            "arlightbosses:mossbound_spider_minion", "arlightbosses:emerald_zombie_minion"},
+                    {"arlightbosses:emerald_zombie_minion", "arlightbosses:emerald_skeleton_archer_minion",
+                            "arlightbosses:emerald_ravager_cub_minion", "arlightbosses:mossbound_spider_minion"},
+                    {"arlightbosses:emerald_golem_sentinel_minion", "arlightbosses:emerald_skeleton_archer_minion",
+                            "arlightbosses:emerald_ravager_cub_minion", "arlightbosses:emerald_creeper_minion"}
+            };
+            int[][] positions = {{0,0},{-20,-10},{19,13},{0,27}};
+            for (int i = 0; i < positions.length; i++) {
+                placeCustomSpawner(new Location(world, cx + positions[i][0], y + 2,
+                        cz + positions[i][1]), mobs[district][i]);
+            }
+        }
+
+        private void buildGrandMarketHallV3(int cx, int y, int cz) {
+            preparePlot(cx, y, cz, 18, 14);
+            for (int x = cx - 17; x <= cx + 17; x++) for (int z = cz - 13; z <= cz + 13; z++) {
+                boolean boundary = Math.abs(x - cx) == 17 || Math.abs(z - cz) == 13;
+                add(x, y, z, ((x + z) & 7) == 0 ? Material.POLISHED_ANDESITE : Material.STONE_BRICKS);
+                for (int yy = 1; yy <= 11; yy++) {
+                    boolean arch = boundary && yy >= 3 && yy <= 7
+                            && ((Math.abs(x - cx) == 17 && Math.floorMod(z - cz, 7) <= 2)
+                            || (Math.abs(z - cz) == 13 && Math.floorMod(x - cx, 7) <= 2));
+                    if (!boundary || arch) add(x, y + yy, z, Material.AIR);
+                    else add(x, y + yy, z, (yy == 1 || yy == 8
+                            ? Material.POLISHED_TUFF : Material.TUFF_BRICKS));
+                }
+            }
+            for (int x = cx - 14; x <= cx + 14; x += 7) for (int z = cz - 9; z <= cz + 9; z += 6) {
+                add(x, y + 1, z, Material.BARREL);
+                add(x, y + 2, z, ((x + z) & 1) == 0 ? Material.RED_WOOL : Material.YELLOW_WOOL);
+            }
+            roofGable(cx - 19, cx + 19, cz - 15, cz + 15, y + 12, true);
+        }
+
+        private void buildCapitalHallV3(int cx, int cz, int width, int depth,
+                                        int height, int role) {
+            int halfX = width / 2;
+            int halfZ = depth / 2;
+            int y = localBuildY(cx, cz, halfX + 3, halfZ + 3);
+            preparePlot(cx, y, cz, halfX + 3, halfZ + 3);
+            for (int x = cx - halfX; x <= cx + halfX; x++) for (int z = cz - halfZ; z <= cz + halfZ; z++) {
+                boolean boundary = Math.abs(x - cx) == halfX || Math.abs(z - cz) == halfZ;
+                add(x, y, z, ((x + z) & 9) == 0 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_TUFF);
+                for (int yy = 1; yy <= height; yy++) {
+                    boolean entrance = z == cz - halfZ && Math.abs(x - cx) <= 2 && yy <= 5;
+                    if (!boundary || entrance) {
+                        add(x, y + yy, z, Material.AIR);
+                        continue;
+                    }
+                    boolean buttress = (Math.abs(x - cx) == halfX && Math.floorMod(z - cz, 6) == 0)
+                            || (Math.abs(z - cz) == halfZ && Math.floorMod(x - cx, 6) == 0);
+                    boolean window = yy >= 4 && yy <= 8 && !buttress
+                            && ((x + z + role) & 3) == 0;
+                    add(x, y + yy, z, window ? Material.LIME_STAINED_GLASS_PANE
+                            : (buttress ? Material.DEEPSLATE_BRICKS
+                            : (((x + z + yy) & 17) == 0 ? Material.MOSSY_STONE_BRICKS : Material.TUFF_BRICKS)));
+                }
+            }
+            for (int floorY = y + 6; floorY < y + height; floorY += 6) {
+                for (int x = cx - halfX + 2; x <= cx + halfX - 2; x++) {
+                    for (int z = cz - halfZ + 2; z <= cz + halfZ - 2; z++) {
+                        if (Math.abs(x - cx) <= 1 && Math.abs(z - cz) <= 1) continue;
+                        add(x, floorY, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            roofGable(cx - halfX - 2, cx + halfX + 2, cz - halfZ - 2, cz + halfZ + 2,
+                    y + height + 1, (role & 1) == 0);
+            furnishCapitalHallV3(cx, y, cz, halfX, halfZ, role);
+        }
+
+        private void furnishCapitalHallV3(int cx, int y, int cz, int halfX, int halfZ, int role) {
+            switch (role) {
+                case 0, 1 -> {
+                    for (int z = cz - halfZ + 2; z <= cz + halfZ - 2; z += 3) {
+                        add(cx - halfX + 2, y + 1, z, Material.BOOKSHELF);
+                        add(cx + halfX - 2, y + 1, z, Material.BOOKSHELF);
+                    }
+                    add(cx, y + 1, cz, Material.LECTERN);
+                }
+                case 2 -> {
+                    add(cx - 4, y + 1, cz, Material.BREWING_STAND);
+                    add(cx, y + 1, cz, Material.CAULDRON);
+                    add(cx + 4, y + 1, cz, Material.CRAFTING_TABLE);
+                }
+                case 3 -> {
+                    add(cx - 4, y + 1, cz, Material.BLAST_FURNACE);
+                    add(cx, y + 1, cz, Material.SMITHING_TABLE);
+                    add(cx + 4, y + 1, cz, Material.ANVIL);
+                }
+                case 4 -> {
+                    for (int x = cx - halfX + 3; x <= cx + halfX - 3; x += 5) {
+                        for (int yy = 1; yy <= 4; yy++) add(x, y + yy, cz + 2, Material.IRON_BARS);
+                    }
+                    add(cx, y + 1, cz - 3, Material.CHAIN);
+                }
+                default -> {
+                    add(cx - 4, y + 1, cz, Material.FLETCHING_TABLE);
+                    add(cx, y + 1, cz, Material.CRAFTING_TABLE);
+                    add(cx + 4, y + 1, cz, Material.STONECUTTER);
+                }
+            }
+            add(cx - halfX + 2, y + 2, cz - halfZ + 2, Material.LANTERN);
+            add(cx + halfX - 2, y + 2, cz - halfZ + 2, Material.LANTERN);
+            placeLootContainer(new Location(world, cx, y + 1, cz + halfZ - 2),
+                    role <= 1 ? LootTables.STRONGHOLD_LIBRARY : LootTables.SIMPLE_DUNGEON,
+                    (role & 1) == 1);
+        }
+
+        /** Arquitectura central completamente nueva de la ciudad invadida. */
+        private void buildInvadedCapitalV3(int cx, int cz, int base) {
+            int[][] wall = {
+                    {-80,-82}, {-22,-94}, {52,-89}, {82,-54}, {80,54},
+                    {66,88}, {-66,88}, {-84,52}, {-86,-42}
+            };
+            for (int i = 0; i < wall.length; i++) {
+                int[] a = wall[i];
+                int[] b = wall[(i + 1) % wall.length];
+                // Puerta occidental y portón norte de progresión se dibujan por separado.
+                if (i == 5) {
+                    buildAdaptiveWallSegment(cx + a[0], cz + a[1], cx + 8, cz + 88, 12, true);
+                    buildAdaptiveWallSegment(cx - 8, cz + 88, cx + b[0], cz + b[1], 12, true);
+                } else if (i == 7) {
+                    buildAdaptiveWallSegment(cx + a[0], cz + a[1], cx - 84, cz + 8, 12, true);
+                    buildAdaptiveWallSegment(cx - 84, cz - 8, cx + b[0], cz + b[1], 12, true);
+                } else {
+                    buildAdaptiveWallSegment(cx + a[0], cz + a[1], cx + b[0], cz + b[1], 12, true);
+                }
+            }
+            buildCastleGatehouseV3(cx - 84, base, cz, false);
+            buildCastleGatehouseV3(cx, base, cz + 88, true);
+            buildSquareCitadelTowerV3(cx - 78, cz - 76, 9, 27, 0);
+            buildSquareCitadelTowerV3(cx + 48, cz - 84, 8, 24, 1);
+            buildSquareCitadelTowerV3(cx + 76, cz + 51, 9, 30, 2);
+            buildSquareCitadelTowerV3(cx - 64, cz + 82, 8, 25, 3);
+
+            road(cx - 96, cz, cx + 68, cz + 6, 10, Material.STONE_BRICKS);
+            road(cx, cz - 88, cx, cz + 92, 9, Material.MOSSY_STONE_BRICKS);
+            road(cx - 62, cz - 40, cx + 62, cz + 46, 6, Material.COBBLESTONE);
+            buildSewerNetworkV3(cx, base, cz);
+
+            buildCapitalHallV3(cx - 48, cz - 45, 27, 19, 15, 1);
+            buildCapitalHallV3(cx + 47, cz - 44, 29, 19, 15, 2);
+            buildCapitalHallV3(cx - 50, cz + 22, 27, 19, 16, 4);
+            buildCapitalHallV3(cx + 49, cz + 21, 29, 19, 16, 3);
+            buildCapitalHallV3(cx - 35, cz + 58, 23, 17, 13, 5);
+            buildCapitalHallV3(cx + 35, cz + 58, 23, 17, 13, 0);
+            buildCastleKeepV3(cx, base + 3, cz + 35);
+            buildBossSanctumV3(cx, base + 10, cz + 130);
+            buildNetherGateShrineV3(cx, base + 2, cz + 202);
+
+            String[] guards = {
+                    "arlightbosses:emerald_zombie_minion",
+                    "arlightbosses:emerald_skeleton_archer_minion",
+                    "arlightbosses:emerald_creeper_minion",
+                    "arlightbosses:emerald_ravager_cub_minion",
+                    "arlightbosses:emerald_golem_sentinel_minion"
+            };
+            int[][] positions = {{-55,-61},{49,-63},{-57,-3},{58,5},{0,67}};
+            for (int i = 0; i < positions.length; i++) {
+                placeCustomSpawner(new Location(world, cx + positions[i][0], base + 2,
+                        cz + positions[i][1]), guards[i]);
+            }
+        }
+
+        private void buildCastleGatehouseV3(int cx, int baseHint, int cz, boolean northSouth) {
+            int y = northSouth ? baseHint
+                    : localBuildY(cx, cz, northSouth ? 18 : 9, northSouth ? 9 : 18);
+            int length = 15;
+            for (int a = -length; a <= length; a++) for (int b = -4; b <= 4; b++) {
+                int x = cx + (northSouth ? a : b);
+                int z = cz + (northSouth ? b : a);
+                for (int yy = 0; yy <= 15; yy++) {
+                    boolean opening = Math.abs(a) <= 5 && yy >= 1 && yy <= 7;
+                    add(x, y + yy, z, opening ? Material.AIR
+                            : (yy == 6 || yy == 12 ? Material.POLISHED_TUFF : Material.DEEPSLATE_BRICKS));
+                }
+            }
+            if (northSouth) {
+                buildSquareCitadelTowerV3(cx - 17, cz, 7, 24, 10);
+                buildSquareCitadelTowerV3(cx + 17, cz, 7, 24, 11);
+            } else {
+                buildSquareCitadelTowerV3(cx, cz - 17, 7, 24, 12);
+                buildSquareCitadelTowerV3(cx, cz + 17, 7, 24, 13);
+            }
+        }
+
+        private void buildSquareCitadelTowerV3(int cx, int cz, int radius, int height, int salt) {
+            int y = localBuildY(cx, cz, radius + 1, radius + 1);
+            preparePlot(cx, y, cz, radius + 1, radius + 1);
+            for (int x = cx - radius; x <= cx + radius; x++) for (int z = cz - radius; z <= cz + radius; z++) {
+                boolean boundary = Math.abs(x - cx) == radius || Math.abs(z - cz) == radius;
+                add(x, y, z, Material.POLISHED_TUFF);
+                if (boundary) for (int yy = 1; yy <= height; yy++) {
+                    boolean window = yy >= 7 && yy <= 9 && Math.floorMod(x + z + salt, 6) == 0;
+                    add(x, y + yy, z, window ? Material.LIME_STAINED_GLASS_PANE
+                            : (((x + z + yy) & 15) == 0 ? Material.MOSSY_STONE_BRICKS : Material.TUFF_BRICKS));
+                }
+            }
+            for (int floor = 7; floor < height; floor += 7) {
+                for (int x = cx - radius + 1; x <= cx + radius - 1; x++) {
+                    for (int z = cz - radius + 1; z <= cz + radius - 1; z++) {
+                        if (Math.abs(x - cx) <= 1 && Math.abs(z - cz) <= 1) continue;
+                        add(x, y + floor, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            for (int layer = 0; layer <= radius; layer++) {
+                int roofY = y + height + 1 + layer;
+                for (int x = cx - radius - 1 + layer; x <= cx + radius + 1 - layer; x++) {
+                    for (int z = cz - radius - 1 + layer; z <= cz + radius + 1 - layer; z++) {
+                        boolean edge = x == cx - radius - 1 + layer || x == cx + radius + 1 - layer
+                                || z == cz - radius - 1 + layer || z == cz + radius + 1 - layer;
+                        if (edge) add(x, roofY, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            for (int yy = y + 1; yy < y + height; yy++) add(cx, yy, cz, Material.SCAFFOLDING);
+        }
+
+        private void buildCastleKeepV3(int cx, int y, int cz) {
+            int halfX = 31;
+            int halfZ = 25;
+            preparePlot(cx, y, cz, halfX + 5, halfZ + 5);
+            for (int x = cx - halfX; x <= cx + halfX; x++) for (int z = cz - halfZ; z <= cz + halfZ; z++) {
+                boolean chamfered = Math.abs(x - cx) + Math.abs(z - cz) <= halfX + halfZ - 8;
+                if (!chamfered) continue;
+                boolean boundary = Math.abs(x - cx) >= halfX - 1 || Math.abs(z - cz) >= halfZ - 1
+                        || Math.abs(x - cx) + Math.abs(z - cz) >= halfX + halfZ - 10;
+                add(x, y, z, Material.POLISHED_TUFF);
+                for (int yy = 1; yy <= 24; yy++) {
+                    boolean southDoor = z <= cz - halfZ + 1 && Math.abs(x - cx) <= 4 && yy <= 7;
+                    boolean northDoor = z >= cz + halfZ - 1 && Math.abs(x - cx) <= 4 && yy <= 7;
+                    if (!boundary || southDoor || northDoor) add(x, y + yy, z, Material.AIR);
+                    else {
+                        boolean window = yy >= 7 && yy <= 11 && Math.floorMod(x + z, 8) <= 1;
+                        add(x, y + yy, z, window ? Material.LIME_STAINED_GLASS_PANE
+                                : (((x * 3 + z + yy) & 19) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.DEEPSLATE_BRICKS));
+                    }
+                }
+            }
+            for (int floorY : new int[]{y + 8, y + 16}) {
+                for (int x = cx - halfX + 3; x <= cx + halfX - 3; x++) {
+                    for (int z = cz - halfZ + 3; z <= cz + halfZ - 3; z++) {
+                        if (Math.abs(x - cx) <= 3 && z >= cz - halfZ + 4 && z <= cz + halfZ - 4) continue;
+                        add(x, floorY, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            buildSquareCitadelTowerV3(cx - 31, cz - 24, 8, 32, 20);
+            buildSquareCitadelTowerV3(cx + 31, cz - 24, 8, 29, 21);
+            buildSquareCitadelTowerV3(cx - 31, cz + 24, 8, 35, 22);
+            buildSquareCitadelTowerV3(cx + 31, cz + 24, 8, 31, 23);
+            roofGable(cx - halfX - 2, cx + halfX + 2, cz - halfZ - 2, cz + halfZ + 2,
+                    y + 25, true);
+            for (int z = cz - 18; z <= cz + 18; z += 6) {
+                add(cx - 9, y + 1, z, Material.CHISELED_TUFF_BRICKS);
+                add(cx + 9, y + 1, z, Material.CHISELED_TUFF_BRICKS);
+                add(cx - 9, y + 2, z, Material.LANTERN);
+                add(cx + 9, y + 2, z, Material.LANTERN);
+            }
+            placeLootContainer(new Location(world, cx - 12, y + 1, cz + 8),
+                    LootTables.STRONGHOLD_CROSSING, false);
+            placeLootContainer(new Location(world, cx + 12, y + 1, cz + 8),
+                    LootTables.STRONGHOLD_CORRIDOR, false);
+        }
+
+        private void buildBossSanctumV3(int cx, int y, int cz) {
+            terraceCircle(cx, y, cz, 48, Material.POLISHED_TUFF, Material.MOSSY_STONE_BRICKS);
+            // Escalera ancha desde el sello de z+88 hasta el patio elevado.
+            for (int step = 0; step <= 28; step++) {
+                int z = cz - 48 + step;
+                int stepY = y - 9 + step / 4;
+                for (int x = cx - 6; x <= cx + 6; x++) add(x, stepY, z,
+                        (step % 5 == 0) ? Material.CHISELED_STONE_BRICKS : Material.STONE_BRICKS);
+            }
+            for (int degree = 0; degree < 360; degree += 3) {
+                double angle = Math.toRadians(degree);
+                int x = cx + (int) Math.round(Math.cos(angle) * 46.0D);
+                int z = cz + (int) Math.round(Math.sin(angle) * 42.0D);
+                boolean entrance = z < cz - 34 && Math.abs(x - cx) <= 8;
+                if (entrance) continue;
+                for (int yy = 1; yy <= 12; yy++) add(x, y + yy, z,
+                        yy == 6 ? Material.POLISHED_TUFF : Material.DEEPSLATE_BRICKS);
+            }
+            for (int x = cx - 18; x <= cx + 18; x++) for (int z = cz - 17; z <= cz + 17; z++) {
+                add(x, y, z, ((x + z) & 7) == 0 ? Material.CHISELED_TUFF_BRICKS : Material.POLISHED_TUFF);
+                for (int yy = 1; yy <= 16; yy++) add(x, y + yy, z, Material.AIR);
+            }
+            // Trono y cristal quedan detrás del punto del jefe, dejando la arena libre.
+            for (int level = 0; level < 6; level++) {
+                for (int x = cx - 8 + level; x <= cx + 8 - level; x++) {
+                    add(x, y + level, cz + 27 + level, Material.DEEPSLATE_BRICKS);
+                }
+            }
+            crystalSpike(cx, y + 6, cz + 35, 19, new Random(1420130L));
+            for (int[] pillar : new int[][]{{-35,-18},{35,-18},{-35,20},{35,20}}) {
+                buildSquareCitadelTowerV3(cx + pillar[0], cz + pillar[1], 5, 17, pillar[0] + pillar[1]);
+            }
+            placeLootContainer(new Location(world, cx - 25, y + 1, cz + 8),
+                    LootTables.STRONGHOLD_CROSSING, false);
+            placeLootContainer(new Location(world, cx + 25, y + 1, cz + 8),
+                    LootTables.STRONGHOLD_CROSSING, false);
+        }
+
+        private void buildNetherGateShrineV3(int cx, int y, int cz) {
+            terraceCircle(cx, y, cz, 17, Material.POLISHED_ANDESITE, Material.MOSSY_STONE_BRICKS);
+            for (int x = cx - 8; x <= cx + 8; x++) for (int z = cz - 6; z <= cz + 6; z++) {
+                add(x, y, z, ((x + z) & 5) == 0 ? Material.CHISELED_STONE_BRICKS : Material.STONE_BRICKS);
+                for (int yy = 1; yy <= 12; yy++) add(x, y + yy, z, Material.AIR);
+            }
+            for (int x : new int[]{cx - 8, cx + 8}) for (int yy = 1; yy <= 12; yy++) {
+                add(x, y + yy, cz, yy % 4 == 0 ? Material.EMERALD_BLOCK : Material.DEEPSLATE_BRICKS);
+            }
+            for (int x = cx - 8; x <= cx + 8; x++) {
+                int arch = 12 + Math.max(0, 4 - Math.abs(x - cx) / 2);
+                add(x, y + arch, cz, Material.DEEPSLATE_BRICKS);
+            }
+            add(cx - 5, y + 2, cz + 4, Material.LANTERN);
+            add(cx + 5, y + 2, cz + 4, Material.LANTERN);
+        }
+
+        private void buildSewerNetworkV3(int cx, int base, int cz) {
+            int sewerY = base - 7;
+            for (int x = cx - 58; x <= cx + 58; x++) for (int width = -2; width <= 2; width++) {
+                int z = cz + width;
+                add(x, sewerY - 1, z, Material.STONE_BRICKS);
+                for (int yy = 0; yy <= 4; yy++) add(x, sewerY + yy, z,
+                        Math.abs(width) == 2 ? Material.MOSSY_STONE_BRICKS : Material.AIR);
+                add(x, sewerY + 5, z, Material.STONE_BRICKS);
+            }
+            for (int z = cz - 72; z <= cz + 72; z++) for (int width = -2; width <= 2; width++) {
+                int x = cx + width;
+                add(x, sewerY - 1, z, Material.STONE_BRICKS);
+                for (int yy = 0; yy <= 4; yy++) add(x, sewerY + yy, z,
+                        Math.abs(width) == 2 ? Material.MOSSY_STONE_BRICKS : Material.AIR);
+                add(x, sewerY + 5, z, Material.STONE_BRICKS);
+            }
+            for (int[] access : new int[][]{{-52,0},{52,0},{0,-60},{0,60}}) {
+                for (int yy = sewerY; yy <= base + 1; yy++) {
+                    add(cx + access[0], yy, cz + access[1], Material.SCAFFOLDING);
+                }
+                placeLootContainer(new Location(world, cx + access[0] + 2, sewerY, cz + access[1]),
+                        LootTables.SIMPLE_DUNGEON, true);
+            }
+        }
+
+        /** Conservado sin llamadas; 1.43.0 nunca lo coloca en una revisión nueva. */
+        @SuppressWarnings("unused")
+        private void buildLegacyDungeonRegion(Location center) {
             int cx = center.getBlockX();
             int cz = center.getBlockZ();
             int base = medianHeight(cx, cz, 58);
@@ -2681,18 +3643,27 @@ public final class OverworldTemplateManager implements Listener {
         private void preparePlot(int cx, int y, int cz, int halfX, int halfZ) {
             for (int x = cx - halfX; x <= cx + halfX; x++) for (int z = cz - halfZ; z <= cz + halfZ; z++) {
                 int current = surfaceY(x, z) - 1;
-                if (current < y) {
+                int edgeDistance = Math.min(halfX - Math.abs(x - cx), halfZ - Math.abs(z - cz));
+                // El último bloque es una transición de terreno, no el borde recto de una losa.
+                int target = edgeDistance == 0
+                        ? y + Math.max(-1, Math.min(1, current - y)) : y;
+                if (current < target) {
                     // La versión anterior rellenaba solo seis bloques y dejaba plataformas
                     // suspendidas sobre laderas. Ahora toda la diferencia se integra al terreno.
-                    for (int yy = current + 1; yy <= y; yy++) {
+                    for (int yy = current + 1; yy <= target; yy++) {
                         boolean face = x == cx - halfX || x == cx + halfX || z == cz - halfZ || z == cz + halfZ;
-                        Material material = yy == y ? Material.STONE
+                        Material material = yy == target
+                                ? (edgeDistance == 0
+                                ? (((x * 3 + z) & 5) == 0 ? Material.MOSS_BLOCK : Material.COARSE_DIRT)
+                                : Material.STONE)
                                 : (face && (yy + x + z) % 7 == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
                         add(x, yy, z, material);
                     }
                 } else {
-                    for (int yy = y + 1; yy <= Math.min(current + 12, world.getMaxHeight() - 2); yy++) add(x, yy, z, Material.AIR);
-                    add(x, y, z, Material.STONE);
+                    for (int yy = target + 1; yy <= Math.min(current + 12, world.getMaxHeight() - 2); yy++) add(x, yy, z, Material.AIR);
+                    add(x, target, z, edgeDistance == 0
+                            ? (((x + z) & 3) == 0 ? Material.MOSS_BLOCK : Material.COARSE_DIRT)
+                            : Material.STONE);
                 }
             }
         }
@@ -2717,35 +3688,78 @@ public final class OverworldTemplateManager implements Listener {
         }
 
         private void road(int x1, int z1, int x2, int z2, int width, Material material) {
-            int dx = Math.abs(x2 - x1), dz = Math.abs(z2 - z1);
-            int sx = x1 < x2 ? 1 : -1;
-            int sz = z1 < z2 ? 1 : -1;
-            int err = dx - dz;
-            int x = x1, z = z1;
-            int lastY = terrainSurfaceY(x, z) - 1;
-            while (true) {
-                int natural = surfaceY(x, z) - 1;
-                int y = Math.max(lastY - 1, Math.min(lastY + 1, natural));
-                lastY = y;
-                for (int wx = -width / 2; wx <= width / 2; wx++) for (int wz = -width / 2; wz <= width / 2; wz++) {
-                    if (Math.abs(wx) + Math.abs(wz) > width / 2 + 1) continue;
-                    int bx = x + wx, bz = z + wz;
+            int deltaX = x2 - x1;
+            int deltaZ = z2 - z1;
+            int steps = Math.max(Math.abs(deltaX), Math.abs(deltaZ));
+            if (steps == 0) return;
+            double length = Math.hypot(deltaX, deltaZ);
+            double perpendicularX = -deltaZ / length;
+            double perpendicularZ = deltaX / length;
+            int hash = Math.floorMod(x1 * 31 + z1 * 17 + x2 * 13 + z2 * 7, 2);
+            double bend = steps < 18 ? 0.0D : Math.min(9.0D, steps / 11.0D) * (hash == 0 ? -1.0D : 1.0D);
+
+            int previousX = x1;
+            int previousZ = z1;
+            int previousY = terrainSurfaceY(x1, z1) - 1;
+            for (int step = 0; step <= steps; step++) {
+                double t = step / (double) steps;
+                double arc = Math.sin(Math.PI * t) * bend;
+                int x = (int) Math.round(x1 + deltaX * t + perpendicularX * arc);
+                int z = (int) Math.round(z1 + deltaZ * t + perpendicularZ * arc);
+                if (step > 0 && x == previousX && z == previousZ) continue;
+
+                int natural = terrainSurfaceY(x, z) - 1;
+                int y = step == 0 ? natural : Math.max(previousY - 1, Math.min(previousY + 1, natural));
+                int moveX = Integer.compare(x, previousX);
+                int moveZ = Integer.compare(z, previousZ);
+                boolean mostlyX = Math.abs(x - previousX) >= Math.abs(z - previousZ);
+                boolean heightChange = step > 0 && y != previousY;
+                String facing = cardinalFacing(heightChange && y < previousY ? -moveX : moveX,
+                        heightChange && y < previousY ? -moveZ : moveZ);
+
+                for (int offset = -width / 2; offset <= width / 2; offset++) {
+                    int bx = mostlyX ? x : x + offset;
+                    int bz = mostlyX ? z + offset : z;
                     int belowRoad = terrainSurfaceY(bx, bz) - 1;
-                    if (belowRoad < y) {
-                        for (int fy = belowRoad + 1; fy < y; fy++) {
-                            add(bx, fy, bz, ((fy + bx + bz) & 7) == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
-                        }
+                    for (int fillY = belowRoad + 1; fillY < y; fillY++) {
+                        add(bx, fillY, bz, ((fillY + bx + bz) & 7) == 0
+                                ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
                     }
-                    add(bx, y, bz, ((bx + bz) % 8 == 0) ? Material.MOSSY_COBBLESTONE : material);
-                    add(bx, y + 1, bz, Material.AIR);
-                    add(bx, y + 2, bz, Material.AIR);
-                    add(bx, y + 3, bz, Material.AIR);
+                    if (heightChange) {
+                        Material stairs = material == Material.DIRT_PATH || material == Material.COARSE_DIRT
+                                ? Material.COBBLESTONE_STAIRS : Material.STONE_BRICK_STAIRS;
+                        addData(bx, y, bz, stairs, "minecraft:" + stairs.name().toLowerCase(Locale.ROOT)
+                                + "[facing=" + facing + ",half=bottom,shape=straight,waterlogged=false]");
+                    } else {
+                        Material roadBlock = Math.floorMod(bx * 5 + bz * 3, 13) == 0
+                                ? Material.MOSSY_COBBLESTONE : material;
+                        add(bx, y, bz, roadBlock);
+                    }
+                    for (int clearY = y + 1; clearY <= y + 4; clearY++) add(bx, clearY, bz, Material.AIR);
                 }
-                if (x == x2 && z == z2) break;
-                int e2 = 2 * err;
-                if (e2 > -dz) { err -= dz; x += sx; }
-                if (e2 < dx) { err += dx; z += sz; }
+
+                if (step % 7 == 0) {
+                    addData(x, y + 3, z, Material.LIGHT,
+                            "minecraft:light[level=15,waterlogged=false]");
+                }
+                if (step > 0 && step < steps && step % 19 == 0) {
+                    int side = width / 2 + 2;
+                    int lampX = mostlyX ? x : x + side;
+                    int lampZ = mostlyX ? z + side : z;
+                    int lampY = Math.max(y, terrainSurfaceY(lampX, lampZ) - 1);
+                    add(lampX, lampY + 1, lampZ, Material.COBBLESTONE_WALL);
+                    add(lampX, lampY + 2, lampZ, Material.SPRUCE_FENCE);
+                    add(lampX, lampY + 3, lampZ, Material.LANTERN);
+                }
+                previousX = x;
+                previousY = y;
+                previousZ = z;
             }
+        }
+
+        private String cardinalFacing(int dx, int dz) {
+            if (Math.abs(dx) >= Math.abs(dz)) return dx >= 0 ? "east" : "west";
+            return dz >= 0 ? "south" : "north";
         }
 
         private void fenceRectangle(int cx, int y, int cz, int halfX, int halfZ, Material fence) {
