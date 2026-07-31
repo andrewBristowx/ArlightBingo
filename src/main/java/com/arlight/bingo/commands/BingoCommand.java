@@ -110,8 +110,14 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                     if (args[1].equalsIgnoreCase("all")) {
                         return filter(Arrays.asList("generate", "status", "cancel", "audit"), args[2]);
                     }
-                    if (Arrays.asList("overworld", "nether", "end").contains(args[1].toLowerCase())) {
-                        return filter(Arrays.asList("generate", "resume", "status", "audit", "cancel", "reset", "tp", "lootr", "testboss"), args[2]);
+                    if (args[1].equalsIgnoreCase("overworld")) {
+                        return filter(Arrays.asList("generate", "resume", "status", "audit",
+                                "revisions", "promote", "rollback", "force-stage",
+                                "cancel", "reset", "tp", "lootr", "testboss"), args[2]);
+                    }
+                    if (Arrays.asList("nether", "end").contains(args[1].toLowerCase())) {
+                        return filter(Arrays.asList("generate", "resume", "status", "audit",
+                                "cancel", "reset", "tp", "lootr", "testboss"), args[2]);
                     }
                     return List.of();
                 case "trigger": {
@@ -134,6 +140,24 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                 case "scene", "demo" -> filter(Arrays.asList("overworld", "nether", "end", "celebration", "altar"), args[3]);
                 default -> List.of();
             };
+        }
+
+        if (sub.equals("template") && args[1].equalsIgnoreCase("overworld")) {
+            if (args.length == 4) {
+                if (args[2].equalsIgnoreCase("generate")) {
+                    return filter(Arrays.asList("r001-zone-a"), args[3]);
+                }
+                if (args[2].equalsIgnoreCase("promote")
+                        || args[2].equalsIgnoreCase("force-stage")) {
+                    if (plugin instanceof BingoPlugin bingoPlugin) {
+                        String working = bingoPlugin.getOverworldTemplateManager().workingRevision();
+                        return working.isBlank() ? List.of() : filter(List.of(working), args[3]);
+                    }
+                }
+            }
+            if (args.length == 5 && args[2].equalsIgnoreCase("force-stage")) {
+                return filter(List.of("custom"), args[4]);
+            }
         }
 
         return List.of();
@@ -516,7 +540,8 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 if (args.length < 3) {
-                    sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo template <overworld|nether|end|all> <generate|resume|status|audit|cancel|reset|tp|lootr|testboss> [force]");
+                    sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo template <overworld|nether|end|all> "
+                            + "<generate|resume|status|audit|revisions|promote|rollback|force-stage|cancel|reset|tp> [revisión]");
                     return true;
                 }
 
@@ -547,10 +572,29 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                 if (dimension.equals("overworld")) {
                     var templates = bingoPlugin.getOverworldTemplateManager();
                     switch (action) {
-                        case "generate" -> templates.generate(sender, force);
+                        case "generate" -> {
+                            if (args.length >= 4 && !force) templates.generate(sender, args[3]);
+                            else templates.generate(sender, force);
+                        }
                         case "resume" -> templates.resume(sender);
                         case "status" -> sender.sendMessage(ChatColor.GREEN + "Plantilla Overworld: " + ChatColor.WHITE + templates.status());
                         case "audit" -> templates.audit(sender);
+                        case "revisions" -> templates.revisions(sender);
+                        case "promote" -> {
+                            if (args.length < 4) {
+                                sender.sendMessage(ChatColor.RED + "Uso: /bingo template overworld promote <revisión>");
+                            } else templates.promote(sender, args[3]);
+                        }
+                        case "rollback" -> {
+                            if (args.length < 4) {
+                                sender.sendMessage(ChatColor.RED + "Uso: /bingo template overworld rollback <revisión>");
+                            } else templates.rollback(sender, args[3]);
+                        }
+                        case "force-stage" -> {
+                            if (args.length < 5) {
+                                sender.sendMessage(ChatColor.RED + "Uso: /bingo template overworld force-stage <revisión> custom");
+                            } else templates.forceStage(sender, args[3], args[4]);
+                        }
                         case "cancel" -> templates.cancel(sender);
                         case "reset" -> templates.reset(sender);
                         case "lootr" -> sender.sendMessage(ChatColor.LIGHT_PURPLE + "Lootr: " + ChatColor.WHITE + templates.lootrStatus());
