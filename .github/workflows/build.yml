@@ -13,7 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
 
     steps:
       - name: Descargar repositorio
@@ -44,9 +44,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT_FILE="$(find /tmp/source-extracted -maxdepth 5 -type f \( -name pom.xml -o -name gradlew \) | head -n 1)"
+          ROOT_FILE="$(find /tmp/source-extracted -maxdepth 5 -type f -name pom.xml | head -n 1)"
           if [ -z "$ROOT_FILE" ]; then
-            echo 'No se encontró pom.xml ni gradlew en el ZIP.' >&2
+            echo 'No se encontró pom.xml en el ZIP.' >&2
             exit 1
           fi
           ROOT="$(dirname "$ROOT_FILE")"
@@ -60,6 +60,24 @@ jobs:
             BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
             git push origin "HEAD:${BRANCH}"
           fi
+
+      - name: Instalar dependencia ArlightCore 1.20.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE_ID='1ZTvzmN3bwT5Xe56dLvfjcI4ISDN0lsPB'
+          curl -L --fail --retry 3 \
+            "https://drive.usercontent.google.com/download?id=${CORE_ID}&export=download&confirm=t" \
+            -o /tmp/arlightcore.zip
+          rm -rf /tmp/arlightcore
+          mkdir -p /tmp/arlightcore
+          unzip -q /tmp/arlightcore.zip -d /tmp/arlightcore
+          CORE_POM="$(find /tmp/arlightcore -maxdepth 5 -type f -name pom.xml | head -n 1)"
+          if [ -z "$CORE_POM" ]; then
+            echo 'No se encontró pom.xml de ArlightCore.' >&2
+            exit 1
+          fi
+          mvn -B -U -f "$CORE_POM" -DskipTests clean install
 
       - name: Compilar con Maven
         shell: bash
