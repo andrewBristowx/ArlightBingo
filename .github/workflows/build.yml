@@ -78,8 +78,9 @@ jobs:
           mkdir -p dist
           find target -maxdepth 1 -type f -name '*.jar' \
             ! -name '*-sources.jar' ! -name '*-javadoc.jar' \
+            ! -name 'original-*.jar' \
             -exec cp {} dist/ \;
-          test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
+          test -f dist/ArlightBingo-1.44.0.jar
           unzip -p dist/ArlightBingo-1.44.0.jar plugin.yml | grep -q '^version: 1.44.0$'
           unzip -l dist/ArlightBingo-1.44.0.jar | grep -q 'OverworldIslandGenerator.class'
           unzip -l dist/ArlightBingo-1.44.0.jar | grep -q 'OverworldVillageSafety.class'
@@ -91,10 +92,36 @@ jobs:
             | grep -q 'buildInvadedCapitalV3'
           ls -lh dist
 
-      - name: Subir JAR compilado
+      - name: Empaquetar fuente y hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          DELIVERY='ArlightBingo-1.44.0-OVERWORLD-LAYOUT-REPAIR'
+          mkdir -p "package/${DELIVERY}-SOURCE"
+          rsync -a \
+            --exclude '.git/' \
+            --exclude 'arlight-core/' \
+            --exclude 'target/' \
+            --exclude 'dist/' \
+            --exclude 'package/' \
+            ./ "package/${DELIVERY}-SOURCE/"
+          cd package
+          zip -qr "${DELIVERY}-SOURCE.zip" "${DELIVERY}-SOURCE"
+          cp ../dist/ArlightBingo-1.44.0.jar .
+          sha256sum ArlightBingo-1.44.0.jar "${DELIVERY}-SOURCE.zip" \
+            > ArlightBingo-1.44.0-SHA256.txt
+          unzip -t "${DELIVERY}-SOURCE.zip"
+          sha256sum -c ArlightBingo-1.44.0-SHA256.txt
+          rm -rf "${DELIVERY}-SOURCE"
+          ls -lh
+
+      - name: Subir entrega completa
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.44.0-JAR
-          path: dist/*.jar
+          name: ArlightBingo-1.44.0-DELIVERY
+          path: |
+            package/ArlightBingo-1.44.0.jar
+            package/ArlightBingo-1.44.0-OVERWORLD-LAYOUT-REPAIR-SOURCE.zip
+            package/ArlightBingo-1.44.0-SHA256.txt
           if-no-files-found: error
           retention-days: 90
