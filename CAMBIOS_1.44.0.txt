@@ -1,0 +1,30 @@
+ArlightBingo 1.44.0 - OVERWORLD LAYOUT REPAIR
+================================================
+
+- Conserva íntegra la revisión 1.43.0 como respaldo y aplica el arreglo solo a
+  una plantilla Overworld terminada durante la ejecución actual.
+- Añade una pasada geométrica posterior a la construcción para reparar los
+  problemas observados en las capturas de prueba de 1.43.0.
+- Seca agua o lava atrapada dentro y debajo de las parcelas.
+- Añade cimientos y muros de apoyo hasta terreno sólido para evitar edificios
+  flotantes o apoyados sobre cuevas y agua.
+- Detecta cicatrices de caminos colocadas sobre tejados y las restaura usando
+  el material dominante del techo cercano.
+- Limpia las entradas y construye conectores transitables con una variación
+  máxima de un bloque de altura por paso.
+- Los conectores respetan las huellas tridimensionales de las demás estructuras
+  y no atraviesan edificios vecinos.
+- Registra posibles solapamientos entre parcelas antes de repararlas.
+- Añade detalles distintos por edificio: chimenea, toldo, jardín o anexo de
+  almacenamiento, reduciendo modelos idénticos demasiado cercanos.
+- Refuerza la iluminación interior y de las rutas de acceso.
+- La reparación se ejecuta por lotes, deja marcador de progreso y puede
+  reanudarse después de un reinicio.
+- Genera un informe dentro de la carpeta del mundo con parcelas reparadas,
+  apoyos, bloques secados, cicatrices de tejado, pendientes y solapamientos.
+
+SEGURIDAD
+- Una plantilla 1.43.0 ya existente no se modifica automáticamente al instalar
+  el JAR 1.44.0.
+- Solo una revisión nueva terminada con 1.44.0, o una reparación 1.44.0 ya
+  iniciada, puede activar la pasada geométrica.
