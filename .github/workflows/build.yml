@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.46.0
+name: Compilar ArlightBingo 1.47.0
 
 on:
   workflow_dispatch:
@@ -17,7 +17,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 55
-
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
@@ -30,36 +29,20 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verificar fuente 1.46.0
+      - name: Verificar fuente 1.47.0
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '<version>1.46.0</version>' pom.xml
-          grep -q '^version: 1.46.0$' src/main/resources/plugin.yml
-          grep -q '^1.46.0$' BUILD_VERSION.txt
-          grep -q '^ArlightBingo 1.46.0 ISLAND-RECONSTRUCTION-BOSS-GATE$' SOURCE_VERSION.txt
-          grep -q 'class OverworldCampaignLandscape146' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape146.java
-          grep -q 'restoreLegacySite' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain146.java
-          grep -q 'shapeVillage' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain146.java
-          grep -q 'static List<BlockEdit> village' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignStructures146.java
-          grep -q 'monumentalArenaEntrance' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture146.java
-          grep -q 'outerRitualAltar' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture146.java
-          grep -q 'invocationAltar' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture146.java
-          grep -q 'GATE_OPEN_MARKER' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape146.java
-          grep -q 'BOSS_AWAKENED_MARKER' \
-            src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape146.java
-          grep -q 'new OverworldCampaignLandscape146' \
-            src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
-          grep -q 'Lleva las tres piezas al altar exterior' \
-            src/main/java/com/arlight/bingo/dungeon/OverworldCampaignProgression.java
+          grep -q '<version>1.47.0</version>' pom.xml
+          grep -q '^version: 1.47.0$' src/main/resources/plugin.yml
+          grep -q '^1.47.0$' BUILD_VERSION.txt
+          grep -q '^ArlightBingo 1.47.0 FORTRESS-INTEGRATION-POLISH$' SOURCE_VERSION.txt
+          grep -q 'legacy-village-fragment' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder147.java
+          grep -q 'farmDistrict' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture147.java
+          grep -q 'connectedPortcullis' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture147.java
+          grep -q 'integrateFortifications' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain147.java
+          grep -q 'polishCoastlines' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain147.java
+          grep -q 'new OverworldCampaignLandscape147' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
 
       - name: Descargar ArlightCore 1.20.0 canónico
         uses: actions/checkout@v4
@@ -68,79 +51,49 @@ jobs:
           ref: 597c130a5d5450ac92e02430def406ef22512bc9
           path: arlight-core
 
-      - name: Instalar dependencia ArlightCore 1.20.0
+      - name: Instalar ArlightCore
         shell: bash
-        run: |
-          set -euo pipefail
-          grep -q '<version>1.20.0</version>' arlight-core/pom.xml
-          mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
+        run: mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
 
-      - name: Compilar con Maven
+      - name: Compilar
         shell: bash
-        run: |
-          set -euo pipefail
-          mvn -B -U clean package
+        run: mvn -B -U clean package
 
-      - name: Reunir y verificar JAR
+      - name: Verificar JAR
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          find target -maxdepth 1 -type f -name '*.jar' \
-            ! -name '*-sources.jar' ! -name '*-javadoc.jar' \
-            ! -name 'original-*.jar' \
-            -exec cp {} dist/ \;
-          test -f dist/ArlightBingo-1.46.0.jar
-          unzip -p dist/ArlightBingo-1.46.0.jar plugin.yml | grep -q '^version: 1.46.0$'
-          unzip -l dist/ArlightBingo-1.46.0.jar | grep -q 'OverworldCampaignLandscape146.class'
-          unzip -l dist/ArlightBingo-1.46.0.jar | grep -q 'OverworldCampaignBuilder146.class'
-          unzip -l dist/ArlightBingo-1.46.0.jar | grep -q 'OverworldCampaignTerrain146.class'
-          unzip -l dist/ArlightBingo-1.46.0.jar | grep -q 'OverworldCampaignArchitecture146.class'
-          unzip -l dist/ArlightBingo-1.46.0.jar | grep -q 'OverworldCampaignStructures146.class'
-          javap -classpath dist/ArlightBingo-1.46.0.jar -p \
-            'com.arlight.bingo.listeners.OverworldCampaignLandscape146' \
-            | grep -q 'handleOuterAltar'
-          javap -classpath dist/ArlightBingo-1.46.0.jar -p \
-            'com.arlight.bingo.listeners.OverworldCampaignLandscape146' \
-            | grep -q 'handleInvocationAltar'
-          javap -classpath dist/ArlightBingo-1.46.0.jar -p \
-            'com.arlight.bingo.listeners.OverworldCampaignBuilder146' \
-            | grep -q 'addRestorePhases'
-          javap -classpath dist/ArlightBingo-1.46.0.jar -p \
-            'com.arlight.bingo.listeners.OverworldCampaignTerrain146' \
-            | grep -q 'restoreLegacySite'
-          ls -lh dist
+          cp target/ArlightBingo-1.47.0.jar dist/
+          unzip -p dist/ArlightBingo-1.47.0.jar plugin.yml | grep -q '^version: 1.47.0$'
+          unzip -l dist/ArlightBingo-1.47.0.jar | grep -q 'OverworldCampaignBuilder147.class'
+          unzip -l dist/ArlightBingo-1.47.0.jar | grep -q 'OverworldCampaignTerrain147.class'
+          unzip -l dist/ArlightBingo-1.47.0.jar | grep -q 'OverworldCampaignArchitecture147.class'
+          unzip -l dist/ArlightBingo-1.47.0.jar | grep -q 'OverworldCampaignStructures147.class'
+          unzip -l dist/ArlightBingo-1.47.0.jar | grep -q 'OverworldCampaignLandscape147.class'
 
-      - name: Empaquetar fuente y hashes
+      - name: Empaquetar entrega
         shell: bash
         run: |
           set -euo pipefail
-          DELIVERY='ArlightBingo-1.46.0-ISLAND-RECONSTRUCTION-BOSS-GATE'
-          mkdir -p "package/${DELIVERY}-SOURCE"
-          rsync -a \
-            --exclude '.git/' \
-            --exclude 'arlight-core/' \
-            --exclude 'target/' \
-            --exclude 'dist/' \
-            --exclude 'package/' \
-            ./ "package/${DELIVERY}-SOURCE/"
+          DELIVERY='ArlightBingo-1.47.0-FORTRESS-INTEGRATION-POLISH'
+          mkdir -p package/${DELIVERY}-SOURCE
+          rsync -a --exclude '.git/' --exclude 'arlight-core/' --exclude 'target/' --exclude 'dist/' --exclude 'package/' ./ package/${DELIVERY}-SOURCE/
           cd package
-          zip -qr "${DELIVERY}-SOURCE.zip" "${DELIVERY}-SOURCE"
-          cp ../dist/ArlightBingo-1.46.0.jar .
-          sha256sum ArlightBingo-1.46.0.jar "${DELIVERY}-SOURCE.zip" \
-            > ArlightBingo-1.46.0-SHA256.txt
-          unzip -t "${DELIVERY}-SOURCE.zip"
-          sha256sum -c ArlightBingo-1.46.0-SHA256.txt
-          rm -rf "${DELIVERY}-SOURCE"
-          ls -lh
+          zip -qr ${DELIVERY}-SOURCE.zip ${DELIVERY}-SOURCE
+          cp ../dist/ArlightBingo-1.47.0.jar .
+          sha256sum ArlightBingo-1.47.0.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.47.0-SHA256.txt
+          unzip -t ${DELIVERY}-SOURCE.zip
+          sha256sum -c ArlightBingo-1.47.0-SHA256.txt
+          rm -rf ${DELIVERY}-SOURCE
 
       - name: Subir entrega completa
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.46.0-DELIVERY
+          name: ArlightBingo-1.47.0-DELIVERY
           path: |
-            package/ArlightBingo-1.46.0.jar
-            package/ArlightBingo-1.46.0-ISLAND-RECONSTRUCTION-BOSS-GATE-SOURCE.zip
-            package/ArlightBingo-1.46.0-SHA256.txt
+            package/ArlightBingo-1.47.0.jar
+            package/ArlightBingo-1.47.0-FORTRESS-INTEGRATION-POLISH-SOURCE.zip
+            package/ArlightBingo-1.47.0-SHA256.txt
           if-no-files-found: error
           retention-days: 90
