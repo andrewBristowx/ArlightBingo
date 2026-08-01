@@ -229,7 +229,7 @@ final class OverworldCampaignArchitecture148 {
                 int x = tx + (alongX ? 0 : o);
                 int z = tz + (alongX ? o : 0);
                 if (yy == 3 || Math.abs(o) == 2)
-                    out.add(e(x, y + yy, z, side < 0 ? Material.DARK_GREEN_WOOL : Material.BROWN_WOOL));
+                    out.add(e(x, y + yy, z, side < 0 ? Material.GREEN_WOOL : Material.BROWN_WOOL));
             }
         }
         out.add(e(cx, y, cz, Material.CAMPFIRE));
@@ -574,7 +574,7 @@ final class OverworldCampaignArchitecture148 {
             else out.add(e(cx + x, y, cz + z, Material.WATER));
         }
         out.add(e(cx, y, cz, Material.CHISELED_STONE_BRICKS));
-        out.add(e(cx, y + 1, cz, Material.POLISHED_ANDESITE_WALL));
+        out.add(e(cx, y + 1, cz, Material.STONE_BRICK_WALL));
         out.add(e(cx, y + 2, cz, Material.LANTERN));
 
         // The bell has its own pavilion instead of occupying or breaking the fountain.

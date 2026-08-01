@@ -241,9 +241,10 @@ final class OverworldCampaignTerrain148 {
                 if (Math.abs(dx) + Math.abs(dz) != 1) continue;
                 int sx = x + dx;
                 int sz = z + dz;
-                int natural = terrainY(world, sx, sz);
-                if (natural < target - 5) {
-                    for (int y = target - 2; y >= natural; y--) out.add(new BlockEdit(sx, y, sz, Material.COBBLESTONE));
+                int neighborGround = terrainY(world, sx, sz);
+                if (neighborGround < target - 5) {
+                    for (int y = target - 2; y >= neighborGround; y--)
+                        out.add(new BlockEdit(sx, y, sz, Material.COBBLESTONE));
                 }
             }
         }
