@@ -277,11 +277,11 @@ public final class OverworldCampaignProgression {
                     SomitaGuideNetwork.Variant.OVERWORLD,
                     SomitaGuideNetwork.Animation.POINT,
                     guide, 180,
-                    "Los tres distritos están libres. La ciudadela se abrió: derrota al Guardián de la Superficie.");
+                    "Los tres distritos están libres. Lleva las tres piezas al altar exterior de la arena.");
             somita.effect(player, SomitaGuideNetwork.Effect.OVERWORLD_POINT, 60, bossHome);
         }
         game.sendToParticipants(ChatColor.GOLD + "[Bingo] La ciudadela está abierta. "
-                + ChatColor.WHITE + "El Guardián de la Superficie ha despertado.");
+                + ChatColor.WHITE + "Sigue la calzada hasta la puerta ritual y coloca las tres piezas.");
     }
 
     public void onBossDefeated() {
