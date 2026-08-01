@@ -27,14 +27,20 @@ final class OverworldCampaignArchitecture148 {
                 if (!edge) { if (yy > 0) out.add(e(cx + x, y + yy, cz + z, Material.AIR)); continue; }
                 boolean door = entrance(front, x, z, hx, hz) && yy <= 1;
                 if (door) { out.add(e(cx + x, y + yy, cz + z, Material.AIR)); continue; }
-                boolean frame = yy == 0 || yy == height || yy % 5 == 0
-                        || (Math.abs(x) == hx && Math.floorMod(z, 5) == 0)
-                        || (Math.abs(z) == hz && Math.floorMod(x, 5) == 0);
-                boolean window = yy % 5 >= 2 && yy % 5 <= 3
-                        && ((Math.abs(x) == hx && Math.floorMod(z, 6) == 0)
-                        || (Math.abs(z) == hz && Math.floorMod(x, 6) == 0));
-                out.add(e(cx + x, y + yy, cz + z,
-                        frame ? Material.STRIPPED_DARK_OAK_LOG : window ? Material.GLASS_PANE : plaster));
+                boolean xWall = Math.abs(x) == hx;
+                boolean corner = xWall && Math.abs(z) == hz;
+                int alongWall = xWall ? z : x;
+                int bay = Math.floorMod(alongWall, 5);
+                boolean frame = corner || yy == 0 || yy == height || yy % 5 == 0
+                        || bay == 0;
+                boolean window = !frame && yy % 5 >= 2 && yy % 5 <= 3
+                        && (bay == 2 || bay == 3);
+                if (window) {
+                    out.add(connectedGlassPane(cx + x, y + yy, cz + z, xWall));
+                } else {
+                    out.add(e(cx + x, y + yy, cz + z,
+                            frame ? Material.STRIPPED_DARK_OAK_LOG : plaster));
+                }
             }
         }
         for (int floor = 1; floor < floors; floor++) {
@@ -46,7 +52,7 @@ final class OverworldCampaignArchitecture148 {
                     out.add(e(cx + x, fy, cz + z, Material.SPRUCE_PLANKS));
         }
         roof(out, cx, y + height + 1, cz, hx, hz, roofAlongX, plaster);
-        frontPath(out, cx, y, cz, hx, hz, front, 5);
+        frontPath(out, world, cx, y, cz, hx, hz, front, 5);
         int frontRadius = front == Facing.NORTH || front == Facing.SOUTH ? hz : hx;
         int doorX = cx + front.dx * frontRadius;
         int doorZ = cz + front.dz * frontRadius;
@@ -141,7 +147,15 @@ final class OverworldCampaignArchitecture148 {
                         + ",half=upper,hinge=left,open=false,powered=false]"));
     }
 
-    private static void frontPath(List<BlockEdit> out, int cx, int y, int cz,
+    private static BlockEdit connectedGlassPane(int x, int y, int z, boolean xWall) {
+        String connections = xWall
+                ? "north=true,east=false,south=true,west=false"
+                : "north=false,east=true,south=false,west=true";
+        return data(x, y, z, Material.GLASS_PANE,
+                "minecraft:glass_pane[" + connections + ",waterlogged=false]");
+    }
+
+    private static void frontPath(List<BlockEdit> out, World world, int cx, int y, int cz,
                                   int hx, int hz, Facing front, int length) {
         int radius = front == Facing.NORTH || front == Facing.SOUTH ? hz : hx;
         for (int step = 0; step <= length; step++) {
@@ -152,8 +166,9 @@ final class OverworldCampaignArchitecture148 {
             for (int side = -sideRadius; side <= sideRadius; side++) {
                 int x = px + (front.dx == 0 ? side : 0);
                 int z = pz + (front.dz == 0 ? side : 0);
-                out.add(e(x, y - 1, z, Math.floorMod(step + side, 5) == 0
-                        ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE));
+                Material floor = Math.floorMod(step + side, 5) == 0
+                        ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE;
+                OverworldCampaignTerrain148.supportedPathCell(out, world, x, y, z, floor);
                 for (int yy = 0; yy <= clearance; yy++) out.add(e(x, y + yy, z, Material.AIR));
             }
         }
@@ -166,19 +181,26 @@ final class OverworldCampaignArchitecture148 {
 
     static void auditedTower(List<BlockEdit> out, World world, Registry registry, String id,
                              int cx, int y, int cz, int radius, int height, Material roof) {
-        registry.registerTower(new TowerSpec(id, cx, y, cz, radius, height));
-        OverworldCampaignTerrain148.buildingPad(out, world, cx, y - 1, cz,
-                radius + 1, radius + 1, 5, Material.STONE_BRICKS);
-        tower(out, cx, y, cz, radius, height, roof);
+        auditedTower(out, world, registry, id, cx, y, cz, radius, height, roof, Facing.SOUTH);
     }
 
-    static void tower(List<BlockEdit> out, int cx, int y, int cz, int radius, int height, Material roof) {
+    static void auditedTower(List<BlockEdit> out, World world, Registry registry, String id,
+                             int cx, int y, int cz, int radius, int height, Material roof,
+                             Facing entrance) {
+        registry.registerTower(new TowerSpec(id, cx, y, cz, radius, height, entrance));
+        OverworldCampaignTerrain148.buildingPad(out, world, cx, y - 1, cz,
+                radius + 1, radius + 1, 5, Material.STONE_BRICKS);
+        tower(out, world, cx, y, cz, radius, height, roof, entrance);
+    }
+
+    static void tower(List<BlockEdit> out, World world, int cx, int y, int cz, int radius,
+                      int height, Material roof, Facing entrance) {
         foundation(out, cx, y - 1, cz, radius + 1, radius + 1);
         for (int x = -radius; x <= radius; x++) for (int z = -radius; z <= radius; z++) {
             boolean wall = Math.abs(x) == radius || Math.abs(z) == radius;
             for (int yy = 0; yy <= height; yy++) {
                 if (!wall) { if (yy > 0) out.add(e(cx + x, y + yy, cz + z, Material.AIR)); continue; }
-                boolean opening = z == radius && x == 0 && yy <= 1;
+                boolean opening = entrance(entrance, x, z, radius, radius) && yy <= 1;
                 out.add(e(cx + x, y + yy, cz + z, opening ? Material.AIR
                         : ((x + z + yy) & 11) == 0 ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
             }
@@ -213,12 +235,34 @@ final class OverworldCampaignArchitecture148 {
             out.add(data(cx + radius - 1, yy, ladderZ, Material.LADDER,
                     "minecraft:ladder[facing=west,waterlogged=false]"));
         }
-        door(out, cx, y, cz + radius, Facing.SOUTH);
+        towerEntranceLanding(out, world, cx, y, cz, radius, entrance);
+        door(out, cx + entrance.dx * radius, y, cz + entrance.dz * radius, entrance);
         for (int x = -radius - 2; x <= radius + 2; x++) for (int z = -radius - 2; z <= radius + 2; z++)
             if (Math.abs(x) + Math.abs(z) <= radius * 2 + 2) out.add(e(cx + x, y + height + 1, cz + z, roof));
         out.add(e(cx, y + height, cz, Material.CHAIN));
         out.add(e(cx, y + height - 1, cz, Material.CHAIN));
         out.add(e(cx, y + height - 2, cz, Material.LANTERN));
+    }
+
+    private static void towerEntranceLanding(List<BlockEdit> out, World world,
+                                             int cx, int y, int cz, int radius,
+                                             Facing entrance) {
+        int sideX = -entrance.dz;
+        int sideZ = entrance.dx;
+        for (int step = 0; step <= 5; step++) {
+            int sideRadius = step == 0 ? 0 : 2;
+            int clearance = step == 0 ? 1 : 3;
+            for (int side = -sideRadius; side <= sideRadius; side++) {
+                int x = cx + entrance.dx * (radius + step) + sideX * side;
+                int z = cz + entrance.dz * (radius + step) + sideZ * side;
+                Material floor = Math.floorMod(step + side, 7) == 0
+                        ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
+                OverworldCampaignTerrain148.supportedPathCell(out, world, x, y, z, floor);
+                for (int yy = 0; yy <= clearance; yy++) {
+                    out.add(e(x, y + yy, z, Material.AIR));
+                }
+            }
+        }
     }
 
     static void well(List<BlockEdit> out, int cx, int y, int cz) {
@@ -495,12 +539,18 @@ final class OverworldCampaignArchitecture148 {
 
     static void straightRoad(List<BlockEdit> out, int x1, int y, int z1, int x2, int z2, int width, Material material) {
         int steps = Math.max(Math.abs(x2 - x1), Math.abs(z2 - z1));
+        int halfWidth = Math.max(1, width / 2);
         for (int step = 0; step <= steps; step++) {
             double t = steps == 0 ? 0.0D : step / (double) steps;
             int cx = (int) Math.round(x1 + (x2 - x1) * t), cz = (int) Math.round(z1 + (z2 - z1) * t);
-            for (int side = -width / 2; side <= width / 2; side++) {
-                out.add(e(cx + side, y - 1, cz, material));
-                for (int yy = 0; yy <= 3; yy++) out.add(e(cx + side, y + yy, cz, Material.AIR));
+            for (int ox = -halfWidth; ox <= halfWidth; ox++) {
+                for (int oz = -halfWidth; oz <= halfWidth; oz++) {
+                    if (ox * ox + oz * oz > halfWidth * halfWidth + halfWidth) continue;
+                    out.add(e(cx + ox, y - 1, cz + oz, material));
+                    for (int yy = 0; yy <= 3; yy++) {
+                        out.add(e(cx + ox, y + yy, cz + oz, Material.AIR));
+                    }
+                }
             }
         }
     }
@@ -606,7 +656,9 @@ final class OverworldCampaignArchitecture148 {
         for (int side = -3; side <= 3; side++) {
             int x = cx + front.dx * (radius + 1) + px * side;
             int z = cz + front.dz * (radius + 1) + pz * side;
-            out.add(e(x, y - 1, z, Material.SMOOTH_STONE_SLAB));
+            // A bottom slab left a half-block trench in front of every doorway.
+            // Full smooth stone keeps the porch flush with the registered path.
+            out.add(e(x, y - 1, z, Material.SMOOTH_STONE));
             if (Math.abs(side) == 3) out.add(e(x, y, z, Material.SPRUCE_FENCE));
         }
         int chimneyX = cx + (variant % 2 == 0 ? -hx + 2 : hx - 2);
@@ -723,25 +775,28 @@ final class OverworldCampaignArchitecture148 {
     static void villageStreet(List<BlockEdit> out, int x1, int y1, int z1,
                               int x2, int y2, int z2, int width) {
         int steps = Math.max(Math.abs(x2 - x1), Math.abs(z2 - z1));
-        boolean mostlyHorizontal = Math.abs(x2 - x1) >= Math.abs(z2 - z1);
         double dx = x2 - x1, dz = z2 - z1;
         double length = Math.max(1.0D, Math.sqrt(dx * dx + dz * dz));
         double nx = -dz / length, nz = dx / length;
+        int halfWidth = Math.max(1, width / 2);
         for (int step = 0; step <= steps; step++) {
             double t = steps == 0 ? 0.0D : step / (double) steps;
             double bend = Math.sin(Math.PI * t) * Math.min(2.5D, length * 0.035D);
             int cx = (int) Math.round(x1 + (x2 - x1) * t + nx * bend);
             int cy = (int) Math.round(y1 + (y2 - y1) * t);
             int cz = (int) Math.round(z1 + (z2 - z1) * t + nz * bend);
-            for (int side = -width / 2; side <= width / 2; side++) {
-                int x = mostlyHorizontal ? cx : cx + side;
-                int z = mostlyHorizontal ? cz + side : cz;
-                Material surface = Math.floorMod(step + side, 11) == 0
+            for (int ox = -halfWidth; ox <= halfWidth; ox++) {
+                for (int oz = -halfWidth; oz <= halfWidth; oz++) {
+                    if (ox * ox + oz * oz > halfWidth * halfWidth + halfWidth) continue;
+                    int x = cx + ox;
+                    int z = cz + oz;
+                    Material surface = Math.floorMod(step + ox * 3 + oz * 5, 11) == 0
                         ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE;
-                out.add(e(x, cy - 1, z, surface));
-                out.add(e(x, cy - 2, z, Material.STONE_BRICKS));
-                out.add(e(x, cy - 3, z, Material.STONE));
-                for (int yy = 0; yy <= 3; yy++) out.add(e(x, cy + yy, z, Material.AIR));
+                    out.add(e(x, cy - 1, z, surface));
+                    out.add(e(x, cy - 2, z, Material.STONE_BRICKS));
+                    out.add(e(x, cy - 3, z, Material.STONE));
+                    for (int yy = 0; yy <= 3; yy++) out.add(e(x, cy + yy, z, Material.AIR));
+                }
             }
         }
     }
@@ -792,9 +847,11 @@ final class OverworldCampaignArchitecture148 {
         out.add(e(x - 1, y, z, Material.SPRUCE_SLAB));
         out.add(e(x, y, z, Material.SPRUCE_SLAB));
         out.add(e(x + 1, y, z, Material.SPRUCE_SLAB));
-        out.add(e(x - 1, y + 1, z + 1, Material.SPRUCE_TRAPDOOR));
-        out.add(e(x, y + 1, z + 1, Material.SPRUCE_TRAPDOOR));
-        out.add(e(x + 1, y + 1, z + 1, Material.SPRUCE_TRAPDOOR));
+        String backrest = "minecraft:spruce_trapdoor[facing=north,half=bottom,"
+                + "open=true,powered=false,waterlogged=false]";
+        out.add(data(x - 1, y + 1, z + 1, Material.SPRUCE_TRAPDOOR, backrest));
+        out.add(data(x, y + 1, z + 1, Material.SPRUCE_TRAPDOOR, backrest));
+        out.add(data(x + 1, y + 1, z + 1, Material.SPRUCE_TRAPDOOR, backrest));
     }
 
     static void outerRitualAltar(List<BlockEdit> out, int cx, int y, int cz) {

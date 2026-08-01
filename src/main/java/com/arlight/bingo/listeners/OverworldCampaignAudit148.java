@@ -15,7 +15,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.3 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.4 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -32,7 +32,8 @@ final class OverworldCampaignAudit148 {
     record HouseSpec(String id, int cx, int y, int cz, int hx, int hz,
                      int height, boolean roofAlongX, Facing front) { }
 
-    record TowerSpec(String id, int cx, int y, int cz, int radius, int height) { }
+    record TowerSpec(String id, int cx, int y, int cz, int radius, int height,
+                     Facing front) { }
 
     record ChimneySpec(String id, int x, int baseY, int topY, int z) { }
 
@@ -112,8 +113,38 @@ final class OverworldCampaignAudit148 {
                 int dz = z - tower.cz;
                 if (Math.abs(dx) <= tower.radius + 2
                         && Math.abs(dz) <= tower.radius + 2) return true;
-                if (dz >= tower.radius && dz <= tower.radius + 7
-                        && Math.abs(dx) <= 3) return true;
+                int forward = dx * tower.front.dx + dz * tower.front.dz;
+                int lateral = Math.abs(dx * tower.front.dz - dz * tower.front.dx);
+                if (forward >= tower.radius && forward <= tower.radius + 7
+                        && lateral <= 3) return true;
+            }
+            return false;
+        }
+
+        boolean blocksTerrainAudit(int x, int z) {
+            for (HouseSpec house : houses) {
+                if (Math.abs(x - house.cx) <= house.hx + 4
+                        && Math.abs(z - house.cz) <= house.hz + 4) return true;
+            }
+            for (TowerSpec tower : towers) {
+                if (Math.abs(x - tower.cx) <= tower.radius + 9
+                        && Math.abs(z - tower.cz) <= tower.radius + 9) return true;
+            }
+            for (FortificationSpec wall : fortifications) {
+                int dx = Math.abs(x - wall.cx);
+                int dz = Math.abs(z - wall.cz);
+                if (wall.shape == FortificationShape.SQUARE) {
+                    if (dx <= wall.radius + 5 && dz <= wall.radius + 5
+                            && (Math.abs(dx - wall.radius) <= 5
+                            || Math.abs(dz - wall.radius) <= 5)) return true;
+                } else {
+                    double distance = Math.sqrt((double) dx * dx + (double) dz * dz);
+                    if (Math.abs(distance - wall.radius) <= 6.0D) return true;
+                }
+            }
+            if (roadCells.containsKey(new RoadColumn(x, z))) return true;
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
+                if (roadCells.containsKey(new RoadColumn(x + dx, z + dz))) return true;
             }
             return false;
         }
@@ -176,7 +207,9 @@ final class OverworldCampaignAudit148 {
         for (HouseSpec house : registry.houses) auditHouse(world, house, failures);
         for (TowerSpec tower : registry.towers) auditTower(world, tower, failures);
         for (ChimneySpec chimney : registry.chimneys) auditChimney(world, chimney, failures);
-        for (TerrainSpec terrain : registry.terrain) auditTerrainBlend(world, terrain, failures);
+        for (TerrainSpec terrain : registry.terrain) {
+            auditTerrainBlend(world, registry, terrain, failures);
+        }
         for (FortificationSpec fortification : registry.fortifications) {
             auditFortificationFoundation(world, fortification, failures);
         }
@@ -197,7 +230,7 @@ final class OverworldCampaignAudit148 {
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.3 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.4 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -293,6 +326,18 @@ final class OverworldCampaignAudit148 {
                         failures.add("pared abierta en " + house.id);
                         return;
                     }
+                    if (type == Material.GLASS_PANE) {
+                        String state = world.getBlockAt(house.cx + x, house.y + yy,
+                                house.cz + z).getBlockData().getAsString();
+                        boolean xWall = Math.abs(x) == house.hx;
+                        boolean connected = xWall
+                                ? state.contains("north=true") && state.contains("south=true")
+                                : state.contains("east=true") && state.contains("west=true");
+                        if (!connected) {
+                            failures.add("panel de cristal desconectado en " + house.id);
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -359,12 +404,28 @@ final class OverworldCampaignAudit148 {
         auditRectangularFoundation(world, tower.id, tower.cx, tower.y - 1, tower.cz,
                 tower.radius + 1, tower.radius + 1, failures);
         if (failures.size() > failuresBeforeFoundation) return;
-        if (world.getBlockAt(tower.cx, tower.y, tower.cz + tower.radius).getType()
-                != Material.SPRUCE_DOOR
-                || world.getBlockAt(tower.cx, tower.y + 1,
-                tower.cz + tower.radius).getType() != Material.SPRUCE_DOOR) {
+        int doorX = tower.cx + tower.front.dx * tower.radius;
+        int doorZ = tower.cz + tower.front.dz * tower.radius;
+        if (world.getBlockAt(doorX, tower.y, doorZ).getType() != Material.SPRUCE_DOOR
+                || world.getBlockAt(doorX, tower.y + 1, doorZ).getType()
+                != Material.SPRUCE_DOOR) {
             failures.add("torre sin puerta real: " + tower.id);
             return;
+        }
+        int sideX = -tower.front.dz;
+        int sideZ = tower.front.dx;
+        for (int step = 0; step <= 5; step++) {
+            int sideRadius = step == 0 ? 0 : 2;
+            for (int side = -sideRadius; side <= sideRadius; side++) {
+                int x = tower.cx + tower.front.dx * (tower.radius + step) + sideX * side;
+                int z = tower.cz + tower.front.dz * (tower.radius + step) + sideZ * side;
+                if (!world.getBlockAt(x, tower.y - 1, z).getType().isSolid()
+                        || world.getBlockAt(x, tower.y, z).getType().isSolid()
+                        || world.getBlockAt(x, tower.y + 1, z).getType().isSolid()) {
+                    failures.add("entrada de torre enterrada o sin descansillo: " + tower.id);
+                    return;
+                }
+            }
         }
         int ladderZ = tower.cz + Math.min(2, tower.radius - 2);
         for (int y = tower.y; y < tower.y + tower.height; y++) {
@@ -415,7 +476,7 @@ final class OverworldCampaignAudit148 {
         }
     }
 
-    private static void auditTerrainBlend(World world, TerrainSpec spec,
+    private static void auditTerrainBlend(World world, Registry registry, TerrainSpec spec,
                                           List<String> failures) {
         Site site = spec.site;
         for (int degree = 0; degree < 360; degree += 15) {
@@ -425,6 +486,10 @@ final class OverworldCampaignAudit148 {
                  radius <= spec.blendRadius + 18; radius++) {
                 int x = site.x() + (int) Math.round(Math.cos(angle) * radius);
                 int z = site.z() + (int) Math.round(Math.sin(angle) * radius);
+                if (registry.blocksTerrainAudit(x, z)) {
+                    previous = null;
+                    continue;
+                }
                 int current = OverworldCampaignTerrain148.terrainY(world, x, z);
                 if (previous != null && Math.abs(current - previous) > 7) {
                     failures.add("corte abrupto del terreno en " + site.id());

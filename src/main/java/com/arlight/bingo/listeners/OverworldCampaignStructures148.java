@@ -199,23 +199,35 @@ final class OverworldCampaignStructures148 {
                 site.x(), y, site.z() - 23, 3);
         villageStreet(out, site.x(), y, site.z() + 25,
                 site.x() + 12, y, site.z() + 25, 3);
+        // Paved branches keep the large military plateau readable and connect the
+        // northern towers instead of leaving an empty coarse-dirt field.
+        villageStreet(out, site.x() - 4, y, site.z() - 20,
+                site.x() - 39, y, site.z() - 33, 3);
+        villageStreet(out, site.x() + 4, y, site.z() - 20,
+                site.x() + 39, y, site.z() - 33, 3);
         house(out, world, registry, "military-barracks", site.x(), y, site.z() + 5,
                 27, 19, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
         int towerIndex = 0;
         for (int[] point : new int[][]{{-39,-39},{39,-39},{-39,39},{39,39}}) {
             auditedTower(out, world, registry, "military-tower-" + towerIndex++,
                     site.x() + point[0], y, site.z() + point[1], 6, 18,
-                    Material.DEEPSLATE_TILES);
+                    Material.DEEPSLATE_TILES,
+                    point[1] > 0 ? Facing.NORTH : Facing.SOUTH);
         }
         fortWall(out, site.x(), y, site.z(), 48, 7, true);
         wallOpening(out, site.x() - 48, y, site.z() - 23, false, 5, 5);
+        OverworldCampaignTerrain148.supportedGateApproach(out, world,
+                "military-west-gate", site.x() - 48, y, site.z() - 23,
+                -1, 0, 8, 14, 3, Material.MOSSY_COBBLESTONE, registry);
         trainingYard(out, site.x() - 24, y, site.z() + 27);
         house(out, world, registry, "military-armory", site.x() + 25, y, site.z() + 25,
                 17, 11, 1, false, Material.LIGHT_GRAY_TERRACOTTA, Facing.WEST);
         house(out, world, registry, "military-supply", site.x() - 25, y + 2, site.z() - 23,
                 15, 11, 1, true, Material.GRAY_TERRACOTTA, Facing.EAST);
         spawnerShrines(out, site, y, Material.AMETHYST_BLOCK);
-        rewardPedestal(out, site.x() + 6, y, site.z() + 3, Material.AMETHYST_BLOCK);
+        // The former +6,+3 position was inside the barracks and erased one of its
+        // twelve LIGHT blocks. This offset keeps the entire 7x7 pedestal outside.
+        rewardPedestal(out, site.x() + 20, y, site.z() + 3, Material.AMETHYST_BLOCK);
         barricade(out, site.x(), y, site.z() + 48, true);
         lampsAround(out, registry, site.x(), y, site.z(), 31, 8);
         report.structures += 11;
@@ -231,19 +243,32 @@ final class OverworldCampaignStructures148 {
         house(out, world, registry, "citadel-great-hall", site.x(), y, site.z(),
                 43, 27, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
         auditedTower(out, world, registry, "citadel-tower-southwest",
-                site.x() - 40, y, site.z() + 24, 7, 22, Material.DEEPSLATE_TILES);
+                site.x() - 40, y, site.z() + 24, 7, 22,
+                Material.DEEPSLATE_TILES, Facing.NORTH);
         auditedTower(out, world, registry, "citadel-tower-southeast",
-                site.x() + 40, y, site.z() + 24, 7, 22, Material.DEEPSLATE_TILES);
+                site.x() + 40, y, site.z() + 24, 7, 22,
+                Material.DEEPSLATE_TILES, Facing.NORTH);
         auditedTower(out, world, registry, "citadel-tower-northwest",
-                site.x() - 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
+                site.x() - 36, y, site.z() - 31, 6, 18,
+                Material.DARK_OAK_PLANKS, Facing.SOUTH);
         auditedTower(out, world, registry, "citadel-tower-northeast",
-                site.x() + 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
+                site.x() + 36, y, site.z() - 31, 6, 18,
+                Material.DARK_OAK_PLANKS, Facing.SOUTH);
         fortWall(out, site.x(), y, site.z(), 55, 8, true);
         wallOpening(out, site.x(), y, site.z() - 55, true, 6, 6);
         wallOpening(out, site.x() - 55, y, site.z() + 10, false, 6, 6);
         wallOpening(out, site.x() + 55, y, site.z() + 10, false, 6, 6);
+        OverworldCampaignTerrain148.supportedGateApproach(out, world,
+                "citadel-west-gate", site.x() - 55, y, site.z() + 10,
+                -1, 0, 8, 14, 4, Material.POLISHED_ANDESITE, registry);
+        OverworldCampaignTerrain148.supportedGateApproach(out, world,
+                "citadel-east-gate", site.x() + 55, y, site.z() + 10,
+                1, 0, 8, 14, 4, Material.POLISHED_ANDESITE, registry);
         gateFrame(out, world, registry, "citadel-south-gate", site.x(), y,
                 site.z() + 55, 9, 14);
+        OverworldCampaignTerrain148.supportedGateApproach(out, world,
+                "citadel-south-approach", site.x(), y, site.z() + 55,
+                0, 1, 8, 14, 4, Material.POLISHED_ANDESITE, registry);
         OverworldCampaignTerrain148.supportedGateApproach(out, world,
                 "citadel-north-gate", site.x(), y, site.z() - 55,
                 0, -1, 8, 14, 4, Material.POLISHED_ANDESITE, registry);
@@ -273,6 +298,10 @@ final class OverworldCampaignStructures148 {
             circleWall(out, site.x(), y, site.z(), radius, 9,
                     radius % 2 == 0 ? Material.DEEPSLATE_BRICKS : Material.MOSSY_STONE_BRICKS);
         }
+        OverworldCampaignTerrain148.supportedGateApproach(out, world,
+                "boss-north-approach", ritualGate.getBlockX(), ritualGate.getBlockY(),
+                ritualGate.getBlockZ(), 0, -1, 6, 24, 8,
+                Material.POLISHED_DEEPSLATE, registry);
         monumentalArenaEntrance(out, world, registry, ritualGate.getBlockX(),
                 ritualGate.getBlockY(), ritualGate.getBlockZ());
         straightRoad(out, ritualGate.getBlockX() - 16, ritualGate.getBlockY(), ritualGate.getBlockZ() + 5,
@@ -285,7 +314,7 @@ final class OverworldCampaignStructures148 {
         for (int[] rear : new int[][]{{-31,34},{31,34}}) {
             auditedTower(out, world, registry, "boss-rear-tower-" + rearIndex++,
                     site.x() + rear[0], y, site.z() + rear[1], 4, 11,
-                    Material.DEEPSLATE_TILES);
+                    Material.DEEPSLATE_TILES, Facing.NORTH);
         }
         // Register every tower before choosing lamps so no post can be embedded
         // in a gatehouse or rear-tower entrance.
@@ -309,6 +338,9 @@ final class OverworldCampaignStructures148 {
                                 ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
             }
         }
+        OverworldCampaignTerrain148.supportedGateApproach(out, world,
+                "portal-north-approach", site.x(), y, site.z() - 10,
+                0, -1, 6, 18, 4, Material.POLISHED_ANDESITE, registry);
         gateFrame(out, world, registry, "portal-north-gate", site.x(), y,
                 site.z() - 10, 6, 10);
         for (int side = -12; side <= 12; side++) {

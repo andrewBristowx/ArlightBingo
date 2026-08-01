@@ -302,7 +302,7 @@ public final class OverworldCampaignProgression {
     }
 
     private void buildCitadelSeal() {
-        // 1.48.3 seals the real citadel doorway. Older revisions created a second
+        // 1.48.4 seals the real citadel doorway. Older revisions created a second
         // emerald/iron cage eighty-eight blocks away, which invaded the approved route.
         gateCenter = new Location(world, citadel.getBlockX(), citadel.getBlockY(),
                 citadel.getBlockZ() + 55);
