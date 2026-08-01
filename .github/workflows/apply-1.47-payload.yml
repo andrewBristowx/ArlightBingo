@@ -1,0 +1,58 @@
+name: Aplicar fuente ArlightBingo 1.47.0
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-source:
+    if: github.head_ref == 'agent/bingo-1.47.0-fortress-integration-polish'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar rama candidata
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Comprobar paquete pendiente
+        id: pending
+        shell: bash
+        run: |
+          if test -d .github/payloads/1.47; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo 'La fuente 1.47.0 ya fue aplicada; no hay paquete pendiente.'
+          fi
+
+      - name: Reconstruir y verificar paquete
+        if: steps.pending.outputs.exists == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/payloads/1.47/chunk-* > /tmp/arlightbingo-1.47.0.b64
+          base64 --decode /tmp/arlightbingo-1.47.0.b64 > /tmp/arlightbingo-1.47.0.tar.gz
+          echo 'a5fde1ae81d689c1b36df7c756a752cb75dd7b5af51a1ffa4e8f0f2669ce9011  /tmp/arlightbingo-1.47.0.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/arlightbingo-1.47.0.tar.gz -C .
+          rm -rf .github/payloads/1.47
+
+      - name: Publicar fuente real
+        if: steps.pending.outputs.exists == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No hay cambios pendientes.'
+            exit 0
+          fi
+          git commit -m 'Aplicar ArlightBingo 1.47.0 fortress integration polish'
+          git push origin HEAD:${{ github.head_ref }}

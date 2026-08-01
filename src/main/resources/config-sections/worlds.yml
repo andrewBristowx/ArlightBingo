@@ -98,7 +98,7 @@ template-worlds:
       enabled: true
       radius: 112
       purge-interval-ticks: 40
-    campaign-layout-1-46:
+    campaign-layout-1-47:
       enabled: true
       citadel-x: 140
       citadel-z: 30

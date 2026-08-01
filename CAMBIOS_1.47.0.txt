@@ -1,0 +1,10 @@
+ArlightBingo 1.47.0 - FORTRESS-INTEGRATION-POLISH
+
+- Rehace el layout Overworld con una revisión nueva 1.47.0 separada de 1.46.0.
+- Mejora murallas y entradas: portones conectados, rejas integradas, accesos más profundos y soportes visuales.
+- Añade integración de fortificaciones con el relieve para evitar muros flotando o cortados.
+- Amplía y adapta la zona agrícola con huertos y pequeños huertos/arboledas en vez de un parche cuadrado simple.
+- Suaviza costas y la península/santuario final para que no se vea como un círculo unido por un cuello extraño.
+- Refuerza el modelado del terreno bajo castillos, arena y distritos.
+
+- Elimina la torre/techo heredado al sureste del pueblo inicial y recompone la ladera sin cráteres ni plataformas artificiales.
