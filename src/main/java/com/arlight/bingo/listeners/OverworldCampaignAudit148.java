@@ -15,7 +15,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.4 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.5 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -230,7 +230,7 @@ final class OverworldCampaignAudit148 {
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.4 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.5 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -253,6 +253,56 @@ final class OverworldCampaignAudit148 {
             }
         }
         return out;
+    }
+
+    /**
+     * Replays every registered private entrance after roads, fortifications and decoration.
+     * Step zero is the real doorway and therefore receives a door instead of AIR; the
+     * remaining cells are the supported outdoor landing. Keeping this separate from the
+     * public-road replay prevents a late road brush from deleting a valid door.
+     */
+    static List<BlockEdit> repairRegisteredEntrances(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (HouseSpec house : registry.houses) {
+            replayEntrance(out, house.cx, house.y, house.cz, frontRadius(house),
+                    house.front, 1, 2, Material.COBBLESTONE);
+        }
+        for (TowerSpec tower : registry.towers) {
+            replayEntrance(out, tower.cx, tower.y, tower.cz, tower.radius,
+                    tower.front, 2, 3, Material.STONE_BRICKS);
+        }
+        return out;
+    }
+
+    private static void replayEntrance(List<BlockEdit> out, int cx, int y, int cz,
+                                       int radius, Facing front, int landingHalfWidth,
+                                       int clearance, Material floor) {
+        int sideX = -front.dz;
+        int sideZ = front.dx;
+        for (int step = 0; step <= 5; step++) {
+            int sideRadius = step == 0 ? 0 : landingHalfWidth;
+            for (int side = -sideRadius; side <= sideRadius; side++) {
+                int x = cx + front.dx * (radius + step) + sideX * side;
+                int z = cz + front.dz * (radius + step) + sideZ * side;
+                out.add(new BlockEdit(x, y - 1, z,
+                        Math.floorMod(step + side, 7) == 0
+                                ? Material.MOSSY_STONE_BRICKS : floor));
+                if (step > 0) {
+                    for (int yy = 0; yy <= clearance; yy++) {
+                        out.add(new BlockEdit(x, y + yy, z, Material.AIR));
+                    }
+                }
+            }
+        }
+        int doorX = cx + front.dx * radius;
+        int doorZ = cz + front.dz * radius;
+        String direction = front.name().toLowerCase(java.util.Locale.ROOT);
+        out.add(new BlockEdit(doorX, y, doorZ, Material.SPRUCE_DOOR,
+                "minecraft:spruce_door[facing=" + direction
+                        + ",half=lower,hinge=left,open=false,powered=false]"));
+        out.add(new BlockEdit(doorX, y + 1, doorZ, Material.SPRUCE_DOOR,
+                "minecraft:spruce_door[facing=" + direction
+                        + ",half=upper,hinge=left,open=false,powered=false]"));
     }
 
     private static void auditHouse(World world, HouseSpec house, List<String> failures) {
@@ -414,8 +464,10 @@ final class OverworldCampaignAudit148 {
         }
         int sideX = -tower.front.dz;
         int sideZ = tower.front.dx;
-        for (int step = 0; step <= 5; step++) {
-            int sideRadius = step == 0 ? 0 : 2;
+        // Step zero is the already-validated closed door. Only the outdoor
+        // landing must be empty; treating the door as AIR rejected every valid tower.
+        for (int step = 1; step <= 5; step++) {
+            int sideRadius = 2;
             for (int side = -sideRadius; side <= sideRadius; side++) {
                 int x = tower.cx + tower.front.dx * (tower.radius + step) + sideX * side;
                 int z = tower.cz + tower.front.dz * (tower.radius + step) + sideZ * side;

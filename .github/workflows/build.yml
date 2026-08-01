@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.48.4
+name: Compilar ArlightBingo 1.48.5
 
 on:
   workflow_dispatch:
@@ -29,16 +29,16 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verificar fuente y restricciones 1.48.4
+      - name: Verificar fuente y restricciones 1.48.5
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '<version>1.48.4</version>' pom.xml
-          grep -q '^version: 1.48.4$' src/main/resources/plugin.yml
-          grep -q '^1.48.4$' BUILD_VERSION.txt
-          grep -q '^ArlightBingo 1.48.4 TERRAIN-ROAD-BLOCKDATA-AUDIT$' SOURCE_VERSION.txt
+          grep -q '<version>1.48.5</version>' pom.xml
+          grep -q '^version: 1.48.5$' src/main/resources/plugin.yml
+          grep -q '^1.48.5$' BUILD_VERSION.txt
+          grep -q '^ArlightBingo 1.48.5 ENTRANCE-FINALIZATION-AUDIT$' SOURCE_VERSION.txt
           grep -q 'campaign_1_48_anchor_only' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
-          grep -q '1.48.4-terrain-road-blockdata-audit-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q '1.48.5-entrance-finalization-audit-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
           grep -q 'frontón abierto' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
           grep -q 'Step 6' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
           grep -q 'pared abierta' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
@@ -56,6 +56,7 @@ jobs:
           grep -q 'boss-portal-east-rim' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
           grep -q 'remaining = steps - step' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
           grep -q 'repairRoadCorridors' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q 'repairRegisteredEntrances' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
           grep -q 'FAILED_MARKER' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           grep -q 'Files.deleteIfExists(folder.resolve(PROGRESS_MARKER))' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           grep -q 'new OverworldCampaignLandscape148' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
@@ -66,7 +67,7 @@ jobs:
           road_line=$(grep -n 'buildRoadNetwork' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java | head -1 | cut -d: -f1)
           village_line=$(grep -n 'OverworldCampaignStructures148.village' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java | head -1 | cut -d: -f1)
           test "${road_line}" -lt "${village_line}"
-          python3 scripts/validate_1_48_4.py
+          python3 scripts/validate_1_48_5.py
 
       - name: Descargar ArlightCore 1.20.0 canónico
         uses: actions/checkout@v4
@@ -88,37 +89,37 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp target/ArlightBingo-1.48.4.jar dist/
-          unzip -p dist/ArlightBingo-1.48.4.jar plugin.yml | grep -q '^version: 1.48.4$'
-          unzip -l dist/ArlightBingo-1.48.4.jar | grep -q 'OverworldCampaignBuilder148.class'
-          unzip -l dist/ArlightBingo-1.48.4.jar | grep -q 'OverworldCampaignTerrain148.class'
-          unzip -l dist/ArlightBingo-1.48.4.jar | grep -q 'OverworldCampaignArchitecture148.class'
-          unzip -l dist/ArlightBingo-1.48.4.jar | grep -q 'OverworldCampaignStructures148.class'
-          unzip -l dist/ArlightBingo-1.48.4.jar | grep -q 'OverworldCampaignLandscape148.class'
-          unzip -l dist/ArlightBingo-1.48.4.jar | grep -q 'OverworldCampaignAudit148.class'
+          cp target/ArlightBingo-1.48.5.jar dist/
+          unzip -p dist/ArlightBingo-1.48.5.jar plugin.yml | grep -q '^version: 1.48.5$'
+          unzip -l dist/ArlightBingo-1.48.5.jar | grep -q 'OverworldCampaignBuilder148.class'
+          unzip -l dist/ArlightBingo-1.48.5.jar | grep -q 'OverworldCampaignTerrain148.class'
+          unzip -l dist/ArlightBingo-1.48.5.jar | grep -q 'OverworldCampaignArchitecture148.class'
+          unzip -l dist/ArlightBingo-1.48.5.jar | grep -q 'OverworldCampaignStructures148.class'
+          unzip -l dist/ArlightBingo-1.48.5.jar | grep -q 'OverworldCampaignLandscape148.class'
+          unzip -l dist/ArlightBingo-1.48.5.jar | grep -q 'OverworldCampaignAudit148.class'
 
       - name: Empaquetar entrega
         shell: bash
         run: |
           set -euo pipefail
-          DELIVERY='ArlightBingo-1.48.4-TERRAIN-ROAD-BLOCKDATA-AUDIT'
+          DELIVERY='ArlightBingo-1.48.5-ENTRANCE-FINALIZATION-AUDIT'
           mkdir -p package/${DELIVERY}-SOURCE
           rsync -a --exclude '.git/' --exclude 'arlight-core/' --exclude 'target/' --exclude 'dist/' --exclude 'package/' ./ package/${DELIVERY}-SOURCE/
           cd package
           zip -qr ${DELIVERY}-SOURCE.zip ${DELIVERY}-SOURCE
-          cp ../dist/ArlightBingo-1.48.4.jar .
-          sha256sum ArlightBingo-1.48.4.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.4-SHA256.txt
+          cp ../dist/ArlightBingo-1.48.5.jar .
+          sha256sum ArlightBingo-1.48.5.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.5-SHA256.txt
           unzip -t ${DELIVERY}-SOURCE.zip
-          sha256sum -c ArlightBingo-1.48.4-SHA256.txt
+          sha256sum -c ArlightBingo-1.48.5-SHA256.txt
           rm -rf ${DELIVERY}-SOURCE
 
       - name: Subir entrega completa
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.48.4-DELIVERY
+          name: ArlightBingo-1.48.5-DELIVERY
           path: |
-            package/ArlightBingo-1.48.4.jar
-            package/ArlightBingo-1.48.4-TERRAIN-ROAD-BLOCKDATA-AUDIT-SOURCE.zip
-            package/ArlightBingo-1.48.4-SHA256.txt
+            package/ArlightBingo-1.48.5.jar
+            package/ArlightBingo-1.48.5-ENTRANCE-FINALIZATION-AUDIT-SOURCE.zip
+            package/ArlightBingo-1.48.5-SHA256.txt
           if-no-files-found: error
           retention-days: 90
