@@ -96,9 +96,9 @@ template-worlds:
       visible-route-to-zone-b: true
     safe-village:
       enabled: true
-      radius: 112
+      radius: 116
       purge-interval-ticks: 40
-    campaign-layout-1-47:
+    campaign-layout-1-48:
       enabled: true
       citadel-x: 140
       citadel-z: 30
