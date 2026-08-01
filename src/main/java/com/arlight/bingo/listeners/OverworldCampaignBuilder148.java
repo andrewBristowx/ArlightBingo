@@ -103,13 +103,13 @@ final class OverworldCampaignBuilder148 {
     }
 
     private void preparePhases() {
-        // 1.48.2 starts from a clean, anchor-only base. It never paints 1.43 structures and
+        // 1.48.3 starts from a clean, anchor-only base. It never paints 1.43 structures and
         // never reconstructs circular legacy footprints over the natural island.
         addVillageShapePhases("pueblo inicial", village, 67, 94);
         addShapePhases("aldea residencial", residential, 43, 66);
         addShapePhases("mercado de la calzada", commercial, 45, 68);
-        addShapePhases("bastión militar", military, 48, 74);
-        addShapePhases("ciudadela", citadel, 54, 82);
+        addShapePhases("bastión militar", military, 52, 74);
+        addShapePhases("ciudadela", citadel, 60, 82);
         addShapePhases("arena sellada", boss, 52, 76);
         addShapePhases("santuario del portal", portal, 24, 44);
         phases.add(new Phase("conectando pueblo, asentamientos y arena",
@@ -118,23 +118,23 @@ final class OverworldCampaignBuilder148 {
                         auditRegistry)));
 
         phases.add(new Phase("reconstruyendo pueblo inicial vivo",
-                () -> OverworldCampaignStructures148.village(village, report, auditRegistry)));
+                () -> OverworldCampaignStructures148.village(world, village, report, auditRegistry)));
         phases.add(new Phase("construyendo aldea residencial ocupada",
-                () -> OverworldCampaignStructures148.residential(residential, report, auditRegistry)));
+                () -> OverworldCampaignStructures148.residential(world, residential, report, auditRegistry)));
         phases.add(new Phase("construyendo mercado ocupado",
-                () -> OverworldCampaignStructures148.commercial(commercial, report, auditRegistry)));
+                () -> OverworldCampaignStructures148.commercial(world, commercial, report, auditRegistry)));
         phases.add(new Phase("construyendo bastión militar",
-                () -> OverworldCampaignStructures148.military(military, report, auditRegistry)));
+                () -> OverworldCampaignStructures148.military(world, military, report, auditRegistry)));
         phases.add(new Phase("construyendo ciudadela apoyada",
-                () -> OverworldCampaignStructures148.citadel(citadel, report, auditRegistry)));
+                () -> OverworldCampaignStructures148.citadel(world, citadel, report, auditRegistry)));
         phases.add(new Phase("construyendo puerta monumental y arena aprobada",
                 () -> OverworldCampaignStructures148.bossArena(
-                        boss, outerAltar, invocationAltar, ritualGate, report, auditRegistry)));
+                        world, boss, outerAltar, invocationAltar, ritualGate, report, auditRegistry)));
         phases.add(new Phase("construyendo santuario del portal",
-                () -> OverworldCampaignStructures148.portal(portal, report, auditRegistry)));
+                () -> OverworldCampaignStructures148.portal(world, portal, report, auditRegistry)));
         phases.add(new Phase("integrando murallas y accesos con el relieve",
                 () -> OverworldCampaignTerrain148.integrateFortifications(
-                        world, village, residential, military, citadel, boss, portal, report)));
+                        world, military, citadel, boss, report, auditRegistry)));
         phases.add(new Phase("decorando la isla reconstruida",
                 () -> OverworldCampaignStructures148.decorations(
                         world, village, residential, commercial, military, citadel, report)));
@@ -172,7 +172,7 @@ final class OverworldCampaignBuilder148 {
 
     void start() {
         purgeBuildFootprintEntities();
-        plugin.getLogger().info("[ArlightBingo] Diseño Overworld 1.48.2: "
+        plugin.getLogger().info("[ArlightBingo] Diseño Overworld 1.48.3: "
                 + phases.size() + " fases reanudables.");
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }
@@ -205,7 +205,7 @@ final class OverworldCampaignBuilder148 {
                 edits = phase.supplier().get();
                 OverworldCampaignAudit148.validatePhase(phase.name(), edits);
                 editCursor = 0;
-                plugin.getLogger().info("[ArlightBingo 1.48.2] " + phase.name()
+                plugin.getLogger().info("[ArlightBingo 1.48.3] " + phase.name()
                         + " · " + edits.size() + " cambios");
                 return;
             }
@@ -244,15 +244,15 @@ final class OverworldCampaignBuilder148 {
         updateTemplateMarker();
         writeReport();
         Files.writeString(folder.resolve(OverworldCampaignLandscape148.DONE_MARKER),
-                "version=1.48.2\ncompleted=" + System.currentTimeMillis() + "\n",
+                "version=1.48.3\ncompleted=" + System.currentTimeMillis() + "\n",
                 StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING);
         Files.deleteIfExists(folder.resolve(OverworldCampaignLandscape148.PROGRESS_MARKER));
         completion.accept(layout);
-        plugin.getLogger().info("[ArlightBingo] Overworld 1.48.2 completado: base limpia, "
+        plugin.getLogger().info("[ArlightBingo] Overworld 1.48.3 completado: base limpia, "
                 + "pueblo accesible, torres auditadas y terreno orgánico.");
         Bukkit.broadcast(ChatColor.GREEN
-                        + "[Bingo] La plantilla Overworld 1.48.2 terminó su construcción limpia.",
+                        + "[Bingo] La plantilla Overworld 1.48.3 terminó su construcción limpia.",
                 "arlightbingo.admin");
     }
 
@@ -264,7 +264,7 @@ final class OverworldCampaignBuilder148 {
 
     private void writeLayout(Layout layout) throws IOException {
         Properties properties = new Properties();
-        properties.setProperty("version", "1.48.2");
+        properties.setProperty("version", "1.48.3");
         properties.setProperty("village", format(layout.village()));
         properties.setProperty("residential", format(layout.residential()));
         properties.setProperty("commercial", format(layout.commercial()));
@@ -281,7 +281,7 @@ final class OverworldCampaignBuilder148 {
                 folder.resolve(OverworldCampaignLandscape148.LAYOUT_MARKER),
                 StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
-            properties.store(writer, "ArlightBingo 1.48.2 Overworld campaign layout");
+            properties.store(writer, "ArlightBingo 1.48.3 Overworld campaign layout");
         }
     }
 
@@ -300,26 +300,26 @@ final class OverworldCampaignBuilder148 {
                 invocationAltar.getBlockZ())));
         properties.setProperty("portal", format(portal.floor(world)));
         properties.setProperty("structureRevision",
-                "1.48.2-clean-base-structural-audit-1");
-        properties.setProperty("villageArchitecture", "closed_doors_supported_ladders_v4");
-        properties.setProperty("islandRestoration", "clean_anchor_base_organic_blend_v4");
-        properties.setProperty("roadNetwork", "terrain_first_audited_routes_v9");
-        properties.setProperty("towerArchitecture", "floored_lit_accessible_v1");
+                "1.48.3-visual-collision-foundation-audit-1");
+        properties.setProperty("villageArchitecture", "sealed_facades_clear_entries_v5");
+        properties.setProperty("islandRestoration", "anchored_building_pads_smooth_blend_v5");
+        properties.setProperty("roadNetwork", "terrain_first_supported_gates_v10");
+        properties.setProperty("towerArchitecture", "anchored_floored_lit_accessible_v2");
         properties.setProperty("bossArena", "approved_arena_without_runtime_intrusion_v4");
         properties.setProperty("villageSafe", "true");
         properties.setProperty("villageSafeRadius", "116");
-        properties.setProperty("structuralAudit", "passed_1_48_2");
-        properties.setProperty("campaignLayout", "1.48.2");
+        properties.setProperty("structuralAudit", "passed_1_48_3");
+        properties.setProperty("campaignLayout", "1.48.3");
         try (Writer writer = Files.newBufferedWriter(marker, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
             properties.store(writer,
-                    "ArlightBingo Overworld template updated by campaign layout 1.48.2");
+                    "ArlightBingo Overworld template updated by campaign layout 1.48.3");
         }
         Files.deleteIfExists(pending);
     }
 
     private void writeReport() throws IOException {
-        String text = "ARLIGHTBINGO 1.48.2 - OVERWORLD LIMPIO Y AUDITADO\n"
+        String text = "ARLIGHTBINGO 1.48.3 - OVERWORLD VISUALMENTE CORREGIDO Y AUDITADO\n"
                 + "columnas-isla-restauradas=" + report.restoredColumns + "\n"
                 + "columnas-zonas-adaptadas=" + report.shapedColumns + "\n"
                 + "bloques-heredados-retirados=" + report.clearedBlocks + "\n"
