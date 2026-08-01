@@ -15,7 +15,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.2 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.3 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -38,6 +38,11 @@ final class OverworldCampaignAudit148 {
 
     record TerrainSpec(Site site, int flatRadius, int blendRadius) { }
 
+    enum FortificationShape { SQUARE, CIRCLE }
+
+    record FortificationSpec(String id, int cx, int baseY, int cz, int radius,
+                             FortificationShape shape) { }
+
     record RoadCell(String id, int x, int walkY, int z, Material floor) { }
 
     private record RoadColumn(int x, int z) { }
@@ -51,6 +56,7 @@ final class OverworldCampaignAudit148 {
         private final List<TowerSpec> towers = new ArrayList<>();
         private final List<ChimneySpec> chimneys = new ArrayList<>();
         private final List<TerrainSpec> terrain = new ArrayList<>();
+        private final List<FortificationSpec> fortifications = new ArrayList<>();
         private final Map<RoadColumn, RoadCell> roadCells = new LinkedHashMap<>();
 
         void registerHouse(HouseSpec candidate) {
@@ -79,6 +85,37 @@ final class OverworldCampaignAudit148 {
 
         void registerTerrain(Site site, int flatRadius, int blendRadius) {
             terrain.add(new TerrainSpec(site, flatRadius, blendRadius));
+        }
+
+        void registerFortification(FortificationSpec fortification) {
+            fortifications.add(fortification);
+        }
+
+        boolean blocksHouseOrEntrance(int x, int y, int z) {
+            for (HouseSpec house : houses) {
+                if (y < house.y - 2 || y > house.y + house.height + 8) continue;
+                int dx = x - house.cx;
+                int dz = z - house.cz;
+                if (Math.abs(dx) <= house.hx + 2 && Math.abs(dz) <= house.hz + 2) {
+                    return true;
+                }
+                int radius = frontRadius(house);
+                int forward = dx * house.front.dx + dz * house.front.dz;
+                int lateral = Math.abs(dx * house.front.dz - dz * house.front.dx);
+                if (forward >= radius && forward <= radius + 7 && lateral <= 3) {
+                    return true;
+                }
+            }
+            for (TowerSpec tower : towers) {
+                if (y < tower.y - 2 || y > tower.y + tower.height + 5) continue;
+                int dx = x - tower.cx;
+                int dz = z - tower.cz;
+                if (Math.abs(dx) <= tower.radius + 2
+                        && Math.abs(dz) <= tower.radius + 2) return true;
+                if (dz >= tower.radius && dz <= tower.radius + 7
+                        && Math.abs(dx) <= 3) return true;
+            }
+            return false;
         }
 
         void registerRoadCell(String id, int x, int walkY, int z, Material floor) {
@@ -140,6 +177,9 @@ final class OverworldCampaignAudit148 {
         for (TowerSpec tower : registry.towers) auditTower(world, tower, failures);
         for (ChimneySpec chimney : registry.chimneys) auditChimney(world, chimney, failures);
         for (TerrainSpec terrain : registry.terrain) auditTerrainBlend(world, terrain, failures);
+        for (FortificationSpec fortification : registry.fortifications) {
+            auditFortificationFoundation(world, fortification, failures);
+        }
         Set<String> brokenRoads = new LinkedHashSet<>();
         for (RoadCell cell : registry.roadCells.values()) {
             if (!isWalkable(world, cell.x, cell.walkY, cell.z)) brokenRoads.add(cell.id);
@@ -152,14 +192,12 @@ final class OverworldCampaignAudit148 {
         int[] light = auditVillageLights(world, village, failures);
         if (light[0] < 18) failures.add("iluminación insuficiente en el pueblo: " + light[0]);
 
-        auditFoundation(world, citadel, 55, failures);
-        auditFoundation(world, portal, 24, failures);
         auditRitualApproach(world, outerAltar, ritualGate, failures);
         auditFountain(world, village, failures);
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.2 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.3 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -259,6 +297,11 @@ final class OverworldCampaignAudit148 {
             }
         }
 
+        int failuresBeforeFoundation = failures.size();
+        auditRectangularFoundation(world, house.id, house.cx, house.y - 1, house.cz,
+                house.hx + 1, house.hz + 1, failures);
+        if (failures.size() > failuresBeforeFoundation) return;
+
         int floors = Math.max(1, house.height / 5);
         if (floors > 1) {
             int ladderX = house.cx + house.hx - 1;
@@ -275,6 +318,18 @@ final class OverworldCampaignAudit148 {
                         ladderZ).getType().isSolid()) {
                     failures.add("escalera sin desembarco en " + house.id);
                     return;
+                }
+                int floorY = house.y + floor * 5;
+                for (int x = -house.hx + 1; x <= house.hx - 1; x++) {
+                    for (int z = -house.hz + 1; z <= house.hz - 1; z++) {
+                        boolean shaft = house.cx + x == ladderX
+                                && house.cz + z == ladderZ;
+                        if (!shaft && !world.getBlockAt(house.cx + x, floorY,
+                                house.cz + z).getType().isSolid()) {
+                            failures.add("piso intermedio abierto en " + house.id);
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -300,6 +355,10 @@ final class OverworldCampaignAudit148 {
     }
 
     private static void auditTower(World world, TowerSpec tower, List<String> failures) {
+        int failuresBeforeFoundation = failures.size();
+        auditRectangularFoundation(world, tower.id, tower.cx, tower.y - 1, tower.cz,
+                tower.radius + 1, tower.radius + 1, failures);
+        if (failures.size() > failuresBeforeFoundation) return;
         if (world.getBlockAt(tower.cx, tower.y, tower.cz + tower.radius).getType()
                 != Material.SPRUCE_DOOR
                 || world.getBlockAt(tower.cx, tower.y + 1,
@@ -448,23 +507,63 @@ final class OverworldCampaignAudit148 {
         return new int[]{lights, unsupported};
     }
 
-    private static void auditFoundation(World world, Site site, int radius,
-                                        List<String> failures) {
-        for (int degree = 0; degree < 360; degree += 30) {
-            double angle = Math.toRadians(degree);
-            int x = site.x() + (int) Math.round(Math.cos(angle) * radius);
-            int z = site.z() + (int) Math.round(Math.sin(angle) * radius);
-            int airRun = 0;
-            for (int y = site.baseY(); y >= site.baseY() - 18; y--) {
-                Material type = world.getBlockAt(x, y, z).getType();
-                if (type.isAir() || type == Material.WATER) airRun++;
-                else airRun = 0;
-                if (airRun >= 3) {
-                    failures.add("cimiento flotante en " + site.id());
+    private static void auditRectangularFoundation(World world, String id, int cx, int topY,
+                                                   int cz, int hx, int hz,
+                                                   List<String> failures) {
+        for (int x = -hx; x <= hx; x += 2) {
+            if (!supportedDepth(world, cx + x, topY, cz - hz, 12)
+                    || !supportedDepth(world, cx + x, topY, cz + hz, 12)) {
+                failures.add("cimiento de edificio flotante en " + id);
+                return;
+            }
+        }
+        for (int z = -hz; z <= hz; z += 2) {
+            if (!supportedDepth(world, cx - hx, topY, cz + z, 12)
+                    || !supportedDepth(world, cx + hx, topY, cz + z, 12)) {
+                failures.add("cimiento de edificio flotante en " + id);
+                return;
+            }
+        }
+        if (!supportedDepth(world, cx, topY, cz, 12)) {
+            failures.add("cimiento de edificio flotante en " + id);
+        }
+    }
+
+    private static void auditFortificationFoundation(World world, FortificationSpec wall,
+                                                      List<String> failures) {
+        if (wall.shape == FortificationShape.SQUARE) {
+            for (int offset = -wall.radius; offset <= wall.radius; offset++) {
+                if (!supportedDepth(world, wall.cx + offset, wall.baseY - 1,
+                        wall.cz - wall.radius, 12)
+                        || !supportedDepth(world, wall.cx + offset, wall.baseY - 1,
+                        wall.cz + wall.radius, 12)
+                        || !supportedDepth(world, wall.cx - wall.radius, wall.baseY - 1,
+                        wall.cz + offset, 12)
+                        || !supportedDepth(world, wall.cx + wall.radius, wall.baseY - 1,
+                        wall.cz + offset, 12)) {
+                    failures.add("cimiento de muralla flotante en " + wall.id);
                     return;
                 }
             }
+            return;
         }
+        for (int degree = 0; degree < 360; degree += 2) {
+            double angle = Math.toRadians(degree);
+            int x = wall.cx + (int) Math.round(Math.cos(angle) * wall.radius);
+            int z = wall.cz + (int) Math.round(Math.sin(angle) * wall.radius);
+            if (!supportedDepth(world, x, wall.baseY - 1, z, 12)) {
+                failures.add("cimiento de muralla flotante en " + wall.id);
+                return;
+            }
+        }
+    }
+
+    private static boolean supportedDepth(World world, int x, int topY, int z, int depth) {
+        for (int y = topY; y > topY - depth; y--) {
+            Material type = world.getBlockAt(x, y, z).getType();
+            if (!type.isSolid() || type == Material.WATER || type == Material.LAVA) return false;
+        }
+        return true;
     }
 
     private static void auditRitualApproach(World world, Location altar, Location gate,

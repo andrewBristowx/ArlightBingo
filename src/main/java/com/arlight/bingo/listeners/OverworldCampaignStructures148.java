@@ -14,7 +14,7 @@ import static com.arlight.bingo.listeners.OverworldCampaignAudit148.*;
 final class OverworldCampaignStructures148 {
     private OverworldCampaignStructures148() { }
 
-    static List<BlockEdit> village(Site site, Report report, Registry registry) {
+    static List<BlockEdit> village(World world, Site site, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int lowerY = site.baseY() + 1;
         int plazaY = site.baseY() + 3;
@@ -61,33 +61,33 @@ final class OverworldCampaignStructures148 {
         villagePlaza(out, site.x(), plazaY, site.z());
 
         // Southern service quarter: one inn, one smithy and a real animal yard, no crop stamps.
-        villageHouse(out, registry, "village-inn", site.x() - 31, lowerY, site.z() + 43,
+        villageHouse(out, world, registry, "village-inn", site.x() - 31, lowerY, site.z() + 43,
                 23, 15, 2, true, Material.LIGHT_GRAY_TERRACOTTA, 1, Facing.EAST);
-        villageHouse(out, registry, "village-smithy", site.x() + 30, lowerY, site.z() + 42,
+        villageHouse(out, world, registry, "village-smithy", site.x() + 30, lowerY, site.z() + 42,
                 19, 15, 1, false, Material.GRAY_TERRACOTTA, 2, Facing.WEST);
-        villageHouse(out, registry, "village-barn", site.x() - 56, lowerY, site.z() + 61,
+        villageHouse(out, world, registry, "village-barn", site.x() - 56, lowerY, site.z() + 61,
                 15, 11, 1, true, Material.LIGHT_GRAY_TERRACOTTA, 10, Facing.EAST);
         animalYard(out, site.x() - 56, lowerY, site.z() + 40, 17, 15, Facing.SOUTH);
         out.add(e(site.x() + 39, lowerY, site.z() + 50, Material.BLAST_FURNACE));
         out.add(e(site.x() + 42, lowerY, site.z() + 50, Material.ANVIL));
 
         // The palette remains neutral and shared; variation comes from form and function.
-        villageHouse(out, registry, "village-cartographer", site.x() - 34, plazaY, site.z() - 1,
+        villageHouse(out, world, registry, "village-cartographer", site.x() - 34, plazaY, site.z() - 1,
                 19, 15, 2, false, Material.WHITE_TERRACOTTA, 3, Facing.EAST);
-        villageHouse(out, registry, "village-bakery", site.x() + 34, plazaY, site.z() - 2,
+        villageHouse(out, world, registry, "village-bakery", site.x() + 34, plazaY, site.z() - 2,
                 19, 15, 2, true, Material.LIGHT_GRAY_TERRACOTTA, 4, Facing.WEST);
-        villageHouse(out, registry, "village-home-southwest", site.x() - 34, plazaY, site.z() + 18,
+        villageHouse(out, world, registry, "village-home-southwest", site.x() - 34, plazaY, site.z() + 18,
                 17, 13, 1, true, Material.GRAY_TERRACOTTA, 5, Facing.EAST);
-        villageHouse(out, registry, "village-home-southeast", site.x() + 35, plazaY, site.z() + 18,
+        villageHouse(out, world, registry, "village-home-southeast", site.x() + 35, plazaY, site.z() + 18,
                 17, 13, 1, false, Material.WHITE_TERRACOTTA, 6, Facing.WEST);
         stall(out, site.x() - 16, plazaY, site.z() + 12, true);
         stall(out, site.x() + 16, plazaY, site.z() + 12, false);
 
-        villageHouse(out, registry, "village-home-northwest", site.x() - 35, upperY, site.z() - 38,
+        villageHouse(out, world, registry, "village-home-northwest", site.x() - 35, upperY, site.z() - 38,
                 17, 13, 2, true, Material.LIGHT_GRAY_TERRACOTTA, 7, Facing.EAST);
-        villageHouse(out, registry, "village-home-northeast", site.x() + 35, upperY, site.z() - 39,
+        villageHouse(out, world, registry, "village-home-northeast", site.x() + 35, upperY, site.z() - 39,
                 17, 13, 2, false, Material.GRAY_TERRACOTTA, 8, Facing.WEST);
-        villageHouse(out, registry, "village-hall", site.x(), upperY, site.z() - 47,
+        villageHouse(out, world, registry, "village-hall", site.x(), upperY, site.z() - 47,
                 27, 17, 2, true, Material.WHITE_TERRACOTTA, 9, Facing.SOUTH);
         out.add(e(site.x() - 8, upperY, site.z() - 44, Material.LECTERN));
         out.add(e(site.x() - 10, upperY, site.z() - 45, Material.BOOKSHELF));
@@ -102,7 +102,7 @@ final class OverworldCampaignStructures148 {
                     site.z() + tree[1], 5 + Math.floorMod(tree[0] + tree[1], 3));
         }
         for (int[] lamp : new int[][]{{-20,13},{20,18},{-20,-15},{20,-15},{0,31},{0,-27},{55,4}}) {
-            OverworldCampaignTerrain148.lamp(out, site.x() + lamp[0],
+            placeLampIfClear(out, registry, site.x() + lamp[0],
                     lamp[1] < -22 ? upperY : lamp[1] > 20 ? lowerY : plazaY,
                     site.z() + lamp[1]);
         }
@@ -111,7 +111,7 @@ final class OverworldCampaignStructures148 {
         return out;
     }
 
-    static List<BlockEdit> residential(Site site, Report report, Registry registry) {
+    static List<BlockEdit> residential(World world, Site site, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 15,
@@ -122,19 +122,19 @@ final class OverworldCampaignStructures148 {
         villageStreet(out, site.x(), y, site.z() - 19, site.x() + 17, y, site.z() - 19, 3);
         villageStreet(out, site.x() - 19, y, site.z() + 20, site.x(), y, site.z() + 20, 3);
         villageStreet(out, site.x(), y, site.z() + 25, site.x() + 17, y, site.z() + 25, 3);
-        villageHouse(out, registry, "residential-home-northwest", site.x() - 27, y,
+        villageHouse(out, world, registry, "residential-home-northwest", site.x() - 27, y,
                 site.z() - 21, 15, 11, 2, true, Material.LIGHT_GRAY_TERRACOTTA,
                 21, Facing.EAST);
-        villageHouse(out, registry, "residential-home-northeast", site.x() + 28, y,
+        villageHouse(out, world, registry, "residential-home-northeast", site.x() + 28, y,
                 site.z() - 19, 13, 11, 2, false, Material.WHITE_TERRACOTTA,
                 22, Facing.WEST);
-        villageHouse(out, registry, "residential-home-southwest", site.x() - 31, y,
+        villageHouse(out, world, registry, "residential-home-southwest", site.x() - 31, y,
                 site.z() + 20, 17, 11, 1, false, Material.GRAY_TERRACOTTA,
                 23, Facing.EAST);
-        villageHouse(out, registry, "residential-home-southeast", site.x() + 28, y,
+        villageHouse(out, world, registry, "residential-home-southeast", site.x() + 28, y,
                 site.z() + 25, 15, 13, 1, true, Material.LIGHT_GRAY_TERRACOTTA,
                 24, Facing.WEST);
-        villageHouse(out, registry, "residential-lodge", site.x(), y,
+        villageHouse(out, world, registry, "residential-lodge", site.x(), y,
                 site.z() + 35, 13, 9, 2, true, Material.WHITE_TERRACOTTA,
                 25, Facing.NORTH);
         serviceYard(out, site.x() - 8, y, site.z() - 35, 19, 13, true);
@@ -142,12 +142,12 @@ final class OverworldCampaignStructures148 {
         spawnerShrines(out, site, y, Material.EMERALD_BLOCK);
         rewardPedestal(out, site.x() + 6, y, site.z() + 3, Material.EMERALD_BLOCK);
         barricade(out, site.x(), y, site.z() - 46, true);
-        lampsAround(out, site.x(), y, site.z(), 32, 8);
+        lampsAround(out, registry, site.x(), y, site.z(), 32, 8);
         report.structures += 11;
         return out;
     }
 
-    static List<BlockEdit> commercial(Site site, Report report, Registry registry) {
+    static List<BlockEdit> commercial(World world, Site site, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 19,
@@ -163,16 +163,16 @@ final class OverworldCampaignStructures148 {
         villageStreet(out, site.x(), y, site.z() + 27,
                 site.x() + 17, y, site.z() + 27, 3);
         market(out, site.x(), y, site.z());
-        villageHouse(out, registry, "commercial-warehouse", site.x() - 31, y,
+        villageHouse(out, world, registry, "commercial-warehouse", site.x() - 31, y,
                 site.z() - 19, 21, 13, 2, true, Material.GRAY_TERRACOTTA,
                 31, Facing.EAST);
-        villageHouse(out, registry, "commercial-inn", site.x() + 31, y,
+        villageHouse(out, world, registry, "commercial-inn", site.x() + 31, y,
                 site.z() - 15, 19, 15, 2, false, Material.LIGHT_GRAY_TERRACOTTA,
                 32, Facing.WEST);
-        villageHouse(out, registry, "commercial-shop-west", site.x() - 29, y,
+        villageHouse(out, world, registry, "commercial-shop-west", site.x() - 29, y,
                 site.z() + 25, 15, 13, 2, true, Material.WHITE_TERRACOTTA,
                 33, Facing.EAST);
-        villageHouse(out, registry, "commercial-shop-east", site.x() + 30, y,
+        villageHouse(out, world, registry, "commercial-shop-east", site.x() + 30, y,
                 site.z() + 27, 17, 11, 2, false, Material.LIGHT_GRAY_TERRACOTTA,
                 34, Facing.WEST);
         serviceYard(out, site.x(), y, site.z() + 39, 21, 11, true);
@@ -184,12 +184,12 @@ final class OverworldCampaignStructures148 {
             out.add(e(site.x() + cart[0] + 1, y, site.z() + cart[1], Material.CHEST));
             out.add(e(site.x() + cart[0] - 1, y, site.z() + cart[1], Material.HAY_BLOCK));
         }
-        lampsAround(out, site.x(), y, site.z(), 36, 10);
+        lampsAround(out, registry, site.x(), y, site.z(), 36, 10);
         report.structures += 12;
         return out;
     }
 
-    static List<BlockEdit> military(Site site, Report report, Registry registry) {
+    static List<BlockEdit> military(World world, Site site, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 22,
@@ -199,51 +199,54 @@ final class OverworldCampaignStructures148 {
                 site.x(), y, site.z() - 23, 3);
         villageStreet(out, site.x(), y, site.z() + 25,
                 site.x() + 12, y, site.z() + 25, 3);
-        house(out, registry, "military-barracks", site.x(), y, site.z() + 5,
+        house(out, world, registry, "military-barracks", site.x(), y, site.z() + 5,
                 27, 19, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
         int towerIndex = 0;
         for (int[] point : new int[][]{{-39,-39},{39,-39},{-39,39},{39,39}}) {
-            auditedTower(out, registry, "military-tower-" + towerIndex++,
+            auditedTower(out, world, registry, "military-tower-" + towerIndex++,
                     site.x() + point[0], y, site.z() + point[1], 6, 18,
                     Material.DEEPSLATE_TILES);
         }
         fortWall(out, site.x(), y, site.z(), 48, 7, true);
         wallOpening(out, site.x() - 48, y, site.z() - 23, false, 5, 5);
         trainingYard(out, site.x() - 24, y, site.z() + 27);
-        house(out, registry, "military-armory", site.x() + 25, y, site.z() + 25,
+        house(out, world, registry, "military-armory", site.x() + 25, y, site.z() + 25,
                 17, 11, 1, false, Material.LIGHT_GRAY_TERRACOTTA, Facing.WEST);
-        house(out, registry, "military-supply", site.x() - 25, y + 2, site.z() - 23,
+        house(out, world, registry, "military-supply", site.x() - 25, y + 2, site.z() - 23,
                 15, 11, 1, true, Material.GRAY_TERRACOTTA, Facing.EAST);
         spawnerShrines(out, site, y, Material.AMETHYST_BLOCK);
         rewardPedestal(out, site.x() + 6, y, site.z() + 3, Material.AMETHYST_BLOCK);
         barricade(out, site.x(), y, site.z() + 48, true);
-        lampsAround(out, site.x(), y, site.z(), 31, 8);
+        lampsAround(out, registry, site.x(), y, site.z(), 31, 8);
         report.structures += 11;
         return out;
     }
 
-    static List<BlockEdit> citadel(Site site, Report report, Registry registry) {
+    static List<BlockEdit> citadel(World world, Site site, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 35,
                 Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
         villageStreet(out, site.x(), y, site.z() - 50, site.x(), y, site.z() + 61, 9);
-        house(out, registry, "citadel-great-hall", site.x(), y, site.z(),
+        house(out, world, registry, "citadel-great-hall", site.x(), y, site.z(),
                 43, 27, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
-        auditedTower(out, registry, "citadel-tower-southwest",
+        auditedTower(out, world, registry, "citadel-tower-southwest",
                 site.x() - 40, y, site.z() + 24, 7, 22, Material.DEEPSLATE_TILES);
-        auditedTower(out, registry, "citadel-tower-southeast",
+        auditedTower(out, world, registry, "citadel-tower-southeast",
                 site.x() + 40, y, site.z() + 24, 7, 22, Material.DEEPSLATE_TILES);
-        auditedTower(out, registry, "citadel-tower-northwest",
+        auditedTower(out, world, registry, "citadel-tower-northwest",
                 site.x() - 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
-        auditedTower(out, registry, "citadel-tower-northeast",
+        auditedTower(out, world, registry, "citadel-tower-northeast",
                 site.x() + 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
         fortWall(out, site.x(), y, site.z(), 55, 8, true);
         wallOpening(out, site.x(), y, site.z() - 55, true, 6, 6);
         wallOpening(out, site.x() - 55, y, site.z() + 10, false, 6, 6);
         wallOpening(out, site.x() + 55, y, site.z() + 10, false, 6, 6);
-        gateFrame(out, registry, "citadel-south-gate", site.x(), y,
+        gateFrame(out, world, registry, "citadel-south-gate", site.x(), y,
                 site.z() + 55, 9, 14);
+        OverworldCampaignTerrain148.supportedGateApproach(out, world,
+                "citadel-north-gate", site.x(), y, site.z() - 55,
+                0, -1, 8, 14, 4, Material.POLISHED_ANDESITE, registry);
         straightRoad(out, site.x(), y, site.z() + 33,
                 site.x(), site.z() + 60, 9, Material.POLISHED_ANDESITE);
         straightRoad(out, site.x() - 12, y, site.z() + 52,
@@ -254,7 +257,7 @@ final class OverworldCampaignStructures148 {
         return out;
     }
 
-    static List<BlockEdit> bossArena(Site site, Location outerAltar, Location invocationAltar,
+    static List<BlockEdit> bossArena(World world, Site site, Location outerAltar, Location invocationAltar,
                                      Location ritualGate, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int y = site.baseY() + 1;
@@ -270,26 +273,28 @@ final class OverworldCampaignStructures148 {
             circleWall(out, site.x(), y, site.z(), radius, 9,
                     radius % 2 == 0 ? Material.DEEPSLATE_BRICKS : Material.MOSSY_STONE_BRICKS);
         }
-        monumentalArenaEntrance(out, registry, ritualGate.getBlockX(),
+        monumentalArenaEntrance(out, world, registry, ritualGate.getBlockX(),
                 ritualGate.getBlockY(), ritualGate.getBlockZ());
         straightRoad(out, ritualGate.getBlockX() - 16, ritualGate.getBlockY(), ritualGate.getBlockZ() + 5,
                 ritualGate.getBlockX() + 16, ritualGate.getBlockZ() + 5, 5, Material.MOSSY_STONE_BRICKS);
         outerRitualAltar(out, outerAltar.getBlockX(), outerAltar.getBlockY(), outerAltar.getBlockZ());
         invocationAltar(out, invocationAltar.getBlockX(), invocationAltar.getBlockY(), invocationAltar.getBlockZ());
         terraces(out, site.x(), y, site.z());
-        lampsAround(out, site.x(), y, site.z(), 39, 12);
         // Broken rear pylons keep the arena monumental without four corner towers.
         int rearIndex = 0;
         for (int[] rear : new int[][]{{-31,34},{31,34}}) {
-            auditedTower(out, registry, "boss-rear-tower-" + rearIndex++,
+            auditedTower(out, world, registry, "boss-rear-tower-" + rearIndex++,
                     site.x() + rear[0], y, site.z() + rear[1], 4, 11,
                     Material.DEEPSLATE_TILES);
         }
+        // Register every tower before choosing lamps so no post can be embedded
+        // in a gatehouse or rear-tower entrance.
+        lampsAround(out, registry, site.x(), y, site.z(), 39, 12);
         report.structures += 8;
         return out;
     }
 
-    static List<BlockEdit> portal(Site site, Report report, Registry registry) {
+    static List<BlockEdit> portal(World world, Site site, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 20,
@@ -304,7 +309,7 @@ final class OverworldCampaignStructures148 {
                                 ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
             }
         }
-        gateFrame(out, registry, "portal-north-gate", site.x(), y,
+        gateFrame(out, world, registry, "portal-north-gate", site.x(), y,
                 site.z() - 10, 6, 10);
         for (int side = -12; side <= 12; side++) {
             if (Math.abs(side) <= 6) continue;

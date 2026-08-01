@@ -986,8 +986,13 @@ public final class OverworldTemplateManager implements Listener {
     public void onTemplateChunkLoad(ChunkLoadEvent event) {
         World world = event.getWorld();
         if (!world.getName().equals(worldName())) return;
+        // Campaign 1.48 owns every decorative edit and audits the finished result.
+        // The legacy per-chunk decorator could otherwise place emerald/froglight
+        // spikes and lazy ruins while the campaign was still building.
+        if (plugin.getConfig().getBoolean(
+                "template-worlds.overworld.campaign-layout-1-48.enabled", true)) return;
         if (!plugin.getConfig().getBoolean(
-                "template-worlds.overworld.safe-corruption.decorate-on-chunk-load", true)) return;
+                "template-worlds.overworld.safe-corruption.decorate-on-chunk-load", false)) return;
         // El marcador jamás se consulta desde ChunkLoadEvent. En 1.39.0 esto disparaba
         // una búsqueda recursiva de carpetas por cada chunk y bloqueaba el servidor.
         if (stage != Stage.COMPLETE) return;
@@ -1004,6 +1009,8 @@ public final class OverworldTemplateManager implements Listener {
 
     private void decorateLoadedTemplateChunk(Chunk chunk) {
         World world = chunk.getWorld();
+        if (plugin.getConfig().getBoolean(
+                "template-worlds.overworld.campaign-layout-1-48.enabled", true)) return;
         if (!world.isChunkLoaded(chunk.getX(), chunk.getZ())) return;
         if (chunk.getPersistentDataContainer().has(corruptionChunkKey, PersistentDataType.BYTE)) return;
 
@@ -1256,9 +1263,9 @@ public final class OverworldTemplateManager implements Listener {
 
         private void planCampaignAnchorsOnly() {
             progressConsumer.accept(new Progress(0.21D,
-                    "reservando anclas limpias para el diseño estructural 1.48.2"));
+                    "reservando anclas limpias para el diseño estructural 1.48.3"));
             if (preferredVillageCenter != null || preferredDungeonCenter != null) {
-                throw new IllegalStateException("La base 1.48.2 no puede reutilizar una plantilla "
+                throw new IllegalStateException("La base 1.48.3 no puede reutilizar una plantilla "
                         + "estructural anterior; ejecuta reset y generate");
             }
             Location villageCenter = preferredVillageCenter != null

@@ -75,7 +75,9 @@ template-worlds:
     corruption-spacing: 48
     max-build-millis-per-tick: 8
     safe-corruption:
-      decorate-on-chunk-load: true
+      # La campaña 1.48 coloca y audita su propia corrupción; el decorador global
+      # queda apagado para no generar agujas o ruinas dentro de casas y caminos.
+      decorate-on-chunk-load: false
       max-patches-per-chunk: 2
       ruin-chance-per-chunk: 0.035
     lootr-mode: LOOT_TABLES

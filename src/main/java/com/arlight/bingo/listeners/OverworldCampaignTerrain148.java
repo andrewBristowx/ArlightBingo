@@ -13,7 +13,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Terrain shaping and supported roads for the clean 1.48.2 Overworld campaign. */
+/** Terrain shaping and supported roads for the clean 1.48.3 Overworld campaign. */
 final class OverworldCampaignTerrain148 {
     private static final int ORGANIC_EDGE_MARGIN = 14;
     private static final Set<Material> TERRAIN = EnumSet.of(
@@ -72,8 +72,9 @@ final class OverworldCampaignTerrain148 {
                 int terrace = (int) Math.round(terraceLevel);
                 if (dx > 28) terrace = Math.max(0, terrace - 1);
                 double localFlat = flatRadius + (localBoundary - blendRadius) * 0.32D;
-                int designed = site.baseY() + terrace + noise(x, z,
-                        distance > localFlat - 6.0D ? 1 : 0);
+                // The organic outline already supplies visible variation. Per-column
+                // vertical noise created the checkerboard pits visible around 1.48.2.
+                int designed = site.baseY() + terrace;
                 double blend = distance <= localFlat ? 0.0D
                         : smooth((distance - localFlat) / Math.max(1.0D, localBoundary - localFlat));
                 int target = (int) Math.round(designed * (1.0D - blend) + natural * blend);
@@ -146,43 +147,119 @@ final class OverworldCampaignTerrain148 {
         }
     }
 
-    static List<BlockEdit> integrateFortifications(World world, Site village, Site residential,
-                                                   Site military, Site citadel, Site boss,
-                                                   Site portal, Report report) {
+    /**
+     * Anchors a building to real terrain and blends its footprint into a short apron.
+     * The apron only raises low ground; it never erases an already-built street.
+     */
+    static void buildingPad(List<BlockEdit> out, World world, int cx, int targetY, int cz,
+                            int hx, int hz, int apron, Material surface) {
+        for (int dx = -hx - apron; dx <= hx + apron; dx++) {
+            for (int dz = -hz - apron; dz <= hz + apron; dz++) {
+                int edgeX = Math.max(0, Math.abs(dx) - hx);
+                int edgeZ = Math.max(0, Math.abs(dz) - hz);
+                double edgeDistance = Math.sqrt(edgeX * edgeX + edgeZ * edgeZ);
+                if (edgeDistance > apron) continue;
+                int x = cx + dx;
+                int z = cz + dz;
+                int natural = terrainY(world, x, z);
+                boolean footprint = edgeX == 0 && edgeZ == 0;
+                if (!footprint && natural >= targetY) continue;
+                double blend = footprint ? 0.0D : smooth(edgeDistance / Math.max(1.0D, apron));
+                int columnTop = (int) Math.round(targetY * (1.0D - blend) + natural * blend);
+                if (!footprint && columnTop <= natural) continue;
+                if (footprint) {
+                    clearAndFill(out, world, x, targetY, z, surface);
+                } else {
+                    fillColumn(out, world, x, columnTop, z,
+                            edgeDistance <= apron * 0.55D ? surface
+                                    : naturalSurface(world, x, natural, z), false);
+                }
+            }
+        }
+    }
+
+    static List<BlockEdit> integrateFortifications(World world, Site military, Site citadel,
+                                                   Site boss, Report report,
+                                                   OverworldCampaignAudit148.Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
-        ringSupport(out, world, village, 74, 4, Material.COBBLESTONE);
-        ringSupport(out, world, residential, 48, 4, Material.COBBLESTONE);
-        ringSupport(out, world, military, 48, 6, Material.MOSSY_STONE_BRICKS);
-        ringSupport(out, world, citadel, 55, 8, Material.STONE_BRICKS);
-        ringSupport(out, world, boss, 51, 9, Material.DEEPSLATE_BRICKS);
-        report.structures += 5;
+        squareWallSupport(out, world, military, 48, 6, Material.MOSSY_STONE_BRICKS);
+        squareWallSupport(out, world, citadel, 55, 8, Material.STONE_BRICKS);
+        for (int radius = 48; radius <= 51; radius++) {
+            circleWallSupport(out, world, boss, radius, 9, Material.DEEPSLATE_BRICKS);
+        }
+        registry.registerFortification(new OverworldCampaignAudit148.FortificationSpec(
+                "military-wall", military.x(), military.baseY() + 1, military.z(), 48,
+                OverworldCampaignAudit148.FortificationShape.SQUARE));
+        registry.registerFortification(new OverworldCampaignAudit148.FortificationSpec(
+                "citadel-wall", citadel.x(), citadel.baseY() + 1, citadel.z(), 55,
+                OverworldCampaignAudit148.FortificationShape.SQUARE));
+        registry.registerFortification(new OverworldCampaignAudit148.FortificationSpec(
+                "boss-wall", boss.x(), boss.baseY() + 1, boss.z(), 51,
+                OverworldCampaignAudit148.FortificationShape.CIRCLE));
+        report.structures += 3;
         return out;
     }
 
-    private static void ringSupport(List<BlockEdit> out, World world, Site site, int radius,
-                                    int height, Material material) {
+    private static void squareWallSupport(List<BlockEdit> out, World world, Site site, int radius,
+                                          int height, Material material) {
+        int target = site.baseY() + 1;
+        for (int offset = -radius; offset <= radius; offset++) {
+            supportColumn(out, world, site.x() + offset, target, site.z() - radius,
+                    height, material);
+            supportColumn(out, world, site.x() + offset, target, site.z() + radius,
+                    height, material);
+        }
+        for (int offset = -radius + 1; offset < radius; offset++) {
+            supportColumn(out, world, site.x() - radius, target, site.z() + offset,
+                    height, material);
+            supportColumn(out, world, site.x() + radius, target, site.z() + offset,
+                    height, material);
+        }
+    }
+
+    private static void circleWallSupport(List<BlockEdit> out, World world, Site site, int radius,
+                                          int height, Material material) {
         for (int degree = 0; degree < 360; degree += 2) {
             double a = Math.toRadians(degree);
             int x = site.x() + (int) Math.round(Math.cos(a) * radius);
             int z = site.z() + (int) Math.round(Math.sin(a) * radius);
-            int target = site.baseY() + 1;
-            int natural = terrainY(world, x, z);
-            int bottom = Math.max(world.getMinHeight() + 2,
-                    Math.min(target - 8, natural - 2));
-            for (int y = target - 1; y >= bottom; y--) {
-                Material existing = world.getBlockAt(x, y, z).getType();
-                if (existing.isSolid() && existing != Material.WATER && y <= natural - 2) break;
-                out.add(new BlockEdit(x, y, z, y >= target - height ? material : Material.COBBLESTONE));
-            }
-            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
-                if (Math.abs(dx) + Math.abs(dz) != 1) continue;
-                int sx = x + dx;
-                int sz = z + dz;
-                int neighborGround = terrainY(world, sx, sz);
-                if (neighborGround < target - 5) {
-                    for (int y = target - 2; y >= neighborGround; y--)
-                        out.add(new BlockEdit(sx, y, sz, Material.COBBLESTONE));
+            supportColumn(out, world, x, site.baseY() + 1, z, height, material);
+        }
+    }
+
+    private static void supportColumn(List<BlockEdit> out, World world, int x, int target,
+                                      int z, int finishDepth, Material material) {
+        int natural = terrainY(world, x, z);
+        int minimumBottom = target - 12;
+        int bottom = Math.max(world.getMinHeight() + 2,
+                Math.max(target - 48, Math.min(minimumBottom, natural - 2)));
+        for (int y = target - 1; y >= bottom; y--) {
+            Material existing = world.getBlockAt(x, y, z).getType();
+            if (y < minimumBottom && existing.isSolid()
+                    && existing != Material.ICE && existing != Material.WATER) break;
+            out.add(new BlockEdit(x, y, z,
+                    y >= target - finishDepth ? material : Material.COBBLESTONE));
+        }
+    }
+
+    static void supportedGateApproach(List<BlockEdit> out, World world, String id,
+                                      int cx, int walkY, int cz, int outwardX, int outwardZ,
+                                      int inside, int outside, int halfWidth, Material floor,
+                                      OverworldCampaignAudit148.Registry registry) {
+        int sideX = -outwardZ;
+        int sideZ = outwardX;
+        for (int step = -inside; step <= outside; step++) {
+            for (int side = -halfWidth; side <= halfWidth; side++) {
+                int x = cx + outwardX * step + sideX * side;
+                int z = cz + outwardZ * step + sideZ * side;
+                supportColumn(out, world, x, walkY, z, 5, Material.STONE_BRICKS);
+                out.add(new BlockEdit(x, walkY - 1, z,
+                        Math.floorMod(step + side, 9) == 0
+                                ? Material.MOSSY_STONE_BRICKS : floor));
+                for (int y = walkY; y <= walkY + 6; y++) {
+                    out.add(new BlockEdit(x, y, z, Material.AIR));
                 }
+                registry.registerRoadCell(id, x, walkY, z, floor);
             }
         }
     }
