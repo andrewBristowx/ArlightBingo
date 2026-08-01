@@ -195,8 +195,6 @@ final class OverworldCampaignStructures148 {
         circleFloor(out, site.x(), y - 1, site.z(), 22,
                 Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
         villageStreet(out, site.x(), y, site.z() - 46, site.x(), y, site.z() + 51, 7);
-        villageStreet(out, site.x() - 13, y + 2, site.z() - 23,
-                site.x(), y, site.z() - 23, 3);
         villageStreet(out, site.x(), y, site.z() + 25,
                 site.x() + 12, y, site.z() + 25, 3);
         // Paved branches keep the large military plateau readable and connect the
@@ -224,6 +222,10 @@ final class OverworldCampaignStructures148 {
                 17, 11, 1, false, Material.LIGHT_GRAY_TERRACOTTA, Facing.WEST);
         house(out, world, registry, "military-supply", site.x() - 25, y + 2, site.z() - 23,
                 15, 11, 1, true, Material.GRAY_TERRACOTTA, Facing.EAST);
+        // Build this connector after the raised supply-house pad. In 1.48.4 the
+        // pad was appended later and could rewrite the exact public-street join.
+        villageStreet(out, site.x() - 13, y + 2, site.z() - 23,
+                site.x(), y, site.z() - 23, 3);
         spawnerShrines(out, site, y, Material.AMETHYST_BLOCK);
         // The former +6,+3 position was inside the barracks and erased one of its
         // twelve LIGHT blocks. This offset keeps the entire 7x7 pedestal outside.
@@ -302,10 +304,12 @@ final class OverworldCampaignStructures148 {
                 "boss-north-approach", ritualGate.getBlockX(), ritualGate.getBlockY(),
                 ritualGate.getBlockZ(), 0, -1, 6, 24, 8,
                 Material.POLISHED_DEEPSLATE, registry);
-        monumentalArenaEntrance(out, world, registry, ritualGate.getBlockX(),
-                ritualGate.getBlockY(), ritualGate.getBlockZ());
         straightRoad(out, ritualGate.getBlockX() - 16, ritualGate.getBlockY(), ritualGate.getBlockZ() + 5,
                 ritualGate.getBlockX() + 16, ritualGate.getBlockZ() + 5, 5, Material.MOSSY_STONE_BRICKS);
+        // The transverse road must exist before the gate towers. In 1.48.4 it
+        // ran afterwards and cleared both tower doors at their southern edge.
+        monumentalArenaEntrance(out, world, registry, ritualGate.getBlockX(),
+                ritualGate.getBlockY(), ritualGate.getBlockZ());
         outerRitualAltar(out, outerAltar.getBlockX(), outerAltar.getBlockY(), outerAltar.getBlockZ());
         invocationAltar(out, invocationAltar.getBlockX(), invocationAltar.getBlockY(), invocationAltar.getBlockZ());
         terraces(out, site.x(), y, site.z());
