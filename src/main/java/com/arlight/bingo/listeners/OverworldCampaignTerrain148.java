@@ -13,9 +13,10 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Terrain shaping and supported roads for the clean 1.48.5 Overworld campaign. */
+/** Terrain shaping and supported roads for the clean 1.48.6 Overworld campaign. */
 final class OverworldCampaignTerrain148 {
     private static final int ORGANIC_EDGE_MARGIN = 14;
+    static final int WALL_FOUNDATION_DEPTH = 12;
     private static final Set<Material> TERRAIN = EnumSet.of(
             Material.GRASS_BLOCK, Material.DIRT, Material.COARSE_DIRT, Material.ROOTED_DIRT,
             Material.PODZOL, Material.MYCELIUM, Material.MOSS_BLOCK, Material.MUD,
@@ -246,12 +247,16 @@ final class OverworldCampaignTerrain148 {
     private static void supportColumn(List<BlockEdit> out, World world, int x, int target,
                                       int z, int finishDepth, Material material) {
         int natural = terrainY(world, x, z);
-        int minimumBottom = target - 12;
+        int minimumBottom = target - WALL_FOUNDATION_DEPTH;
         int bottom = Math.max(world.getMinHeight() + 2,
                 Math.max(target - 48, Math.min(minimumBottom, natural - 2)));
         for (int y = target - 1; y >= bottom; y--) {
             Material existing = world.getBlockAt(x, y, z).getType();
-            if (y < target - 1 && existing.isSolid()
+            // A surface block is not enough evidence of a grounded wall: shallow caves
+            // beneath that block caused the military and citadel foundations to fail the
+            // final audit. Always seal the complete audited core before joining natural
+            // terrain; below it, keep the old non-destructive early exit.
+            if (y < target - WALL_FOUNDATION_DEPTH && existing.isSolid()
                     && existing != Material.ICE && existing != Material.WATER
                     && existing != Material.LAVA) break;
             out.add(new BlockEdit(x, y, z,
