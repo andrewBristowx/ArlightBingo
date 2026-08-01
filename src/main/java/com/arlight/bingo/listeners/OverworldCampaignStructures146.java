@@ -1,5 +1,6 @@
 package com.arlight.bingo.listeners;
 
+import org.bukkit.Location;
 import org.bukkit.Material;
 
 import java.util.ArrayList;
