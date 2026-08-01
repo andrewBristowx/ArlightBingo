@@ -15,7 +15,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.5 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.6 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -230,7 +230,7 @@ final class OverworldCampaignAudit148 {
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.5 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.6 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -270,6 +270,36 @@ final class OverworldCampaignAudit148 {
         for (TowerSpec tower : registry.towers) {
             replayEntrance(out, tower.cx, tower.y, tower.cz, tower.radius,
                     tower.front, 2, 3, Material.STONE_BRICKS);
+        }
+        return out;
+    }
+
+    /**
+     * Replays the complete vertical route of every registered tower after all other edits.
+     * The arena's west gate shares a dense boundary with roads, the gatehouse and the arena
+     * wall; restoring both the ladder and its backing here makes the final world independent
+     * of which of those structures wrote the same column earlier.
+     */
+    static List<BlockEdit> repairRegisteredVerticalAccess(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (TowerSpec tower : registry.towers) {
+            int localLadderZ = Math.min(2, tower.radius - 2);
+            int ladderX = tower.cx + tower.radius - 1;
+            int ladderZ = tower.cz + localLadderZ;
+            for (int offset = 0; offset < tower.height; offset++) {
+                Material backing = ((tower.radius + localLadderZ + offset) & 11) == 0
+                        ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
+                out.add(new BlockEdit(ladderX + 1, tower.y + offset, ladderZ, backing));
+                out.add(new BlockEdit(ladderX, tower.y + offset, ladderZ, Material.LADDER,
+                        "minecraft:ladder[facing=west,waterlogged=false]"));
+            }
+            for (int level = 6; level < tower.height; level += 6) {
+                // The solid cell immediately west of the shaft is the actual dismount.
+                out.add(new BlockEdit(ladderX - 1, tower.y + level, ladderZ,
+                        Material.DEEPSLATE_TILES));
+                out.add(new BlockEdit(ladderX - 1, tower.y + level + 1, ladderZ,
+                        Material.AIR));
+            }
         }
         return out;
     }
@@ -481,16 +511,26 @@ final class OverworldCampaignAudit148 {
         }
         int ladderZ = tower.cz + Math.min(2, tower.radius - 2);
         for (int y = tower.y; y < tower.y + tower.height; y++) {
-            if (world.getBlockAt(tower.cx + tower.radius - 1, y, ladderZ).getType()
-                    != Material.LADDER
-                    || !world.getBlockAt(tower.cx + tower.radius, y, ladderZ)
-                    .getType().isSolid()) {
-                failures.add("torre inaccesible por escalera: " + tower.id);
+            Material ladder = world.getBlockAt(tower.cx + tower.radius - 1,
+                    y, ladderZ).getType();
+            Material backing = world.getBlockAt(tower.cx + tower.radius,
+                    y, ladderZ).getType();
+            if (ladder != Material.LADDER || !backing.isSolid()) {
+                failures.add("torre inaccesible por escalera: " + tower.id
+                        + " (y=" + y + ", escalera=" + ladder
+                        + ", respaldo=" + backing + ")");
                 return;
             }
         }
         for (int level = 6; level < tower.height; level += 6) {
-            if (!world.getBlockAt(tower.cx, tower.y + level, tower.cz).getType().isSolid()) {
+            int ladderX = tower.cx + tower.radius - 1;
+            boolean centralFloor = world.getBlockAt(tower.cx,
+                    tower.y + level, tower.cz).getType().isSolid();
+            boolean dismount = world.getBlockAt(ladderX - 1,
+                    tower.y + level, ladderZ).getType().isSolid()
+                    && !world.getBlockAt(ladderX - 1,
+                    tower.y + level + 1, ladderZ).getType().isSolid();
+            if (!centralFloor || !dismount) {
                 failures.add("torre sin piso intermedio: " + tower.id);
                 return;
             }
@@ -651,14 +691,15 @@ final class OverworldCampaignAudit148 {
         if (wall.shape == FortificationShape.SQUARE) {
             for (int offset = -wall.radius; offset <= wall.radius; offset++) {
                 if (!supportedDepth(world, wall.cx + offset, wall.baseY - 1,
-                        wall.cz - wall.radius, 12)
+                        wall.cz - wall.radius, OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)
                         || !supportedDepth(world, wall.cx + offset, wall.baseY - 1,
-                        wall.cz + wall.radius, 12)
+                        wall.cz + wall.radius, OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)
                         || !supportedDepth(world, wall.cx - wall.radius, wall.baseY - 1,
-                        wall.cz + offset, 12)
+                        wall.cz + offset, OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)
                         || !supportedDepth(world, wall.cx + wall.radius, wall.baseY - 1,
-                        wall.cz + offset, 12)) {
-                    failures.add("cimiento de muralla flotante en " + wall.id);
+                        wall.cz + offset, OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)) {
+                    failures.add("cimiento de muralla flotante en " + wall.id
+                            + " (offset=" + offset + ")");
                     return;
                 }
             }
@@ -668,8 +709,10 @@ final class OverworldCampaignAudit148 {
             double angle = Math.toRadians(degree);
             int x = wall.cx + (int) Math.round(Math.cos(angle) * wall.radius);
             int z = wall.cz + (int) Math.round(Math.sin(angle) * wall.radius);
-            if (!supportedDepth(world, x, wall.baseY - 1, z, 12)) {
-                failures.add("cimiento de muralla flotante en " + wall.id);
+            if (!supportedDepth(world, x, wall.baseY - 1, z,
+                    OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)) {
+                failures.add("cimiento de muralla flotante en " + wall.id
+                        + " (x=" + x + ", z=" + z + ")");
                 return;
             }
         }
