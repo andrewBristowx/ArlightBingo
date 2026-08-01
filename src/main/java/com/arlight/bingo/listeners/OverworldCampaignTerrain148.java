@@ -13,9 +13,9 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Terrain reconstruction and supported roads for the 1.48.1 Overworld campaign. */
+/** Terrain shaping and supported roads for the clean 1.48.2 Overworld campaign. */
 final class OverworldCampaignTerrain148 {
-    private static final int SEA_LEVEL = 62;
+    private static final int ORGANIC_EDGE_MARGIN = 14;
     private static final Set<Material> TERRAIN = EnumSet.of(
             Material.GRASS_BLOCK, Material.DIRT, Material.COARSE_DIRT, Material.ROOTED_DIRT,
             Material.PODZOL, Material.MYCELIUM, Material.MOSS_BLOCK, Material.MUD,
@@ -51,73 +51,15 @@ final class OverworldCampaignTerrain148 {
         return world.getHighestBlockYAt(x, z, HeightMap.OCEAN_FLOOR);
     }
 
-    /**
-     * Rebuilds a complete legacy footprint from a sampled natural boundary. Unlike the
-     * 1.45 cleanup, it does not trust the damaged terrain inside the footprint, so cut
-     * towers, rectangular lakes and floating houses cannot survive as the new reference.
-     */
-    static List<BlockEdit> restoreLegacySite(World world, Site site, Report report,
-                                             int minimumDx, int maximumDx) {
-        List<BlockEdit> out = new ArrayList<>();
-        BoundaryProfile profile = BoundaryProfile.sample(world, site, site.radius() + 12);
-        int radius = site.radius();
-        for (int dx = Math.max(-radius, minimumDx); dx <= Math.min(radius, maximumDx); dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
-                double distance = Math.sqrt(dx * dx + dz * dz);
-                if (distance > radius) continue;
-                int x = site.x() + dx;
-                int z = site.z() + dz;
-                double ratio = Math.min(1.0D, distance / Math.max(1.0D, radius));
-                BoundarySample boundary = profile.at(Math.atan2(dz, dx));
-                double edgeBlend = smooth(Math.max(0.0D, (ratio - 0.72D) / 0.28D));
-                int insideTarget = profile.centerY
-                        + (int) Math.round(profile.gradientX * dx + profile.gradientZ * dz)
-                        + noise(x, z, 2);
-                int target = (int) Math.round(insideTarget * (1.0D - edgeBlend)
-                        + boundary.y * edgeBlend);
-                target = Math.max(world.getMinHeight() + 5,
-                        Math.min(world.getMaxHeight() - 30, target));
-
-                boolean restoreOcean = boundary.wet && ratio >= 0.56D;
-                if (restoreOcean) {
-                    double wetBlend = smooth((ratio - 0.56D) / 0.44D);
-                    int oceanFloor = Math.min(SEA_LEVEL - 3, boundary.y);
-                    target = (int) Math.round(target * (1.0D - wetBlend) + oceanFloor * wetBlend);
-                }
-
-                int top = Math.min(world.getMaxHeight() - 2,
-                        world.getHighestBlockYAt(x, z, HeightMap.WORLD_SURFACE) + 48);
-                for (int y = target + 1; y <= top; y++) {
-                    Material current = world.getBlockAt(x, y, z).getType();
-                    Material replacement = restoreOcean && y <= SEA_LEVEL ? Material.WATER : Material.AIR;
-                    if (current != replacement) {
-                        out.add(new BlockEdit(x, y, z, replacement));
-                        if (!current.isAir() && current != Material.WATER) report.clearedBlocks++;
-                    }
-                }
-
-                Material topMaterial;
-                if (restoreOcean) topMaterial = ratio > 0.78D ? Material.GRAVEL : Material.SAND;
-                else if (ratio > 0.84D && boundary.wet) topMaterial = Material.SAND;
-                else topMaterial = Math.floorMod(x * 17 + z * 11, 23) < 4
-                        ? Material.MOSS_BLOCK : Material.GRASS_BLOCK;
-                fillColumn(out, world, x, target, z, topMaterial, restoreOcean);
-                if (restoreOcean) {
-                    for (int y = target + 1; y <= SEA_LEVEL; y++) out.add(new BlockEdit(x, y, z, Material.WATER));
-                }
-                report.restoredColumns++;
-            }
-        }
-        return out;
-    }
-
     static List<BlockEdit> shapeVillage(World world, Site site, int flatRadius, int blendRadius,
                                         Report report, int minimumDx, int maximumDx) {
         List<BlockEdit> out = new ArrayList<>();
-        for (int dx = Math.max(-blendRadius, minimumDx); dx <= Math.min(blendRadius, maximumDx); dx++) {
-            for (int dz = -blendRadius; dz <= blendRadius; dz++) {
+        int extent = blendRadius + ORGANIC_EDGE_MARGIN;
+        for (int dx = Math.max(-extent, minimumDx); dx <= Math.min(extent, maximumDx); dx++) {
+            for (int dz = -extent; dz <= extent; dz++) {
                 double distance = Math.sqrt(dx * dx + dz * dz);
-                if (distance > blendRadius) continue;
+                double localBoundary = organicBoundary(site, dx, dz, blendRadius);
+                if (distance > localBoundary) continue;
                 int x = site.x() + dx;
                 int z = site.z() + dz;
                 int natural = terrainY(world, x, z);
@@ -129,11 +71,15 @@ final class OverworldCampaignTerrain148 {
                 else terraceLevel = 0.0D;
                 int terrace = (int) Math.round(terraceLevel);
                 if (dx > 28) terrace = Math.max(0, terrace - 1);
-                int designed = site.baseY() + terrace + noise(x, z, distance > flatRadius - 6 ? 1 : 0);
-                double blend = distance <= flatRadius ? 0.0D
-                        : smooth((distance - flatRadius) / Math.max(1.0D, blendRadius - flatRadius));
+                double localFlat = flatRadius + (localBoundary - blendRadius) * 0.32D;
+                int designed = site.baseY() + terrace + noise(x, z,
+                        distance > localFlat - 6.0D ? 1 : 0);
+                double blend = distance <= localFlat ? 0.0D
+                        : smooth((distance - localFlat) / Math.max(1.0D, localBoundary - localFlat));
                 int target = (int) Math.round(designed * (1.0D - blend) + natural * blend);
-                clearAndFill(out, world, x, target, z, Style.VILLAGE, distance >= flatRadius - 3.0D);
+                Material top = blendedSurface(world, x, natural, z,
+                        surface(Style.VILLAGE), blend);
+                clearAndFill(out, world, x, target, z, top);
                 report.shapedColumns++;
             }
         }
@@ -143,15 +89,18 @@ final class OverworldCampaignTerrain148 {
     static List<BlockEdit> shapeSite(World world, Site site, int flatRadius, int blendRadius,
                                      Report report, int minimumDx, int maximumDx) {
         List<BlockEdit> out = new ArrayList<>();
-        for (int dx = Math.max(-blendRadius, minimumDx); dx <= Math.min(blendRadius, maximumDx); dx++) {
-            for (int dz = -blendRadius; dz <= blendRadius; dz++) {
+        int extent = blendRadius + ORGANIC_EDGE_MARGIN;
+        for (int dx = Math.max(-extent, minimumDx); dx <= Math.min(extent, maximumDx); dx++) {
+            for (int dz = -extent; dz <= extent; dz++) {
                 double distance = Math.sqrt(dx * dx + dz * dz);
-                if (distance > blendRadius) continue;
+                double localBoundary = organicBoundary(site, dx, dz, blendRadius);
+                if (distance > localBoundary) continue;
                 int x = site.x() + dx;
                 int z = site.z() + dz;
                 int natural = terrainY(world, x, z);
-                double blend = distance <= flatRadius ? 0.0D
-                        : smooth((distance - flatRadius) / Math.max(1.0D, blendRadius - flatRadius));
+                double localFlat = flatRadius + (localBoundary - blendRadius) * 0.30D;
+                double blend = distance <= localFlat ? 0.0D
+                        : smooth((distance - localFlat) / Math.max(1.0D, localBoundary - localFlat));
                 int designed = site.baseY();
                 if (site.style() == Style.RESIDENTIAL) designed += dz < -16 ? 1 : 0;
                 if (site.style() == Style.MILITARY) designed += dz < -24 ? 2 : 0;
@@ -162,7 +111,9 @@ final class OverworldCampaignTerrain148 {
                     designed += dz > 8 ? Math.max(-4, 3 - (int) Math.round(axial / 8.0D)) : 1;
                 }
                 int target = (int) Math.round(designed * (1.0D - blend) + natural * blend);
-                clearAndFill(out, world, x, target, z, site.style(), distance >= flatRadius - 2.0D);
+                Material top = blendedSurface(world, x, natural, z,
+                        surface(site.style()), blend);
+                clearAndFill(out, world, x, target, z, top);
                 report.shapedColumns++;
             }
         }
@@ -170,12 +121,11 @@ final class OverworldCampaignTerrain148 {
     }
 
     private static void clearAndFill(List<BlockEdit> out, World world, int x, int target, int z,
-                                     Style style, boolean edge) {
+                                     Material surface) {
         int top = Math.min(world.getMaxHeight() - 2,
                 world.getHighestBlockYAt(x, z, HeightMap.WORLD_SURFACE) + 12);
         for (int y = target + 1; y <= top; y++) out.add(new BlockEdit(x, y, z, Material.AIR));
-        fillColumn(out, world, x, target, z, surface(style, edge), false);
-        stabilizeSlope(out, world, x, target, z, style, edge);
+        fillColumn(out, world, x, target, z, surface, false);
     }
 
     private static void fillColumn(List<BlockEdit> out, World world, int x, int target, int z,
@@ -196,17 +146,6 @@ final class OverworldCampaignTerrain148 {
         }
     }
 
-    private static void stabilizeSlope(List<BlockEdit> out, World world, int x, int target, int z,
-                                      Style style, boolean edge) {
-        if (!edge) return;
-        Material facing = style == Style.CITADEL || style == Style.BOSS || style == Style.MILITARY
-                ? Material.MOSSY_STONE_BRICKS : Material.COBBLESTONE;
-        for (int y = target - 1; y >= Math.max(world.getMinHeight() + 2, target - 6); y--) {
-            Material below = world.getBlockAt(x, y, z).getType();
-            if (below.isAir() || below == Material.WATER) out.add(new BlockEdit(x, y, z, facing));
-        }
-    }
-
     static List<BlockEdit> integrateFortifications(World world, Site village, Site residential,
                                                    Site military, Site citadel, Site boss,
                                                    Site portal, Report report) {
@@ -216,9 +155,7 @@ final class OverworldCampaignTerrain148 {
         ringSupport(out, world, military, 48, 6, Material.MOSSY_STONE_BRICKS);
         ringSupport(out, world, citadel, 55, 8, Material.STONE_BRICKS);
         ringSupport(out, world, boss, 51, 9, Material.DEEPSLATE_BRICKS);
-        reinforceFoundation(out, world, citadel, 48, Material.STONE_BRICKS);
-        reinforceFoundation(out, world, portal, 24, Material.COBBLESTONE);
-        report.structures += 7;
+        report.structures += 5;
         return out;
     }
 
@@ -250,76 +187,7 @@ final class OverworldCampaignTerrain148 {
         }
     }
 
-    private static void reinforceFoundation(List<BlockEdit> out, World world, Site site,
-                                            int radius, Material facing) {
-        for (int degree = 0; degree < 360; degree += 45) {
-            double angle = Math.toRadians(degree);
-            int nx = (int) Math.round(Math.cos(angle));
-            int nz = (int) Math.round(Math.sin(angle));
-            for (int step = 0; step <= 10; step++) {
-                int half = Math.max(1, 4 - step / 3);
-                int cx = site.x() + nx * (radius + step);
-                int cz = site.z() + nz * (radius + step);
-                int target = site.baseY() - step / 2;
-                for (int side = -half; side <= half; side++) {
-                    int x = cx + (nz == 0 ? 0 : side);
-                    int z = cz + (nx == 0 ? 0 : side);
-                    int natural = terrainY(world, x, z);
-                    for (int y = target; y >= Math.max(natural - 1, target - 36); y--) {
-                        out.add(new BlockEdit(x, y, z,
-                                y >= target - 4 ? facing : Material.COBBLESTONE));
-                    }
-                }
-            }
-        }
-    }
-
-    static List<BlockEdit> polishCoastlines(World world, Site village, Site portal, Report report) {
-        List<BlockEdit> out = new ArrayList<>();
-        adaptiveShoreline(out, world, village.x(), village.z(), 78, 103);
-        adaptiveShoreline(out, world, portal.x(), portal.z(), 27, 45);
-        reinforceFoundation(out, world, portal, 24, Material.MOSSY_COBBLESTONE);
-        report.restoredColumns += 96;
-        return out;
-    }
-
-    private static void adaptiveShoreline(List<BlockEdit> out, World world,
-                                          int cx, int cz, int inner, int outer) {
-        for (int dx = -outer; dx <= outer; dx++) for (int dz = -outer; dz <= outer; dz++) {
-            double distance = Math.sqrt(dx * dx + dz * dz);
-            if (distance < inner || distance > outer) continue;
-            int x = cx + dx;
-            int z = cz + dz;
-            int current = terrainY(world, x, z);
-            int[] neighbors = {
-                    terrainY(world, x - 3, z), terrainY(world, x + 3, z),
-                    terrainY(world, x, z - 3), terrainY(world, x, z + 3)
-            };
-            java.util.Arrays.sort(neighbors);
-            int median = (neighbors[1] + neighbors[2]) / 2;
-            if (current > SEA_LEVEL + 14 && median > SEA_LEVEL + 14) continue;
-            int target = Math.max(current - 2, Math.min(current + 2, median));
-            boolean shore = target <= SEA_LEVEL + 2;
-            Material top = shore ? (Math.floorMod(x + z, 5) == 0
-                    ? Material.GRAVEL : Material.SAND) : Material.GRASS_BLOCK;
-            int highest = world.getHighestBlockYAt(x, z, HeightMap.WORLD_SURFACE);
-            for (int y = target + 1; y <= Math.min(highest + 2, target + 8); y++) {
-                out.add(new BlockEdit(x, y, z, y <= SEA_LEVEL ? Material.WATER : Material.AIR));
-            }
-            fillColumn(out, world, x, target, z, top, shore);
-            if (target < SEA_LEVEL) for (int y = target + 1; y <= SEA_LEVEL; y++)
-                out.add(new BlockEdit(x, y, z, Material.WATER));
-        }
-    }
-
-    private static Material surface(Style style, boolean edge) {
-        if (edge) return switch (style) {
-            case VILLAGE, RESIDENTIAL -> Material.MOSS_BLOCK;
-            case COMMERCIAL -> Material.MUD_BRICKS;
-            case MILITARY, CITADEL -> Material.MOSSY_COBBLESTONE;
-            case BOSS -> Material.DEEPSLATE_BRICKS;
-            case PORTAL -> Material.COBBLESTONE;
-        };
+    private static Material surface(Style style) {
         return switch (style) {
             case VILLAGE, RESIDENTIAL -> Material.GRASS_BLOCK;
             case COMMERCIAL -> Material.PACKED_MUD;
@@ -328,6 +196,33 @@ final class OverworldCampaignTerrain148 {
             case BOSS -> Material.DEEPSLATE_TILES;
             case PORTAL -> Material.POLISHED_ANDESITE;
         };
+    }
+
+    private static Material naturalSurface(World world, int x, int y, int z) {
+        Material material = world.getBlockAt(x, y, z).getType();
+        if (TERRAIN.contains(material) && material != Material.DEEPSLATE) return material;
+        return y <= 64 ? Material.GRAVEL : Material.GRASS_BLOCK;
+    }
+
+    private static Material blendedSurface(World world, int x, int y, int z,
+                                           Material designed, double blend) {
+        if (blend <= 0.38D) return designed;
+        Material natural = naturalSurface(world, x, y, z);
+        int threshold = (int) Math.round(Math.min(1.0D,
+                (blend - 0.38D) / 0.62D) * 100.0D);
+        int sample = Math.floorMod(x * 31 + z * 17, 100);
+        return sample < threshold ? natural : designed;
+    }
+
+    private static double organicBoundary(Site site, int dx, int dz, int nominalRadius) {
+        double angle = Math.atan2(dz, dx);
+        double salt = site.style().ordinal() * 0.71D + site.x() * 0.0007D
+                + site.z() * 0.0009D;
+        double waves = Math.sin(angle * 3.0D + salt) * 5.5D
+                + Math.sin(angle * 5.0D - salt * 1.7D) * 3.5D
+                + Math.sin(angle * 9.0D + salt * 0.6D) * 1.8D;
+        int coarseNoise = noise(site.x() + dx / 4, site.z() + dz / 4, 2);
+        return nominalRadius + waves + coarseNoise;
     }
 
     static List<BlockEdit> buildRoadNetwork(World world, Layout layout, Site villageCenter,
@@ -480,59 +375,4 @@ final class OverworldCampaignTerrain148 {
         return t * t * (3.0D - 2.0D * t);
     }
 
-    private record BoundarySample(int y, boolean wet) { }
-
-    private static final class BoundaryProfile {
-        private static final int SAMPLES = 32;
-        private final BoundarySample[] samples;
-        private final int centerY;
-        private final double gradientX;
-        private final double gradientZ;
-
-        private BoundaryProfile(BoundarySample[] samples, int centerY,
-                                double gradientX, double gradientZ) {
-            this.samples = samples;
-            this.centerY = centerY;
-            this.gradientX = gradientX;
-            this.gradientZ = gradientZ;
-        }
-
-        static BoundaryProfile sample(World world, Site site, int radius) {
-            BoundarySample[] samples = new BoundarySample[SAMPLES];
-            List<Integer> dry = new ArrayList<>();
-            List<Integer> all = new ArrayList<>();
-            for (int index = 0; index < SAMPLES; index++) {
-                double angle = Math.PI * 2.0D * index / SAMPLES;
-                int x = site.x() + (int) Math.round(Math.cos(angle) * radius);
-                int z = site.z() + (int) Math.round(Math.sin(angle) * radius);
-                int y = terrainY(world, x, z);
-                boolean wet = wet(world, x, z);
-                samples[index] = new BoundarySample(y, wet);
-                all.add(y);
-                if (!wet) dry.add(y);
-            }
-            List<Integer> reference = dry.size() >= 6 ? dry : all;
-            reference.sort(Comparator.naturalOrder());
-            int centerY = reference.get(reference.size() / 2);
-            int east = samples[0].y;
-            int west = samples[SAMPLES / 2].y;
-            int south = samples[SAMPLES / 4].y;
-            int north = samples[SAMPLES * 3 / 4].y;
-            return new BoundaryProfile(samples, centerY,
-                    (east - west) / (2.0D * radius),
-                    (south - north) / (2.0D * radius));
-        }
-
-        BoundarySample at(double angle) {
-            double normalized = angle < 0.0D ? angle + Math.PI * 2.0D : angle;
-            double position = normalized / (Math.PI * 2.0D) * SAMPLES;
-            int first = Math.floorMod((int) Math.floor(position), SAMPLES);
-            int second = (first + 1) % SAMPLES;
-            double fraction = position - Math.floor(position);
-            int y = (int) Math.round(samples[first].y * (1.0D - fraction)
-                    + samples[second].y * fraction);
-            boolean wet = fraction < 0.5D ? samples[first].wet : samples[second].wet;
-            return new BoundarySample(y, wet);
-        }
-    }
 }

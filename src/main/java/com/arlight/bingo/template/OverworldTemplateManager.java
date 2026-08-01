@@ -57,8 +57,9 @@ import java.util.function.Consumer;
  *
  * La generación se divide en dos fases:
  *  1) Chunky pregenera la isla determinista completa dentro del borde.
- *  2) Este constructor añade el refugio y los pueblos ocupados de 1.43.0
- *     por lotes pequeños en el hilo del servidor.
+ *  2) Con la campaña 1.48 activa sólo escribe anclas; el constructor auditado
+ *     crea después todo el diseño sobre una isla limpia. El modo 1.43 queda
+ *     disponible únicamente cuando esa campaña se desactiva explícitamente.
  */
 public final class OverworldTemplateManager implements Listener {
 
@@ -843,6 +844,9 @@ public final class OverworldTemplateManager implements Listener {
                 + "structureRevision=" + STRUCTURE_REVISION + "\n"
                 + "terrainMode=" + (plugin.getConfig().getBoolean(
                 "template-worlds.overworld.island.enabled", true) ? "integrated_island" : "legacy_vanilla") + "\n"
+                + "baseConstruction=" + (plugin.getConfig().getBoolean(
+                "template-worlds.overworld.campaign-layout-1-48.enabled", true)
+                ? "campaign_1_48_anchor_only" : "legacy_1_43_structures") + "\n"
                 + "islandRadius=" + plugin.getConfig().getInt(
                 "template-worlds.overworld.island.land-radius", 500) + "\n"
                 + "externalStructures=false\n"
@@ -1124,6 +1128,7 @@ public final class OverworldTemplateManager implements Listener {
         private Location dungeon;
         private final Location preferredVillageCenter;
         private final Location preferredDungeonCenter;
+        private final boolean campaignLayout148;
 
         OverworldTemplateBuilder(BingoPlugin plugin, World world,
                                  BiProgress progress, Consumer<BuildResult> completion,
@@ -1138,6 +1143,8 @@ public final class OverworldTemplateManager implements Listener {
             this.dungeonZKey = dungeonZKey;
             this.preferredVillageCenter = preferredVillageCenter == null ? null : preferredVillageCenter.clone();
             this.preferredDungeonCenter = preferredDungeonCenter == null ? null : preferredDungeonCenter.clone();
+            this.campaignLayout148 = plugin.getConfig().getBoolean(
+                    "template-worlds.overworld.campaign-layout-1-48.enabled", true);
             this.random = new Random(plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L) ^ 0x5EEDB1A6L);
         }
 
@@ -1154,6 +1161,11 @@ public final class OverworldTemplateManager implements Listener {
             try {
                 switch (planningPhase) {
                     case 0 -> {
+                        if (campaignLayout148) {
+                            planCampaignAnchorsOnly();
+                            planningPhase = 4;
+                            break;
+                        }
                         if (preferredVillageCenter != null && preferredDungeonCenter != null) {
                             progressConsumer.accept(new Progress(0.21D,
                                     "actualizando la plantilla existente en sus coordenadas guardadas"));
@@ -1211,6 +1223,12 @@ public final class OverworldTemplateManager implements Listener {
         }
 
         private void startBlockPlacement() {
+            if (blocks.isEmpty()) {
+                progressConsumer.accept(new Progress(0.96D,
+                        "anclas limpias listas; no se pintaron estructuras heredadas"));
+                completeBlockPlacement();
+                return;
+            }
             int perTick = Math.max(100, plugin.getConfig().getInt("template-worlds.overworld.blocks-per-tick", 500));
             long maxNanos = Math.max(2L,
                     plugin.getConfig().getLong("template-worlds.overworld.max-build-millis-per-tick", 8L)) * 1_000_000L;
@@ -1229,13 +1247,45 @@ public final class OverworldTemplateManager implements Listener {
                 if (cursor < total) return;
                 task.cancel();
                 try {
-                    for (Runnable runnable : afterBlocks) runnable.run();
-                    world.setSpawnLocation(village.clone().add(0.5, 1.0, 0.5));
-                    completion.accept(BuildResult.success(village, dungeon));
+                    completeBlockPlacement();
                 } catch (Throwable error) {
                     completion.accept(BuildResult.failed("Falló la fase de entidades/contenedores: " + rootMessage(error)));
                 }
             }, 1L, 1L);
+        }
+
+        private void planCampaignAnchorsOnly() {
+            progressConsumer.accept(new Progress(0.21D,
+                    "reservando anclas limpias para el diseño estructural 1.48.2"));
+            if (preferredVillageCenter != null || preferredDungeonCenter != null) {
+                throw new IllegalStateException("La base 1.48.2 no puede reutilizar una plantilla "
+                        + "estructural anterior; ejecuta reset y generate");
+            }
+            Location villageCenter = preferredVillageCenter != null
+                    ? preferredVillageCenter.clone()
+                    : deterministicAnchor(
+                    plugin.getConfig().getInt("template-worlds.overworld.layout.village-x", -360),
+                    plugin.getConfig().getInt("template-worlds.overworld.layout.village-z", 0));
+            Location cityCenter = preferredDungeonCenter != null
+                    ? preferredDungeonCenter.clone()
+                    : deterministicAnchor(
+                    plugin.getConfig().getInt("template-worlds.overworld.layout.city-x", 420),
+                    plugin.getConfig().getInt("template-worlds.overworld.layout.city-z", 0));
+            int villageBase = medianHeight(villageCenter.getBlockX(),
+                    villageCenter.getBlockZ(), 28);
+            int cityBase = medianHeight(cityCenter.getBlockX(), cityCenter.getBlockZ(), 46);
+            village = new Location(world, villageCenter.getBlockX() + 3,
+                    villageBase + 1, villageCenter.getBlockZ() + 15);
+            dungeon = new Location(world, cityCenter.getBlockX(), cityBase + 1,
+                    cityCenter.getBlockZ());
+            blocks.clear();
+            afterBlocks.clear();
+        }
+
+        private void completeBlockPlacement() {
+            for (Runnable runnable : afterBlocks) runnable.run();
+            world.setSpawnLocation(village.clone().add(0.5D, 1.0D, 0.5D));
+            completion.accept(BuildResult.success(village, dungeon));
         }
 
         private void stopPlanning(BuildResult result) {

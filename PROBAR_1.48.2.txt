@@ -1,0 +1,24 @@
+1. Conserva ArlightBingo 1.48.1 y 1.48.0 como rollback.
+2. Detén completamente el servidor; no uses /reload.
+3. Instala únicamente ArlightBingo-1.48.2.jar y arranca el servidor.
+4. Regenera Overworld desde cero:
+
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.2-test1
+   /bingo template overworld status
+
+5. Cuando el estado sea READY:
+
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+6. Revisa especialmente:
+   - village-hall y residential-lodge: puerta y calle despejadas;
+   - todas las casas: paredes/techos cerrados y escaleras utilizables;
+   - chimeneas: conectadas desde el hogar hasta el remate, sin tramos flotantes;
+   - todas las torres, incluidas puertas monumentales: pisos, luz y acceso vertical;
+   - murallas: ningún contrafuerte o pilar separado;
+   - límites de distritos y costa: sin domos, círculos, cortes ni islas pegadas;
+   - consola: un único resultado READY o FAILED, nunca un bucle.
+
+7. No promuevas la revisión hasta completar la inspección visual.

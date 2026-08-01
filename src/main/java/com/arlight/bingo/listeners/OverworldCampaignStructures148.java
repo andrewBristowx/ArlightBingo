@@ -89,9 +89,10 @@ final class OverworldCampaignStructures148 {
                 17, 13, 2, false, Material.GRAY_TERRACOTTA, 8, Facing.WEST);
         villageHouse(out, registry, "village-hall", site.x(), upperY, site.z() - 47,
                 27, 17, 2, true, Material.WHITE_TERRACOTTA, 9, Facing.SOUTH);
-        out.add(e(site.x(), upperY, site.z() - 38, Material.LECTERN));
-        out.add(e(site.x() - 2, upperY, site.z() - 38, Material.BOOKSHELF));
-        out.add(e(site.x() + 2, upperY, site.z() - 38, Material.BOOKSHELF));
+        out.add(e(site.x() - 8, upperY, site.z() - 44, Material.LECTERN));
+        out.add(e(site.x() - 10, upperY, site.z() - 45, Material.BOOKSHELF));
+        out.add(e(site.x() - 9, upperY, site.z() - 45, Material.BOOKSHELF));
+        out.add(e(site.x() - 8, upperY, site.z() - 45, Material.BOOKSHELF));
         animalYard(out, site.x() + 56, upperY, site.z() - 42, 17, 15, Facing.NORTH);
 
         villageEntry(out, site.x() + 67, plazaY, site.z() + 4, Facing.EAST);
@@ -200,8 +201,10 @@ final class OverworldCampaignStructures148 {
                 site.x() + 12, y, site.z() + 25, 3);
         house(out, registry, "military-barracks", site.x(), y, site.z() + 5,
                 27, 19, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
+        int towerIndex = 0;
         for (int[] point : new int[][]{{-39,-39},{39,-39},{-39,39},{39,39}}) {
-            tower(out, site.x() + point[0], y, site.z() + point[1], 6, 18,
+            auditedTower(out, registry, "military-tower-" + towerIndex++,
+                    site.x() + point[0], y, site.z() + point[1], 6, 18,
                     Material.DEEPSLATE_TILES);
         }
         fortWall(out, site.x(), y, site.z(), 48, 7, true);
@@ -227,15 +230,20 @@ final class OverworldCampaignStructures148 {
         villageStreet(out, site.x(), y, site.z() - 50, site.x(), y, site.z() + 61, 9);
         house(out, registry, "citadel-great-hall", site.x(), y, site.z(),
                 43, 27, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
-        tower(out, site.x() - 40, y, site.z() + 24, 7, 22, Material.DEEPSLATE_TILES);
-        tower(out, site.x() + 40, y, site.z() + 24, 7, 22, Material.DEEPSLATE_TILES);
-        tower(out, site.x() - 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
-        tower(out, site.x() + 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
+        auditedTower(out, registry, "citadel-tower-southwest",
+                site.x() - 40, y, site.z() + 24, 7, 22, Material.DEEPSLATE_TILES);
+        auditedTower(out, registry, "citadel-tower-southeast",
+                site.x() + 40, y, site.z() + 24, 7, 22, Material.DEEPSLATE_TILES);
+        auditedTower(out, registry, "citadel-tower-northwest",
+                site.x() - 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
+        auditedTower(out, registry, "citadel-tower-northeast",
+                site.x() + 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
         fortWall(out, site.x(), y, site.z(), 55, 8, true);
         wallOpening(out, site.x(), y, site.z() - 55, true, 6, 6);
         wallOpening(out, site.x() - 55, y, site.z() + 10, false, 6, 6);
         wallOpening(out, site.x() + 55, y, site.z() + 10, false, 6, 6);
-        gateFrame(out, site.x(), y, site.z() + 55, 9, 14);
+        gateFrame(out, registry, "citadel-south-gate", site.x(), y,
+                site.z() + 55, 9, 14);
         straightRoad(out, site.x(), y, site.z() + 33,
                 site.x(), site.z() + 60, 9, Material.POLISHED_ANDESITE);
         straightRoad(out, site.x() - 12, y, site.z() + 52,
@@ -247,7 +255,7 @@ final class OverworldCampaignStructures148 {
     }
 
     static List<BlockEdit> bossArena(Site site, Location outerAltar, Location invocationAltar,
-                                     Location ritualGate, Report report) {
+                                     Location ritualGate, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int y = site.baseY() + 1;
         // Build one continuous ceremonial approach before the arena. The entrance,
@@ -262,7 +270,8 @@ final class OverworldCampaignStructures148 {
             circleWall(out, site.x(), y, site.z(), radius, 9,
                     radius % 2 == 0 ? Material.DEEPSLATE_BRICKS : Material.MOSSY_STONE_BRICKS);
         }
-        monumentalArenaEntrance(out, ritualGate.getBlockX(), ritualGate.getBlockY(), ritualGate.getBlockZ());
+        monumentalArenaEntrance(out, registry, ritualGate.getBlockX(),
+                ritualGate.getBlockY(), ritualGate.getBlockZ());
         straightRoad(out, ritualGate.getBlockX() - 16, ritualGate.getBlockY(), ritualGate.getBlockZ() + 5,
                 ritualGate.getBlockX() + 16, ritualGate.getBlockZ() + 5, 5, Material.MOSSY_STONE_BRICKS);
         outerRitualAltar(out, outerAltar.getBlockX(), outerAltar.getBlockY(), outerAltar.getBlockZ());
@@ -270,14 +279,17 @@ final class OverworldCampaignStructures148 {
         terraces(out, site.x(), y, site.z());
         lampsAround(out, site.x(), y, site.z(), 39, 12);
         // Broken rear pylons keep the arena monumental without four corner towers.
+        int rearIndex = 0;
         for (int[] rear : new int[][]{{-31,34},{31,34}}) {
-            tower(out, site.x() + rear[0], y, site.z() + rear[1], 4, 11, Material.DEEPSLATE_TILES);
+            auditedTower(out, registry, "boss-rear-tower-" + rearIndex++,
+                    site.x() + rear[0], y, site.z() + rear[1], 4, 11,
+                    Material.DEEPSLATE_TILES);
         }
         report.structures += 8;
         return out;
     }
 
-    static List<BlockEdit> portal(Site site, Report report) {
+    static List<BlockEdit> portal(Site site, Report report, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 20,
@@ -292,7 +304,8 @@ final class OverworldCampaignStructures148 {
                                 ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
             }
         }
-        gateFrame(out, site.x(), y, site.z() - 10, 6, 10);
+        gateFrame(out, registry, "portal-north-gate", site.x(), y,
+                site.z() - 10, 6, 10);
         for (int side = -12; side <= 12; side++) {
             if (Math.abs(side) <= 6) continue;
             out.add(e(site.x() + side, y + 1, site.z() - 10, Material.STONE_BRICK_WALL));

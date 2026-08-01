@@ -31,13 +31,6 @@ final class OverworldCampaignBuilder148 {
     private final Path folder;
     private final Site village;
     private final Location safeVillageSpawn;
-    private final Site legacyCitadel;
-    private final Site legacyResidential;
-    private final Site legacyCommercial;
-    private final Site legacyMilitary;
-    private final Site legacyBoss;
-    private final Site legacyPortal;
-    private final Site legacyVillageFragment;
     private final Site residential;
     private final Site commercial;
     private final Site military;
@@ -75,23 +68,6 @@ final class OverworldCampaignBuilder148 {
         this.safeVillageSpawn = new Location(world, village.x(), village.baseY() + 2,
                 village.z() + 63, 180.0F, 0.0F);
 
-        // Enlarged restoration footprints cover the cut walls and floating fragments seen
-        // around the eastern coast instead of cleaning only the original building centers.
-        this.legacyCitadel = site("legacy-citadel", citadelAnchor, 132, Style.CITADEL);
-        this.legacyResidential = site("legacy-residential",
-                citadelAnchor.clone().add(-170, 0, 100), 84, Style.RESIDENTIAL);
-        this.legacyCommercial = site("legacy-commercial",
-                citadelAnchor.clone().add(0, 0, -190), 90, Style.COMMERCIAL);
-        this.legacyMilitary = site("legacy-military",
-                citadelAnchor.clone().add(170, 0, 80), 98, Style.MILITARY);
-        this.legacyBoss = site("legacy-boss", bossAnchor, 94, Style.BOSS);
-        this.legacyPortal = site("legacy-portal", portalAnchor, 62, Style.PORTAL);
-        // Fragmento heredado visto al sureste del pueblo: una torre/techo incompleto
-        // que queda fuera del radio principal. Se limpia antes de modelar el pueblo
-        // y se reconstruye desde el terreno sano circundante para no dejar cráteres.
-        this.legacyVillageFragment = site("legacy-village-fragment",
-                villageCenter.clone().add(-42, 0, 96), 32, Style.VILLAGE);
-
         int plannedCitadelX = plugin.getConfig().getInt(
                 "template-worlds.overworld.campaign-layout-1-48.citadel-x", 140);
         int plannedCitadelZ = plugin.getConfig().getInt(
@@ -127,15 +103,8 @@ final class OverworldCampaignBuilder148 {
     }
 
     private void preparePhases() {
-        addRestorePhases("capital y murallas heredadas", legacyCitadel);
-        addRestorePhases("asentamiento residencial heredado", legacyResidential);
-        addRestorePhases("mercado heredado", legacyCommercial);
-        addRestorePhases("bastión costero heredado", legacyMilitary);
-        addRestorePhases("arena y viviendas heredadas", legacyBoss);
-        addRestorePhases("santuario heredado", legacyPortal);
-        addRestorePhases("torre y tejados heredados del pueblo", legacyVillageFragment);
-
-        // First finish every terrain surface. Routes are then laid on terrain only, never on roofs.
+        // 1.48.2 starts from a clean, anchor-only base. It never paints 1.43 structures and
+        // never reconstructs circular legacy footprints over the natural island.
         addVillageShapePhases("pueblo inicial", village, 67, 94);
         addShapePhases("aldea residencial", residential, 43, 66);
         addShapePhases("mercado de la calzada", commercial, 45, 68);
@@ -143,9 +112,6 @@ final class OverworldCampaignBuilder148 {
         addShapePhases("ciudadela", citadel, 54, 82);
         addShapePhases("arena sellada", boss, 52, 76);
         addShapePhases("santuario del portal", portal, 24, 44);
-        phases.add(new Phase("reparando costa sin crear masas circulares",
-                () -> OverworldCampaignTerrain148.polishCoastlines(
-                        world, village, portal, report)));
         phases.add(new Phase("conectando pueblo, asentamientos y arena",
                 () -> OverworldCampaignTerrain148.buildRoadNetwork(world, layout(), village,
                         residential, commercial, military, citadel, boss, portal, report,
@@ -163,9 +129,9 @@ final class OverworldCampaignBuilder148 {
                 () -> OverworldCampaignStructures148.citadel(citadel, report, auditRegistry)));
         phases.add(new Phase("construyendo puerta monumental y arena aprobada",
                 () -> OverworldCampaignStructures148.bossArena(
-                        boss, outerAltar, invocationAltar, ritualGate, report)));
+                        boss, outerAltar, invocationAltar, ritualGate, report, auditRegistry)));
         phases.add(new Phase("construyendo santuario del portal",
-                () -> OverworldCampaignStructures148.portal(portal, report)));
+                () -> OverworldCampaignStructures148.portal(portal, report, auditRegistry)));
         phases.add(new Phase("integrando murallas y accesos con el relieve",
                 () -> OverworldCampaignTerrain148.integrateFortifications(
                         world, village, residential, military, citadel, boss, portal, report)));
@@ -176,24 +142,14 @@ final class OverworldCampaignBuilder148 {
                 () -> OverworldCampaignAudit148.repairRoadCorridors(auditRegistry)));
     }
 
-    private void addRestorePhases(String name, Site site) {
-        int strip = Math.max(6, plugin.getConfig().getInt(
-                "template-worlds.overworld.campaign-layout-1-48.planning-strip-width", 10));
-        for (int minimum = -site.radius(); minimum <= site.radius(); minimum += strip) {
-            int from = minimum;
-            int to = Math.min(site.radius(), minimum + strip - 1);
-            phases.add(new Phase("reconstruyendo isla: " + name + " [" + from + ".." + to + "]",
-                    () -> OverworldCampaignTerrain148.restoreLegacySite(
-                            world, site, report, from, to)));
-        }
-    }
-
     private void addVillageShapePhases(String name, Site site, int flatRadius, int blendRadius) {
+        auditRegistry.registerTerrain(site, flatRadius, blendRadius);
         int strip = Math.max(6, plugin.getConfig().getInt(
                 "template-worlds.overworld.campaign-layout-1-48.planning-strip-width", 10));
-        for (int minimum = -blendRadius; minimum <= blendRadius; minimum += strip) {
+        int extent = blendRadius + 14;
+        for (int minimum = -extent; minimum <= extent; minimum += strip) {
             int from = minimum;
-            int to = Math.min(blendRadius, minimum + strip - 1);
+            int to = Math.min(extent, minimum + strip - 1);
             phases.add(new Phase("aterrazando " + name + " [" + from + ".." + to + "]",
                     () -> OverworldCampaignTerrain148.shapeVillage(
                             world, site, flatRadius, blendRadius, report, from, to)));
@@ -201,11 +157,13 @@ final class OverworldCampaignBuilder148 {
     }
 
     private void addShapePhases(String name, Site site, int flatRadius, int blendRadius) {
+        auditRegistry.registerTerrain(site, flatRadius, blendRadius);
         int strip = Math.max(6, plugin.getConfig().getInt(
                 "template-worlds.overworld.campaign-layout-1-48.planning-strip-width", 10));
-        for (int minimum = -blendRadius; minimum <= blendRadius; minimum += strip) {
+        int extent = blendRadius + 14;
+        for (int minimum = -extent; minimum <= extent; minimum += strip) {
             int from = minimum;
-            int to = Math.min(blendRadius, minimum + strip - 1);
+            int to = Math.min(extent, minimum + strip - 1);
             phases.add(new Phase("adaptando " + name + " [" + from + ".." + to + "]",
                     () -> OverworldCampaignTerrain148.shapeSite(
                             world, site, flatRadius, blendRadius, report, from, to)));
@@ -213,19 +171,19 @@ final class OverworldCampaignBuilder148 {
     }
 
     void start() {
-        purgeLegacyEntities();
-        plugin.getLogger().info("[ArlightBingo] Diseño Overworld 1.48.1: "
+        purgeBuildFootprintEntities();
+        plugin.getLogger().info("[ArlightBingo] Diseño Overworld 1.48.2: "
                 + phases.size() + " fases reanudables.");
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }
 
-    private void purgeLegacyEntities() {
-        List<Site> legacy = List.of(legacyCitadel, legacyResidential, legacyCommercial,
-                legacyMilitary, legacyBoss, legacyPortal, legacyVillageFragment);
+    private void purgeBuildFootprintEntities() {
+        List<Site> footprints = List.of(village, residential, commercial, military,
+                citadel, boss, portal);
         for (Entity entity : new ArrayList<>(world.getEntities())) {
             if (!(entity instanceof LivingEntity) || entity instanceof Player
                     || entity.getScoreboardTags().contains("arlightbingo_keep")) continue;
-            for (Site site : legacy) {
+            for (Site site : footprints) {
                 double dx = entity.getLocation().getX() - site.x();
                 double dz = entity.getLocation().getZ() - site.z();
                 if (dx * dx + dz * dz <= (site.radius() + 8.0D) * (site.radius() + 8.0D)) {
@@ -247,7 +205,7 @@ final class OverworldCampaignBuilder148 {
                 edits = phase.supplier().get();
                 OverworldCampaignAudit148.validatePhase(phase.name(), edits);
                 editCursor = 0;
-                plugin.getLogger().info("[ArlightBingo 1.48] " + phase.name()
+                plugin.getLogger().info("[ArlightBingo 1.48.2] " + phase.name()
                         + " · " + edits.size() + " cambios");
                 return;
             }
@@ -261,7 +219,11 @@ final class OverworldCampaignBuilder148 {
             while (editCursor < edits.size() && applied < maximum && System.nanoTime() < deadline) {
                 BlockEdit edit = edits.get(editCursor++);
                 if (edit.y() >= world.getMinHeight() && edit.y() < world.getMaxHeight()) {
-                    world.getBlockAt(edit.x(), edit.y(), edit.z()).setType(edit.material(), false);
+                    var block = world.getBlockAt(edit.x(), edit.y(), edit.z());
+                    if (block.getType() != edit.material()) block.setType(edit.material(), false);
+                    if (edit.data() != null) {
+                        block.setBlockData(Bukkit.createBlockData(edit.data()), false);
+                    }
                     report.appliedBlocks++;
                 }
                 applied++;
@@ -277,19 +239,20 @@ final class OverworldCampaignBuilder148 {
         Layout layout = layout();
         auditSummary = OverworldCampaignAudit148.auditWorld(world, auditRegistry,
                 village, citadel, portal, outerAltar, ritualGate);
+        world.setSpawnLocation(safeVillageSpawn);
         writeLayout(layout);
         updateTemplateMarker();
         writeReport();
         Files.writeString(folder.resolve(OverworldCampaignLandscape148.DONE_MARKER),
-                "version=1.48.1\ncompleted=" + System.currentTimeMillis() + "\n",
+                "version=1.48.2\ncompleted=" + System.currentTimeMillis() + "\n",
                 StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING);
         Files.deleteIfExists(folder.resolve(OverworldCampaignLandscape148.PROGRESS_MARKER));
         completion.accept(layout);
-        plugin.getLogger().info("[ArlightBingo] Overworld 1.48.1 completado: isla restaurada, "
-                + "pueblo nuevo, entrada ritual y arena de dos fases.");
+        plugin.getLogger().info("[ArlightBingo] Overworld 1.48.2 completado: base limpia, "
+                + "pueblo accesible, torres auditadas y terreno orgánico.");
         Bukkit.broadcast(ChatColor.GREEN
-                        + "[Bingo] La plantilla Overworld 1.48.1 terminó su reconstrucción.",
+                        + "[Bingo] La plantilla Overworld 1.48.2 terminó su construcción limpia.",
                 "arlightbingo.admin");
     }
 
@@ -301,7 +264,7 @@ final class OverworldCampaignBuilder148 {
 
     private void writeLayout(Layout layout) throws IOException {
         Properties properties = new Properties();
-        properties.setProperty("version", "1.48.1");
+        properties.setProperty("version", "1.48.2");
         properties.setProperty("village", format(layout.village()));
         properties.setProperty("residential", format(layout.residential()));
         properties.setProperty("commercial", format(layout.commercial()));
@@ -318,7 +281,7 @@ final class OverworldCampaignBuilder148 {
                 folder.resolve(OverworldCampaignLandscape148.LAYOUT_MARKER),
                 StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
-            properties.store(writer, "ArlightBingo 1.48.1 Overworld campaign layout");
+            properties.store(writer, "ArlightBingo 1.48.2 Overworld campaign layout");
         }
     }
 
@@ -337,25 +300,26 @@ final class OverworldCampaignBuilder148 {
                 invocationAltar.getBlockZ())));
         properties.setProperty("portal", format(portal.floor(world)));
         properties.setProperty("structureRevision",
-                "1.48.1-route-audit-loop-fix-1");
-        properties.setProperty("villageArchitecture", "coherent_closed_varied_village_v3");
-        properties.setProperty("islandRestoration", "adaptive_shoreline_legacy_cleanup_v3");
-        properties.setProperty("roadNetwork", "terrain_first_audited_routes_v8");
+                "1.48.2-clean-base-structural-audit-1");
+        properties.setProperty("villageArchitecture", "closed_doors_supported_ladders_v4");
+        properties.setProperty("islandRestoration", "clean_anchor_base_organic_blend_v4");
+        properties.setProperty("roadNetwork", "terrain_first_audited_routes_v9");
+        properties.setProperty("towerArchitecture", "floored_lit_accessible_v1");
         properties.setProperty("bossArena", "approved_arena_without_runtime_intrusion_v4");
         properties.setProperty("villageSafe", "true");
         properties.setProperty("villageSafeRadius", "116");
-        properties.setProperty("structuralAudit", "passed_1_48");
-        properties.setProperty("campaignLayout", "1.48.1");
+        properties.setProperty("structuralAudit", "passed_1_48_2");
+        properties.setProperty("campaignLayout", "1.48.2");
         try (Writer writer = Files.newBufferedWriter(marker, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
             properties.store(writer,
-                    "ArlightBingo Overworld template updated by campaign layout 1.48.1");
+                    "ArlightBingo Overworld template updated by campaign layout 1.48.2");
         }
         Files.deleteIfExists(pending);
     }
 
     private void writeReport() throws IOException {
-        String text = "ARLIGHTBINGO 1.48.1 - ISLA Y CAMPAÑA OVERWORLD\n"
+        String text = "ARLIGHTBINGO 1.48.2 - OVERWORLD LIMPIO Y AUDITADO\n"
                 + "columnas-isla-restauradas=" + report.restoredColumns + "\n"
                 + "columnas-zonas-adaptadas=" + report.shapedColumns + "\n"
                 + "bloques-heredados-retirados=" + report.clearedBlocks + "\n"
@@ -365,8 +329,11 @@ final class OverworldCampaignBuilder148 {
                 + "caminos=" + report.roads + "\n"
                 + "decoraciones=" + report.decorations + "\n"
                 + "auditoria-casas-cerradas=" + auditSummary.houses() + "\n"
+                + "auditoria-torres-accesibles=" + auditSummary.towers() + "\n"
+                + "auditoria-chimeneas-apoyadas=" + auditSummary.chimneys() + "\n"
                 + "auditoria-muestras-camino=" + auditSummary.roadSamples() + "\n"
                 + "auditoria-luces-pueblo=" + auditSummary.villageLights() + "\n"
+                + "auditoria-luces-interiores=" + auditSummary.interiorLights() + "\n"
                 + "auditoria-cultivos=" + auditSummary.crops() + "\n"
                 + "auditoria-faroles-sin-soporte=" + auditSummary.unsupportedLanterns() + "\n"
                 + "pueblo=" + format(safeVillageSpawn) + "\n"
