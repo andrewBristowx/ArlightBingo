@@ -13,7 +13,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Terrain shaping and supported roads for the clean 1.48.3 Overworld campaign. */
+/** Terrain shaping and supported roads for the clean 1.48.4 Overworld campaign. */
 final class OverworldCampaignTerrain148 {
     private static final int ORGANIC_EDGE_MARGIN = 14;
     private static final Set<Material> TERRAIN = EnumSet.of(
@@ -58,7 +58,8 @@ final class OverworldCampaignTerrain148 {
         for (int dx = Math.max(-extent, minimumDx); dx <= Math.min(extent, maximumDx); dx++) {
             for (int dz = -extent; dz <= extent; dz++) {
                 double distance = Math.sqrt(dx * dx + dz * dz);
-                double localBoundary = organicBoundary(site, dx, dz, blendRadius);
+                double localBoundary = Math.max(flatRadius + 18.0D,
+                        organicBoundary(site, dx, dz, blendRadius));
                 if (distance > localBoundary) continue;
                 int x = site.x() + dx;
                 int z = site.z() + dz;
@@ -79,7 +80,7 @@ final class OverworldCampaignTerrain148 {
                         : smooth((distance - localFlat) / Math.max(1.0D, localBoundary - localFlat));
                 int target = (int) Math.round(designed * (1.0D - blend) + natural * blend);
                 Material top = blendedSurface(world, x, natural, z,
-                        surface(Style.VILLAGE), blend);
+                        designedSurface(Style.VILLAGE, x, z), blend);
                 clearAndFill(out, world, x, target, z, top);
                 report.shapedColumns++;
             }
@@ -94,7 +95,8 @@ final class OverworldCampaignTerrain148 {
         for (int dx = Math.max(-extent, minimumDx); dx <= Math.min(extent, maximumDx); dx++) {
             for (int dz = -extent; dz <= extent; dz++) {
                 double distance = Math.sqrt(dx * dx + dz * dz);
-                double localBoundary = organicBoundary(site, dx, dz, blendRadius);
+                double localBoundary = Math.max(flatRadius + 18.0D,
+                        organicBoundary(site, dx, dz, blendRadius));
                 if (distance > localBoundary) continue;
                 int x = site.x() + dx;
                 int z = site.z() + dz;
@@ -113,7 +115,7 @@ final class OverworldCampaignTerrain148 {
                 }
                 int target = (int) Math.round(designed * (1.0D - blend) + natural * blend);
                 Material top = blendedSurface(world, x, natural, z,
-                        surface(site.style()), blend);
+                        designedSurface(site.style(), x, z), blend);
                 clearAndFill(out, world, x, target, z, top);
                 report.shapedColumns++;
             }
@@ -178,6 +180,20 @@ final class OverworldCampaignTerrain148 {
         }
     }
 
+    /** Places a walkable surface and fills only the air beneath it until real ground. */
+    static void supportedPathCell(List<BlockEdit> out, World world, int x, int walkY, int z,
+                                  Material floor) {
+        out.add(new BlockEdit(x, walkY - 1, z, floor));
+        int minimum = Math.max(world.getMinHeight() + 2, walkY - 24);
+        for (int y = walkY - 2; y >= minimum; y--) {
+            Material existing = world.getBlockAt(x, y, z).getType();
+            if (existing.isSolid() && existing != Material.ICE
+                    && existing != Material.WATER && existing != Material.LAVA) break;
+            out.add(new BlockEdit(x, y, z,
+                    y >= walkY - 6 ? Material.COBBLESTONE : Material.STONE));
+        }
+    }
+
     static List<BlockEdit> integrateFortifications(World world, Site military, Site citadel,
                                                    Site boss, Report report,
                                                    OverworldCampaignAudit148.Registry registry) {
@@ -235,8 +251,9 @@ final class OverworldCampaignTerrain148 {
                 Math.max(target - 48, Math.min(minimumBottom, natural - 2)));
         for (int y = target - 1; y >= bottom; y--) {
             Material existing = world.getBlockAt(x, y, z).getType();
-            if (y < minimumBottom && existing.isSolid()
-                    && existing != Material.ICE && existing != Material.WATER) break;
+            if (y < target - 1 && existing.isSolid()
+                    && existing != Material.ICE && existing != Material.WATER
+                    && existing != Material.LAVA) break;
             out.add(new BlockEdit(x, y, z,
                     y >= target - finishDepth ? material : Material.COBBLESTONE));
         }
@@ -261,17 +278,39 @@ final class OverworldCampaignTerrain148 {
                 }
                 registry.registerRoadCell(id, x, walkY, z, floor);
             }
+            if (step >= 0) {
+                for (int side : new int[]{-halfWidth - 1, halfWidth + 1}) {
+                    int x = cx + outwardX * step + sideX * side;
+                    int z = cz + outwardZ * step + sideZ * side;
+                    int natural = terrainY(world, x, z);
+                    int wallTop = Math.min(walkY + 6, Math.max(walkY + 2, natural + 1));
+                    for (int y = walkY - 2; y <= wallTop; y++) {
+                        Material material = Math.floorMod(step + side + y, 9) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
+                        out.add(new BlockEdit(x, y, z, material));
+                    }
+                }
+            }
         }
     }
 
-    private static Material surface(Style style) {
+    private static Material designedSurface(Style style, int x, int z) {
+        int sample = Math.floorMod(x * 31 + z * 17, 100);
         return switch (style) {
-            case VILLAGE, RESIDENTIAL -> Material.GRASS_BLOCK;
-            case COMMERCIAL -> Material.PACKED_MUD;
-            case MILITARY -> Material.COARSE_DIRT;
-            case CITADEL -> Material.STONE_BRICKS;
-            case BOSS -> Material.DEEPSLATE_TILES;
-            case PORTAL -> Material.POLISHED_ANDESITE;
+            case VILLAGE, RESIDENTIAL -> sample < 9 ? Material.COARSE_DIRT : Material.GRASS_BLOCK;
+            case COMMERCIAL -> sample < 62 ? Material.MUD
+                    : sample < 84 ? Material.COARSE_DIRT : Material.ROOTED_DIRT;
+            case MILITARY -> sample < 42 ? Material.COARSE_DIRT
+                    : sample < 68 ? Material.GRAVEL
+                    : sample < 86 ? Material.ANDESITE : Material.TUFF;
+            case CITADEL -> sample < 48 ? Material.ANDESITE
+                    : sample < 76 ? Material.TUFF
+                    : sample < 90 ? Material.STONE : Material.GRAVEL;
+            case BOSS -> sample < 58 ? Material.DEEPSLATE
+                    : sample < 84 ? Material.TUFF : Material.STONE;
+            case PORTAL -> sample < 46 ? Material.ANDESITE
+                    : sample < 73 ? Material.DIORITE
+                    : sample < 90 ? Material.TUFF : Material.GRAVEL;
         };
     }
 
@@ -388,16 +427,23 @@ final class OverworldCampaignTerrain148 {
             }
 
             boolean bridge = wet(world, cx, cz) || natural < walkY - 2;
-            for (int side = -width / 2; side <= width / 2; side++) {
-                int x = (int) Math.round(cx + nx * side);
-                int z = (int) Math.round(cz + nz * side);
-                Material floor = bridge ? Material.SPRUCE_PLANKS
-                        : Math.floorMod(step + side, 9) == 0 ? secondary(path) : path;
-                out.add(new BlockEdit(x, walkY - 1, z, floor));
-                for (int y = walkY; y <= walkY + 3; y++) out.add(new BlockEdit(x, y, z, Material.AIR));
-                registry.registerRoadCell(id, x, walkY, z, floor);
-                support(out, world, x, walkY - 2, z,
-                        bridge ? Material.STRIPPED_SPRUCE_LOG : Material.COBBLESTONE);
+            int halfWidth = Math.max(1, width / 2);
+            for (int ox = -halfWidth; ox <= halfWidth; ox++) {
+                for (int oz = -halfWidth; oz <= halfWidth; oz++) {
+                    if (ox * ox + oz * oz > halfWidth * halfWidth + halfWidth) continue;
+                    int x = cx + ox;
+                    int z = cz + oz;
+                    Material floor = bridge ? Material.SPRUCE_PLANKS
+                            : Math.floorMod(step + ox * 3 + oz * 5, 9) == 0
+                            ? secondary(path) : path;
+                    out.add(new BlockEdit(x, walkY - 1, z, floor));
+                    for (int y = walkY; y <= walkY + 3; y++) {
+                        out.add(new BlockEdit(x, y, z, Material.AIR));
+                    }
+                    registry.registerRoadCell(id, x, walkY, z, floor);
+                    support(out, world, x, walkY - 2, z,
+                            bridge ? Material.STRIPPED_SPRUCE_LOG : Material.COBBLESTONE);
+                }
             }
             if (step > 0 && step % 18 == 0) {
                 int lx = (int) Math.round(cx + nx * (width / 2 + 2));
