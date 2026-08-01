@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   apply:
-    if: ${{ hashFiles('.github/arlight-1.46-payload/part-*') != '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Descargar rama
@@ -19,7 +18,18 @@ jobs:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
 
+      - name: Comprobar paquete temporal
+        id: payload
+        shell: bash
+        run: |
+          if compgen -G '.github/arlight-1.46-payload/part-*' > /dev/null; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'available=false' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Restaurar archivos 1.46.0
+        if: steps.payload.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -29,6 +39,7 @@ jobs:
           rm -rf .github/arlight-1.46-payload
 
       - name: Guardar fuente reconstruida
+        if: steps.payload.outputs.available == 'true'
         shell: bash
         run: |
           set -euo pipefail
