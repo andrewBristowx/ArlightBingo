@@ -38,7 +38,7 @@ jobs:
           grep -q '^1.48.1$' BUILD_VERSION.txt
           grep -q '^ArlightBingo 1.48.1 ROUTE-AUDIT-LOOP-FIX$' SOURCE_VERSION.txt
           grep -q 'legacy-village-fragment' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
-          grep -q 'closed-roofs-supported-villages' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q '1.48.1-route-audit-loop-fix-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
           grep -q 'frontón abierto' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
           grep -q 'Step 6' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
           grep -q 'adaptiveShoreline' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
