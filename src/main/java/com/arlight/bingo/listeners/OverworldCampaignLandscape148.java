@@ -34,13 +34,14 @@ import java.util.UUID;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Coordinates the 1.48.0 template rebuild and its two-stage boss ritual. */
+/** Coordinates the 1.48.1 template rebuild and its two-stage boss ritual. */
 public final class OverworldCampaignLandscape148 {
     static final String TEMPLATE_MARKER = "arlight-overworld-template.properties";
     static final String PENDING_TEMPLATE_MARKER = "arlight-overworld-template-1.48.pending";
     static final String LAYOUT_MARKER = "arlight-overworld-campaign-1.48.properties";
     static final String PROGRESS_MARKER = "arlight-overworld-campaign-1.48.in-progress";
     static final String DONE_MARKER = "arlight-overworld-campaign-1.48.done";
+    static final String FAILED_MARKER = "arlight-overworld-campaign-1.48.failed";
     static final String REPORT_FILE = "arlight-overworld-campaign-1.48-report.txt";
     private static final String GATE_OPEN_MARKER = "arlight-overworld-ritual-gate-open.properties";
     private static final String BOSS_AWAKENED_MARKER = "arlight-overworld-boss-awakened.properties";
@@ -161,15 +162,23 @@ public final class OverworldCampaignLandscape148 {
         Path pendingMarker = folder.resolve(PENDING_TEMPLATE_MARKER);
         Path progress = folder.resolve(PROGRESS_MARKER);
         Path done = folder.resolve(DONE_MARKER);
+        Path failed = folder.resolve(FAILED_MARKER);
         if ((!Files.isRegularFile(baseMarker) && !Files.isRegularFile(pendingMarker))
                 || Files.isRegularFile(done)) return;
 
         try {
+            boolean completedThisRun = Files.isRegularFile(baseMarker)
+                    && Files.getLastModifiedTime(baseMarker).toMillis() >= startupEpochMillis - 5_000L;
+            // A failed audit is terminal for this generated revision. Only a freshly
+            // generated base marker represents an explicit new attempt.
+            if (Files.isRegularFile(failed)) {
+                if (!completedThisRun) return;
+                Files.deleteIfExists(failed);
+                Files.deleteIfExists(progress);
+            }
             boolean interrupted = Files.isRegularFile(progress)
                     && (Files.isRegularFile(pendingMarker) || Files.isRegularFile(baseMarker));
             Path sourceMarker = Files.isRegularFile(pendingMarker) ? pendingMarker : baseMarker;
-            boolean completedThisRun = Files.isRegularFile(baseMarker)
-                    && Files.getLastModifiedTime(baseMarker).toMillis() >= startupEpochMillis - 5_000L;
             if (!interrupted && !completedThisRun) return;
 
             Properties base = read(sourceMarker);
@@ -178,12 +187,13 @@ public final class OverworldCampaignLandscape148 {
             Location boss = parse(world, base.getProperty("boss"));
             Location portal = parse(world, base.getProperty("portal"));
             if (village == null || citadel == null || boss == null || portal == null) {
-                plugin.getLogger().warning("No se inició 1.48.0: faltan anclas en " + sourceMarker);
+                failBuild(folder, new IllegalStateException(
+                        "No se inició 1.48.1: faltan anclas en " + sourceMarker));
                 return;
             }
 
             Files.writeString(progress,
-                    "version=1.48.0\nstarted=" + System.currentTimeMillis() + "\n",
+                    "version=1.48.1\nstarted=" + System.currentTimeMillis() + "\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
             Files.deleteIfExists(folder.resolve(GATE_OPEN_MARKER));
@@ -200,11 +210,26 @@ public final class OverworldCampaignLandscape148 {
                         closeGate(world, layout);
                     }, error -> {
                         activeBuilds.remove(world.getUID());
-                        plugin.getLogger().severe("Falló el diseño Overworld 1.48.0: " + root(error));
+                        failBuild(folder, error);
                     }).start();
         } catch (IOException exception) {
-            plugin.getLogger().warning("No se pudo iniciar el diseño 1.48.0: "
-                    + exception.getMessage());
+            failBuild(folder, exception);
+        }
+    }
+
+    private void failBuild(Path folder, Throwable error) {
+        String reason = root(error).replace('\n', ' ').replace('\r', ' ');
+        plugin.getLogger().severe("Falló el diseño Overworld 1.48.1: " + reason);
+        try {
+            Files.deleteIfExists(folder.resolve(PROGRESS_MARKER));
+            Files.writeString(folder.resolve(FAILED_MARKER),
+                    "version=1.48.1\nfailed=" + System.currentTimeMillis()
+                            + "\nreason=" + reason + "\n",
+                    StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException markerError) {
+            plugin.getLogger().severe("No se pudo guardar el estado FAILED de Overworld 1.48.1: "
+                    + markerError.getMessage());
         }
     }
 
@@ -233,7 +258,7 @@ public final class OverworldCampaignLandscape148 {
             layouts.put(world.getUID(), layout);
             return layout;
         } catch (IOException | IllegalArgumentException exception) {
-            plugin.getLogger().warning("No se pudo leer el diseño 1.48.0 en "
+            plugin.getLogger().warning("No se pudo leer el diseño 1.48.1 en "
                     + world.getName() + ": " + exception.getMessage());
             return null;
         }
@@ -354,7 +379,7 @@ public final class OverworldCampaignLandscape148 {
     private void writeMarker(Path marker, Player player, String stage) {
         try {
             Files.writeString(marker,
-                    "version=1.48.0\nstage=" + stage + "\nplayer=" + player.getUniqueId()
+                    "version=1.48.1\nstage=" + stage + "\nplayer=" + player.getUniqueId()
                             + "\ntime=" + System.currentTimeMillis() + "\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);

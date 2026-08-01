@@ -275,6 +275,28 @@ final class OverworldCampaignArchitecture148 {
         }
     }
 
+    static void wallOpening(List<BlockEdit> out, int cx, int y, int cz,
+                            boolean alongX, int halfWidth, int clearance) {
+        for (int side = -halfWidth; side <= halfWidth; side++) {
+            int x = cx + (alongX ? side : 0);
+            int z = cz + (alongX ? 0 : side);
+            out.add(e(x, y - 1, z, Material.POLISHED_ANDESITE));
+            for (int yy = 0; yy <= clearance; yy++) out.add(e(x, y + yy, z, Material.AIR));
+            out.add(e(x, y + clearance + 1, z,
+                    Math.floorMod(side, 4) == 0 ? Material.CHISELED_STONE_BRICKS
+                            : Material.STONE_BRICKS));
+        }
+        for (int side : new int[]{-halfWidth - 1, halfWidth + 1}) {
+            int x = cx + (alongX ? side : 0);
+            int z = cz + (alongX ? 0 : side);
+            for (int yy = 0; yy <= clearance + 2; yy++) {
+                out.add(e(x, y + yy, z,
+                        Math.floorMod(side + yy, 7) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
+            }
+        }
+    }
+
     static void wallColumn(List<BlockEdit> out, int x, int y, int z, int height, boolean crest) {
         for (int depth = 1; depth <= 3; depth++) {
             out.add(e(x, y - depth, z, depth == 1 ? Material.STONE_BRICKS : Material.COBBLESTONE));

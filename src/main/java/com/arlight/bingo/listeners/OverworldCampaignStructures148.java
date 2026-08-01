@@ -46,6 +46,8 @@ final class OverworldCampaignStructures148 {
                 site.x() + 12, upperY, site.z() - 29, 3);
         villageStreet(out, site.x() + 12, upperY, site.z() - 29,
                 site.x(), upperY, site.z() - 28, 3);
+        villageStreet(out, site.x(), upperY, site.z() - 33,
+                site.x(), upperY, site.z() - 28, 3);
         villageStreet(out, site.x() + 54, plazaY, site.z(),
                 site.x() + 72, plazaY, site.z() + 4, 5);
         villageStreet(out, site.x() - 56, lowerY, site.z() + 47,
@@ -98,7 +100,7 @@ final class OverworldCampaignStructures148 {
                     tree[1] < -22 ? upperY : tree[1] > 20 ? lowerY : plazaY,
                     site.z() + tree[1], 5 + Math.floorMod(tree[0] + tree[1], 3));
         }
-        for (int[] lamp : new int[][]{{-20,18},{20,18},{-20,-15},{20,-15},{0,31},{0,-27},{55,4}}) {
+        for (int[] lamp : new int[][]{{-20,13},{20,18},{-20,-15},{20,-15},{0,31},{0,-27},{55,4}}) {
             OverworldCampaignTerrain148.lamp(out, site.x() + lamp[0],
                     lamp[1] < -22 ? upperY : lamp[1] > 20 ? lowerY : plazaY,
                     site.z() + lamp[1]);
@@ -131,7 +133,7 @@ final class OverworldCampaignStructures148 {
         villageHouse(out, registry, "residential-home-southeast", site.x() + 28, y,
                 site.z() + 25, 15, 13, 1, true, Material.LIGHT_GRAY_TERRACOTTA,
                 24, Facing.WEST);
-        villageHouse(out, registry, "residential-lodge", site.x(), y + 1,
+        villageHouse(out, registry, "residential-lodge", site.x(), y,
                 site.z() + 35, 13, 9, 2, true, Material.WHITE_TERRACOTTA,
                 25, Facing.NORTH);
         serviceYard(out, site.x() - 8, y, site.z() - 35, 19, 13, true);
@@ -203,6 +205,7 @@ final class OverworldCampaignStructures148 {
                     Material.DEEPSLATE_TILES);
         }
         fortWall(out, site.x(), y, site.z(), 48, 7, true);
+        wallOpening(out, site.x() - 48, y, site.z() - 23, false, 5, 5);
         trainingYard(out, site.x() - 24, y, site.z() + 27);
         house(out, registry, "military-armory", site.x() + 25, y, site.z() + 25,
                 17, 11, 1, false, Material.LIGHT_GRAY_TERRACOTTA, Facing.WEST);
@@ -229,6 +232,9 @@ final class OverworldCampaignStructures148 {
         tower(out, site.x() - 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
         tower(out, site.x() + 36, y, site.z() - 31, 6, 18, Material.DARK_OAK_PLANKS);
         fortWall(out, site.x(), y, site.z(), 55, 8, true);
+        wallOpening(out, site.x(), y, site.z() - 55, true, 6, 6);
+        wallOpening(out, site.x() - 55, y, site.z() + 10, false, 6, 6);
+        wallOpening(out, site.x() + 55, y, site.z() + 10, false, 6, 6);
         gateFrame(out, site.x(), y, site.z() + 55, 9, 14);
         straightRoad(out, site.x(), y, site.z() + 33,
                 site.x(), site.z() + 60, 9, Material.POLISHED_ANDESITE);

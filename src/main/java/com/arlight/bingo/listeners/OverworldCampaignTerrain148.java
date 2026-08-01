@@ -13,7 +13,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Terrain reconstruction and supported roads for the 1.48.0 Overworld campaign. */
+/** Terrain reconstruction and supported roads for the 1.48.1 Overworld campaign. */
 final class OverworldCampaignTerrain148 {
     private static final int SEA_LEVEL = 62;
     private static final Set<Material> TERRAIN = EnumSet.of(
@@ -394,6 +394,7 @@ final class OverworldCampaignTerrain148 {
         double nx = -dz / length;
         double nz = dx / length;
         int walkY = start.getBlockY();
+        int endY = end.getBlockY();
         for (int step = 0; step <= steps; step++) {
             double t = step / (double) steps;
             double bend = Math.sin(Math.PI * t) * curve * Math.min(75.0D, length * 0.17D);
@@ -402,9 +403,17 @@ final class OverworldCampaignTerrain148 {
             int natural = terrainY(world, cx, cz) + 1;
             int expected = (int) Math.round(start.getY() + (end.getY() - start.getY()) * t);
             int desired = Math.max(expected - 2, Math.min(expected + 2, natural));
-            if (desired > walkY + 1) walkY++;
-            else if (desired < walkY - 1) walkY--;
-            else walkY = desired;
+            if (step == 0) {
+                walkY = start.getBlockY();
+            } else {
+                // Reserve enough remaining blocks to reach the declared waypoint by one
+                // vertical block per step. Consecutive segments therefore share one exact
+                // height instead of overwriting the same endpoint at different levels.
+                int remaining = steps - step;
+                desired = Math.max(endY - remaining, Math.min(endY + remaining, desired));
+                if (desired > walkY) walkY++;
+                else if (desired < walkY) walkY--;
+            }
 
             boolean bridge = wet(world, cx, cz) || natural < walkY - 2;
             for (int side = -width / 2; side <= width / 2; side++) {
@@ -414,6 +423,7 @@ final class OverworldCampaignTerrain148 {
                         : Math.floorMod(step + side, 9) == 0 ? secondary(path) : path;
                 out.add(new BlockEdit(x, walkY - 1, z, floor));
                 for (int y = walkY; y <= walkY + 3; y++) out.add(new BlockEdit(x, y, z, Material.AIR));
+                registry.registerRoadCell(id, x, walkY, z, floor);
                 support(out, world, x, walkY - 2, z,
                         bridge ? Material.STRIPPED_SPRUCE_LOG : Material.COBBLESTONE);
             }
@@ -422,8 +432,6 @@ final class OverworldCampaignTerrain148 {
                 int lz = (int) Math.round(cz + nz * (width / 2 + 2));
                 lamp(out, lx, walkY, lz);
             }
-            if (step == 0 || step == steps || step % 12 == 0)
-                registry.registerRoadSample(id, cx, walkY, cz);
         }
     }
 

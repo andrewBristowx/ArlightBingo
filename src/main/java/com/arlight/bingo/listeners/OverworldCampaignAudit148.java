@@ -6,12 +6,15 @@ import org.bukkit.World;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.0 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.1 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -28,14 +31,16 @@ final class OverworldCampaignAudit148 {
     record HouseSpec(String id, int cx, int y, int cz, int hx, int hz,
                      int height, boolean roofAlongX, Facing front) { }
 
-    record RoadSample(String id, int x, int walkY, int z) { }
+    record RoadCell(String id, int x, int walkY, int z, Material floor) { }
+
+    private record RoadColumn(int x, int z) { }
 
     record Summary(int houses, int roadSamples, int villageLights,
                    int crops, int unsupportedLanterns) { }
 
     static final class Registry {
         private final List<HouseSpec> houses = new ArrayList<>();
-        private final List<RoadSample> roadSamples = new ArrayList<>();
+        private final Map<RoadColumn, RoadCell> roadCells = new LinkedHashMap<>();
 
         void registerHouse(HouseSpec candidate) {
             for (HouseSpec placed : houses) {
@@ -53,8 +58,8 @@ final class OverworldCampaignAudit148 {
             houses.add(candidate);
         }
 
-        void registerRoadSample(String id, int x, int walkY, int z) {
-            roadSamples.add(new RoadSample(id, x, walkY, z));
+        void registerRoadCell(String id, int x, int walkY, int z, Material floor) {
+            roadCells.put(new RoadColumn(x, z), new RoadCell(id, x, walkY, z, floor));
         }
     }
 
@@ -89,7 +94,11 @@ final class OverworldCampaignAudit148 {
                               Location ritualGate) {
         List<String> failures = new ArrayList<>();
         for (HouseSpec house : registry.houses) auditHouse(world, house, failures);
-        for (RoadSample sample : registry.roadSamples) auditRoad(world, sample, failures);
+        Set<String> brokenRoads = new LinkedHashSet<>();
+        for (RoadCell cell : registry.roadCells.values()) {
+            if (!isWalkable(world, cell.x, cell.walkY, cell.z)) brokenRoads.add(cell.id);
+        }
+        for (String road : brokenRoads) failures.add("camino cortado: " + road);
 
         int crops = countCrops(world, village, village.radius() - 4);
         if (crops > 0) failures.add("quedaron " + crops + " bloques de cultivo en el pueblo");
@@ -104,11 +113,27 @@ final class OverworldCampaignAudit148 {
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.0 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.1 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
-        return new Summary(registry.houses.size(), registry.roadSamples.size(),
+        return new Summary(registry.houses.size(), registry.roadCells.size(),
                 light[0], crops, light[1]);
+    }
+
+    /**
+     * Roads are planned before buildings so terrain height never sees roofs. Fortifications,
+     * gates and decoration are intentionally built afterwards, so the registered road cells
+     * are replayed once at the end to keep every declared corridor open at its audited height.
+     */
+    static List<BlockEdit> repairRoadCorridors(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (RoadCell cell : registry.roadCells.values()) {
+            out.add(new BlockEdit(cell.x, cell.walkY - 1, cell.z, cell.floor));
+            for (int y = cell.walkY; y <= cell.walkY + 3; y++) {
+                out.add(new BlockEdit(cell.x, y, cell.z, Material.AIR));
+            }
+        }
+        return out;
     }
 
     private static void auditHouse(World world, HouseSpec house, List<String> failures) {
@@ -178,13 +203,12 @@ final class OverworldCampaignAudit148 {
         }
     }
 
-    private static void auditRoad(World world, RoadSample sample, List<String> failures) {
-        Material floor = world.getBlockAt(sample.x, sample.walkY - 1, sample.z).getType();
+    private static boolean isWalkable(World world, int x, int walkY, int z) {
+        Material floor = world.getBlockAt(x, walkY - 1, z).getType();
         if (floor.isAir() || floor == Material.WATER || floor == Material.LAVA
-                || world.getBlockAt(sample.x, sample.walkY, sample.z).getType().isSolid()
-                || world.getBlockAt(sample.x, sample.walkY + 1, sample.z).getType().isSolid()) {
-            failures.add("camino cortado: " + sample.id);
-        }
+                || world.getBlockAt(x, walkY, z).getType().isSolid()
+                || world.getBlockAt(x, walkY + 1, z).getType().isSolid()) return false;
+        return true;
     }
 
     private static int countCrops(World world, Site site, int radius) {
