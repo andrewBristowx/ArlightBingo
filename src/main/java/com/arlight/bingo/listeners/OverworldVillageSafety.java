@@ -24,22 +24,22 @@ import java.util.Properties;
 import java.util.UUID;
 
 /**
- * Protege la aldea inicial y coordina el reconstrucción de isla y campaña Overworld 1.46.0.
+ * Protege la aldea inicial y coordina el reconstrucción de isla y campaña Overworld 1.47.0.
  * La versión anterior queda en su propia rama; esta clase no modifica revisiones
  * antiguas y sólo inicia el nuevo diseño sobre una plantilla creada en la misma
- * ejecución o sobre una construcción 1.46.0 interrumpida.
+ * ejecución o sobre una construcción 1.47.0 interrumpida.
  */
 public final class OverworldVillageSafety implements Listener {
     private static final String MARKER = "arlight-overworld-template.properties";
 
     private final BingoPlugin plugin;
-    private final OverworldCampaignLandscape146 campaignLayout;
+    private final OverworldCampaignLandscape147 campaignLayout;
     private final Map<UUID, SafeZone> zones = new HashMap<>();
     private final Map<UUID, Long> retryAfter = new HashMap<>();
 
     public OverworldVillageSafety(BingoPlugin plugin) {
         this.plugin = plugin;
-        this.campaignLayout = new OverworldCampaignLandscape146(plugin);
+        this.campaignLayout = new OverworldCampaignLandscape147(plugin);
         long interval = Math.max(20L, plugin.getConfig().getLong(
                 "template-worlds.overworld.safe-village.purge-interval-ticks", 40L));
         Bukkit.getScheduler().runTaskTimer(plugin, this::maintenanceTick, interval, interval);
