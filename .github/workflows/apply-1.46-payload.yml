@@ -1,0 +1,39 @@
+name: Aplicar fuente ArlightBingo 1.46.0
+
+on:
+  push:
+    branches:
+      - agent/bingo-1.46.0-island-reconstruction-boss-gate
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ hashFiles('.github/arlight-1.46-payload/part-*') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar rama
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Restaurar archivos 1.46.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/arlight-1.46-payload/part-* | base64 -d > /tmp/arlight146.tar.gz
+          echo '6a97a79c6bc28c3c3e3c57bf7ad0db5fa794be5e0b7a473848f4eeb29b1e71dd  /tmp/arlight146.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/arlight146.tar.gz -C .
+          rm -rf .github/arlight-1.46-payload
+
+      - name: Guardar fuente reconstruida
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Aplicar ArlightBingo 1.46.0 island reconstruction boss gate'
+          git push origin HEAD:${{ github.ref_name }}
