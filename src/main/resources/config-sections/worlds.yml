@@ -98,6 +98,13 @@ template-worlds:
       enabled: true
       radius: 112
       purge-interval-ticks: 40
+    campaign-layout-1-46:
+      enabled: true
+      citadel-x: 140
+      citadel-z: 30
+      planning-strip-width: 10
+      blocks-per-tick: 1400
+      max-millis-per-tick: 6
   nether:
     enabled: true
     name: bingo_template_nether

@@ -1,0 +1,74 @@
+name: Aplicar fuente ArlightBingo 1.46.0
+
+on:
+  push:
+    branches:
+      - agent/bingo-1.46.0-island-reconstruction-boss-gate
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+    steps:
+      - name: Descargar rama
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BRANCH_NAME }}
+          fetch-depth: 0
+
+      - name: Comprobar tareas temporales
+        id: temporary
+        shell: bash
+        run: |
+          if compgen -G '.github/arlight-1.46-payload/part-*' > /dev/null; then
+            echo 'payload=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'payload=false' >> "$GITHUB_OUTPUT"
+          fi
+          if compgen -G '.github/arlight-1.46-fixes/*.py' > /dev/null; then
+            echo 'fixes=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'fixes=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restaurar archivos 1.46.0
+        if: steps.temporary.outputs.payload == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/arlight-1.46-payload/part-* | base64 -d > /tmp/arlight146.tar.gz
+          echo '6a97a79c6bc28c3c3e3c57bf7ad0db5fa794be5e0b7a473848f4eeb29b1e71dd  /tmp/arlight146.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/arlight146.tar.gz -C .
+          rm -rf .github/arlight-1.46-payload
+          git checkout HEAD -- .github/workflows/build.yml
+
+      - name: Aplicar correcciones temporales
+        if: steps.temporary.outputs.fixes == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for script in .github/arlight-1.46-fixes/*.py; do
+            python3 "$script"
+          done
+          rm -rf .github/arlight-1.46-fixes
+
+      - name: Guardar cambios reconstruidos
+        if: steps.temporary.outputs.payload == 'true' || steps.temporary.outputs.fixes == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No hay cambios que guardar.'
+            exit 0
+          fi
+          git commit -m 'Aplicar correcciones verificadas ArlightBingo 1.46.0'
+          git push origin HEAD:${BRANCH_NAME}
