@@ -22,7 +22,7 @@ final class OverworldCampaignArchitecture148 {
             boolean edge = Math.abs(x) == hx || Math.abs(z) == hz;
             for (int yy = 0; yy <= height; yy++) {
                 if (!edge) { if (yy > 0) out.add(e(cx + x, y + yy, cz + z, Material.AIR)); continue; }
-                boolean door = entrance(front, x, z, hx, hz) && yy <= 2;
+                boolean door = entrance(front, x, z, hx, hz) && yy <= 1;
                 if (door) { out.add(e(cx + x, y + yy, cz + z, Material.AIR)); continue; }
                 boolean frame = yy == 0 || yy == height || yy % 5 == 0
                         || (Math.abs(x) == hx && Math.floorMod(z, 5) == 0)
@@ -42,16 +42,34 @@ final class OverworldCampaignArchitecture148 {
         }
         roof(out, cx, y + height + 1, cz, hx, hz, roofAlongX, plaster);
         frontPath(out, cx, y, cz, hx, hz, front, 5);
+        int frontRadius = front == Facing.NORTH || front == Facing.SOUTH ? hz : hx;
+        int doorX = cx + front.dx * frontRadius;
+        int doorZ = cz + front.dz * frontRadius;
+        door(out, doorX, y, doorZ, front);
         out.add(e(cx - hx + 2, y, cz - hz + 2, Material.CRAFTING_TABLE));
         out.add(e(cx + hx - 2, y, cz - hz + 2, Material.BARREL));
         for (int floor = 0; floor < floors; floor++) {
             int ceiling = y + (floor + 1) * 5;
             out.add(e(cx, ceiling - 1, cz, Material.CHAIN));
             out.add(e(cx, ceiling - 2, cz, Material.LANTERN));
-            if (floor + 1 < floors) {
-                for (int yy = y + floor * 5 + 1; yy < ceiling; yy++) {
-                    out.add(e(cx + hx - 2, yy, cz - hz + 2, Material.LADDER));
-                }
+            int walkY = y + floor * 5 + (floor == 0 ? 0 : 1);
+            out.add(e(cx - hx + 2, walkY, cz + hz - 2, Material.BOOKSHELF));
+            out.add(e(cx - hx + 3, walkY, cz + hz - 2,
+                    floor % 2 == 0 ? Material.CHEST : Material.BARREL));
+            int lightX = Math.max(2, hx / 2);
+            int lightZ = Math.max(2, hz / 2);
+            for (int sx : new int[]{-1, 1}) for (int sz : new int[]{-1, 1}) {
+                out.add(data(cx + sx * lightX, ceiling - 2, cz + sz * lightZ,
+                        Material.LIGHT, "minecraft:light[level=12,waterlogged=false]"));
+            }
+        }
+        if (floors > 1) {
+            int ladderX = cx + hx - 1;
+            int ladderZ = cz + Math.min(2, hz - 2);
+            for (int yy = y; yy <= y + (floors - 1) * 5 + 1; yy++) {
+                out.add(e(cx + hx, yy, ladderZ, Material.STRIPPED_DARK_OAK_LOG));
+                out.add(data(ladderX, yy, ladderZ, Material.LADDER,
+                        "minecraft:ladder[facing=west,waterlogged=false]"));
             }
         }
     }
@@ -96,11 +114,26 @@ final class OverworldCampaignArchitecture148 {
 
     private static boolean entrance(Facing front, int x, int z, int hx, int hz) {
         return switch (front) {
-            case NORTH -> z == -hz && Math.abs(x) <= 1;
-            case SOUTH -> z == hz && Math.abs(x) <= 1;
-            case EAST -> x == hx && Math.abs(z) <= 1;
-            case WEST -> x == -hx && Math.abs(z) <= 1;
+            case NORTH -> z == -hz && x == 0;
+            case SOUTH -> z == hz && x == 0;
+            case EAST -> x == hx && z == 0;
+            case WEST -> x == -hx && z == 0;
         };
+    }
+
+    private static void door(List<BlockEdit> out, int x, int y, int z, Facing facing) {
+        String direction = switch (facing) {
+            case NORTH -> "north";
+            case SOUTH -> "south";
+            case EAST -> "east";
+            case WEST -> "west";
+        };
+        out.add(data(x, y, z, Material.SPRUCE_DOOR,
+                "minecraft:spruce_door[facing=" + direction
+                        + ",half=lower,hinge=left,open=false,powered=false]"));
+        out.add(data(x, y + 1, z, Material.SPRUCE_DOOR,
+                "minecraft:spruce_door[facing=" + direction
+                        + ",half=upper,hinge=left,open=false,powered=false]"));
     }
 
     private static void frontPath(List<BlockEdit> out, int cx, int y, int cz,
@@ -124,17 +157,54 @@ final class OverworldCampaignArchitecture148 {
             for (int d = 0; d < 5; d++) out.add(e(cx + x, y - d, cz + z, d < 2 ? Material.STONE_BRICKS : Material.STONE));
     }
 
+    static void auditedTower(List<BlockEdit> out, Registry registry, String id,
+                             int cx, int y, int cz, int radius, int height, Material roof) {
+        registry.registerTower(new TowerSpec(id, cx, y, cz, radius, height));
+        tower(out, cx, y, cz, radius, height, roof);
+    }
+
     static void tower(List<BlockEdit> out, int cx, int y, int cz, int radius, int height, Material roof) {
         foundation(out, cx, y - 1, cz, radius + 1, radius + 1);
         for (int x = -radius; x <= radius; x++) for (int z = -radius; z <= radius; z++) {
             boolean wall = Math.abs(x) == radius || Math.abs(z) == radius;
             for (int yy = 0; yy <= height; yy++) {
                 if (!wall) { if (yy > 0) out.add(e(cx + x, y + yy, cz + z, Material.AIR)); continue; }
-                boolean opening = z == radius && Math.abs(x) <= 1 && yy <= 2;
+                boolean opening = z == radius && x == 0 && yy <= 1;
                 out.add(e(cx + x, y + yy, cz + z, opening ? Material.AIR
                         : ((x + z + yy) & 11) == 0 ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
             }
         }
+        for (int level = 6; level < height; level += 6) {
+            for (int x = -radius + 1; x <= radius - 1; x++) {
+                for (int z = -radius + 1; z <= radius - 1; z++) {
+                    if (x == radius - 1 && z == Math.min(2, radius - 2)) continue;
+                    out.add(e(cx + x, y + level, cz + z, Material.DEEPSLATE_TILES));
+                }
+            }
+        }
+        for (int level = 0; level < height; level += 6) {
+            int windowY = y + Math.min(height - 1, level + 3);
+            for (int yy = windowY; yy <= Math.min(y + height - 1, windowY + 1); yy++) {
+                out.add(e(cx, yy, cz - radius, Material.IRON_BARS));
+                out.add(e(cx - radius, yy, cz, Material.IRON_BARS));
+                out.add(e(cx + radius, yy, cz, Material.IRON_BARS));
+            }
+            int walkY = y + level + (level == 0 ? 0 : 1);
+            out.add(e(cx - radius + 2, walkY, cz - radius + 2,
+                    level % 12 == 0 ? Material.SMITHING_TABLE : Material.CRAFTING_TABLE));
+            out.add(e(cx - radius + 3, walkY, cz - radius + 2, Material.BARREL));
+            out.add(data(cx - Math.max(1, radius / 2), windowY, cz,
+                    Material.LIGHT, "minecraft:light[level=13,waterlogged=false]"));
+            out.add(data(cx + Math.max(1, radius / 2), windowY, cz,
+                    Material.LIGHT, "minecraft:light[level=13,waterlogged=false]"));
+        }
+        int ladderZ = cz + Math.min(2, radius - 2);
+        for (int yy = y; yy < y + height; yy++) {
+            out.add(e(cx + radius, yy, ladderZ, Material.STONE_BRICKS));
+            out.add(data(cx + radius - 1, yy, ladderZ, Material.LADDER,
+                    "minecraft:ladder[facing=west,waterlogged=false]"));
+        }
+        door(out, cx, y, cz + radius, Facing.SOUTH);
         for (int x = -radius - 2; x <= radius + 2; x++) for (int z = -radius - 2; z <= radius + 2; z++)
             if (Math.abs(x) + Math.abs(z) <= radius * 2 + 2) out.add(e(cx + x, y + height + 1, cz + z, roof));
         out.add(e(cx, y + height, cz, Material.CHAIN));
@@ -255,11 +325,12 @@ final class OverworldCampaignArchitecture148 {
             wallColumn(out, cx + radius, y, cz + z, height, false);
         }
         for (int offset = -radius + 8; offset <= radius - 8; offset += 14) {
-            buttress(out, cx + offset, y, cz - radius + 2, false);
-            if (!southGate || Math.abs(offset) > gateHalf + 2) buttress(out, cx + offset, y, cz + radius - 2, true);
+            wallButtress(out, cx + offset, y, cz - radius, 0, -1);
+            if (!southGate || Math.abs(offset) > gateHalf + 2)
+                wallButtress(out, cx + offset, y, cz + radius, 0, 1);
             if (Math.abs(offset) < radius - 6) {
-                buttress(out, cx - radius + 2, y, cz + offset, false);
-                buttress(out, cx + radius - 2, y, cz + offset, true);
+                wallButtress(out, cx - radius, y, cz + offset, -1, 0);
+                wallButtress(out, cx + radius, y, cz + offset, 1, 0);
             }
         }
         if (southGate) {
@@ -323,7 +394,7 @@ final class OverworldCampaignArchitecture148 {
     }
 
     static void spawnerShrines(List<BlockEdit> out, Site site, int y, Material accent) {
-        for (int[] o : new int[][]{{0,0},{-20,-10},{19,13},{0,27}}) {
+        for (int[] o : new int[][]{{0,0},{-20,-10},{19,13},{18,38}}) {
             int cx = site.x() + o[0], cz = site.z() + o[1];
             for (int x = -2; x <= 2; x++) for (int z = -2; z <= 2; z++)
                 out.add(e(cx + x, y - 1, cz + z, Math.abs(x) == 2 || Math.abs(z) == 2 ? Material.MOSSY_STONE_BRICKS : accent));
@@ -343,9 +414,12 @@ final class OverworldCampaignArchitecture148 {
         out.add(e(cx, y, cz, Material.CHEST));
     }
 
-    static void gateFrame(List<BlockEdit> out, int cx, int y, int cz, int halfWidth, int height) {
-        tower(out, cx - halfWidth - 4, y, cz, 5, height + 5, Material.DARK_OAK_PLANKS);
-        tower(out, cx + halfWidth + 4, y, cz, 5, height + 5, Material.DARK_OAK_PLANKS);
+    static void gateFrame(List<BlockEdit> out, Registry registry, String id,
+                          int cx, int y, int cz, int halfWidth, int height) {
+        auditedTower(out, registry, id + "-west", cx - halfWidth - 4, y, cz,
+                5, height + 5, Material.DARK_OAK_PLANKS);
+        auditedTower(out, registry, id + "-east", cx + halfWidth + 4, y, cz,
+                5, height + 5, Material.DARK_OAK_PLANKS);
         for (int x = -halfWidth; x <= halfWidth; x++) for (int yy = 0; yy <= height; yy++) {
             boolean pillar = Math.abs(x) >= halfWidth - 1;
             boolean arch = yy >= height - 3 && Math.abs(x) <= halfWidth - Math.max(0, yy - (height - 3));
@@ -453,11 +527,14 @@ final class OverworldCampaignArchitecture148 {
         }
     }
 
-    static void buttress(List<BlockEdit> out, int x, int y, int z, boolean alongZ) {
+    static void wallButtress(List<BlockEdit> out, int x, int y, int z, int dx, int dz) {
         for (int step = 0; step < 4; step++) {
-            int px = alongZ ? x : x;
-            int pz = alongZ ? z - step : z;
-            if (!alongZ) px = x - step;
+            int px = x + dx * step;
+            int pz = z + dz * step;
+            for (int depth = 1; depth <= 3; depth++) {
+                out.add(e(px, y - depth, pz,
+                        depth == 1 ? Material.STONE_BRICKS : Material.COBBLESTONE));
+            }
             for (int yy = 0; yy <= 3 - step; yy++) {
                 out.add(e(px, y + yy, pz, yy == 3 - step ? Material.STONE_BRICK_WALL : Material.STONE_BRICKS));
             }
@@ -509,9 +586,13 @@ final class OverworldCampaignArchitecture148 {
         }
         int chimneyX = cx + (variant % 2 == 0 ? -hx + 2 : hx - 2);
         int chimneyZ = cz + (variant % 3 == 0 ? hz - 2 : -hz + 2);
-        int chimneyBase = y + floors * 5 - 1;
-        for (int yy = 0; yy <= 5; yy++) out.add(e(chimneyX, chimneyBase + yy, chimneyZ, Material.BRICKS));
-        out.add(e(chimneyX, chimneyBase + 6, chimneyZ, Material.CAMPFIRE));
+        int chimneyTop = y + floors * 5 + 4;
+        registry.registerChimney(new ChimneySpec(id, chimneyX, y, chimneyTop, chimneyZ));
+        out.add(e(chimneyX, y, chimneyZ, Material.SMOKER));
+        for (int yy = y + 1; yy <= chimneyTop; yy++) {
+            out.add(e(chimneyX, yy, chimneyZ, Material.BRICKS));
+        }
+        out.add(e(chimneyX, chimneyTop + 1, chimneyZ, Material.CAMPFIRE));
         if (variant % 3 == 0) {
             out.add(e(cx - hx + 2, y, cz + 1, Material.LECTERN));
             out.add(e(cx - hx + 2, y, cz - 1, Material.BOOKSHELF));
@@ -523,13 +604,13 @@ final class OverworldCampaignArchitecture148 {
             out.add(e(cx - hx + 2, y, cz, Material.BARREL));
         }
         for (int side : new int[]{-1, 1}) {
-            int x = cx + front.dx * radius + px * side * Math.max(3,
+            int x = cx + front.dx * (radius + 1) + px * side * Math.max(3,
                     (front == Facing.NORTH || front == Facing.SOUTH ? hx : hz) - 2);
-            int z = cz + front.dz * radius + pz * side * Math.max(3,
+            int z = cz + front.dz * (radius + 1) + pz * side * Math.max(3,
                     (front == Facing.NORTH || front == Facing.SOUTH ? hx : hz) - 2);
-            out.add(e(x, y + 1, z, Material.SPRUCE_TRAPDOOR));
-            out.add(e(x, y + 2, z,
-                    variant % 2 == 0 ? Material.POPPY : Material.CORNFLOWER));
+            out.add(e(x, y - 1, z, Material.SPRUCE_SLAB));
+            out.add(e(x, y, z,
+                    variant % 2 == 0 ? Material.POTTED_POPPY : Material.POTTED_CORNFLOWER));
         }
 
         int style = Math.floorMod(variant, 4);
@@ -727,10 +808,9 @@ final class OverworldCampaignArchitecture148 {
         out.add(e(cx, y + 4, cz, Material.LODESTONE));
     }
 
-    static void monumentalArenaEntrance(List<BlockEdit> out, int cx, int y, int cz) {
+    static void monumentalArenaEntrance(List<BlockEdit> out, Registry registry,
+                                        int cx, int y, int cz) {
         // A thicker gatehouse with connected wings prevents floating bars and open corners.
-        tower(out, cx - 15, y, cz, 7, 24, Material.DARK_OAK_PLANKS);
-        tower(out, cx + 15, y, cz, 7, 24, Material.DARK_OAK_PLANKS);
         for (int z = 0; z <= 5; z++) {
             for (int x = -15; x <= 15; x++) for (int yy = 0; yy <= 17; yy++) {
                 boolean side = Math.abs(x) >= 11;
@@ -744,10 +824,18 @@ final class OverworldCampaignArchitecture148 {
                 out.add(e(cx + x, y - 1, cz + z, Math.floorMod(x + z, 7) == 0 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_DEEPSLATE));
             }
         }
-        for (int side : new int[]{-1, 1}) {
-            pillar(out, cx + side * 10, y + 1, cz + 5, 5, Material.POLISHED_DEEPSLATE_WALL, Material.SOUL_LANTERN);
-        }
+        // Towers are replayed last so the gatehouse cannot overwrite their ladders or floors.
+        auditedTower(out, registry, "boss-gate-west", cx - 15, y, cz,
+                7, 24, Material.DARK_OAK_PLANKS);
+        auditedTower(out, registry, "boss-gate-east", cx + 15, y, cz,
+                7, 24, Material.DARK_OAK_PLANKS);
     }
 
-    static BlockEdit e(int x, int y, int z, Material material) { return new BlockEdit(x, y, z, material); }
+    static BlockEdit e(int x, int y, int z, Material material) {
+        return new BlockEdit(x, y, z, material);
+    }
+
+    static BlockEdit data(int x, int y, int z, Material material, String blockData) {
+        return new BlockEdit(x, y, z, material, blockData);
+    }
 }

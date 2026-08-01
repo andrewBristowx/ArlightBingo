@@ -33,7 +33,7 @@ public final class OverworldCampaignProgression {
                             List<List<String>> spawnerPools) { }
 
     private static final int[][] SPAWNER_OFFSETS = {
-            {0, 0}, {-20, -10}, {19, 13}, {0, 27}
+            {0, 0}, {-20, -10}, {19, 13}, {18, 38}
     };
 
     private final JavaPlugin plugin;
@@ -302,7 +302,7 @@ public final class OverworldCampaignProgression {
     }
 
     private void buildCitadelSeal() {
-        // 1.48.1 seals the real citadel doorway. Older revisions created a second
+        // 1.48.2 seals the real citadel doorway. Older revisions created a second
         // emerald/iron cage eighty-eight blocks away, which invaded the approved route.
         gateCenter = new Location(world, citadel.getBlockX(), citadel.getBlockY(),
                 citadel.getBlockZ() + 55);

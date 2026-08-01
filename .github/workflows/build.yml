@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.48.1
+name: Compilar ArlightBingo 1.48.2
 
 on:
   workflow_dispatch:
@@ -29,20 +29,26 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verificar fuente y restricciones 1.48.1
+      - name: Verificar fuente y restricciones 1.48.2
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '<version>1.48.1</version>' pom.xml
-          grep -q '^version: 1.48.1$' src/main/resources/plugin.yml
-          grep -q '^1.48.1$' BUILD_VERSION.txt
-          grep -q '^ArlightBingo 1.48.1 ROUTE-AUDIT-LOOP-FIX$' SOURCE_VERSION.txt
-          grep -q 'legacy-village-fragment' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
-          grep -q '1.48.1-route-audit-loop-fix-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q '<version>1.48.2</version>' pom.xml
+          grep -q '^version: 1.48.2$' src/main/resources/plugin.yml
+          grep -q '^1.48.2$' BUILD_VERSION.txt
+          grep -q '^ArlightBingo 1.48.2 CLEAN-BASE-STRUCTURAL-AUDIT$' SOURCE_VERSION.txt
+          grep -q 'campaign_1_48_anchor_only' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
+          grep -q '1.48.2-clean-base-structural-audit-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
           grep -q 'frontón abierto' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
           grep -q 'Step 6' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
-          grep -q 'adaptiveShoreline' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
-          grep -q 'reinforceFoundation' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          grep -q 'pared abierta' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'torre inaccesible por escalera' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'chimenea cortada o flotante' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'corte abrupto del terreno' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          ! grep -q 'addRestorePhases' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          ! grep -q 'polishCoastlines' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          ! grep -q 'adaptiveShoreline' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          ! grep -q 'reinforceFoundation' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
           grep -q 'boss-portal-north-rim' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
           grep -q 'boss-portal-east-rim' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
           grep -q 'remaining = steps - step' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
@@ -57,7 +63,7 @@ jobs:
           road_line=$(grep -n 'buildRoadNetwork' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java | head -1 | cut -d: -f1)
           village_line=$(grep -n 'OverworldCampaignStructures148.village' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java | head -1 | cut -d: -f1)
           test "${road_line}" -lt "${village_line}"
-          python3 scripts/validate_1_48_1.py
+          python3 scripts/validate_1_48_2.py
 
       - name: Descargar ArlightCore 1.20.0 canónico
         uses: actions/checkout@v4
@@ -79,37 +85,37 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp target/ArlightBingo-1.48.1.jar dist/
-          unzip -p dist/ArlightBingo-1.48.1.jar plugin.yml | grep -q '^version: 1.48.1$'
-          unzip -l dist/ArlightBingo-1.48.1.jar | grep -q 'OverworldCampaignBuilder148.class'
-          unzip -l dist/ArlightBingo-1.48.1.jar | grep -q 'OverworldCampaignTerrain148.class'
-          unzip -l dist/ArlightBingo-1.48.1.jar | grep -q 'OverworldCampaignArchitecture148.class'
-          unzip -l dist/ArlightBingo-1.48.1.jar | grep -q 'OverworldCampaignStructures148.class'
-          unzip -l dist/ArlightBingo-1.48.1.jar | grep -q 'OverworldCampaignLandscape148.class'
-          unzip -l dist/ArlightBingo-1.48.1.jar | grep -q 'OverworldCampaignAudit148.class'
+          cp target/ArlightBingo-1.48.2.jar dist/
+          unzip -p dist/ArlightBingo-1.48.2.jar plugin.yml | grep -q '^version: 1.48.2$'
+          unzip -l dist/ArlightBingo-1.48.2.jar | grep -q 'OverworldCampaignBuilder148.class'
+          unzip -l dist/ArlightBingo-1.48.2.jar | grep -q 'OverworldCampaignTerrain148.class'
+          unzip -l dist/ArlightBingo-1.48.2.jar | grep -q 'OverworldCampaignArchitecture148.class'
+          unzip -l dist/ArlightBingo-1.48.2.jar | grep -q 'OverworldCampaignStructures148.class'
+          unzip -l dist/ArlightBingo-1.48.2.jar | grep -q 'OverworldCampaignLandscape148.class'
+          unzip -l dist/ArlightBingo-1.48.2.jar | grep -q 'OverworldCampaignAudit148.class'
 
       - name: Empaquetar entrega
         shell: bash
         run: |
           set -euo pipefail
-          DELIVERY='ArlightBingo-1.48.1-ROUTE-AUDIT-LOOP-FIX'
+          DELIVERY='ArlightBingo-1.48.2-CLEAN-BASE-STRUCTURAL-AUDIT'
           mkdir -p package/${DELIVERY}-SOURCE
           rsync -a --exclude '.git/' --exclude 'arlight-core/' --exclude 'target/' --exclude 'dist/' --exclude 'package/' ./ package/${DELIVERY}-SOURCE/
           cd package
           zip -qr ${DELIVERY}-SOURCE.zip ${DELIVERY}-SOURCE
-          cp ../dist/ArlightBingo-1.48.1.jar .
-          sha256sum ArlightBingo-1.48.1.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.1-SHA256.txt
+          cp ../dist/ArlightBingo-1.48.2.jar .
+          sha256sum ArlightBingo-1.48.2.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.2-SHA256.txt
           unzip -t ${DELIVERY}-SOURCE.zip
-          sha256sum -c ArlightBingo-1.48.1-SHA256.txt
+          sha256sum -c ArlightBingo-1.48.2-SHA256.txt
           rm -rf ${DELIVERY}-SOURCE
 
       - name: Subir entrega completa
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.48.1-DELIVERY
+          name: ArlightBingo-1.48.2-DELIVERY
           path: |
-            package/ArlightBingo-1.48.1.jar
-            package/ArlightBingo-1.48.1-ROUTE-AUDIT-LOOP-FIX-SOURCE.zip
-            package/ArlightBingo-1.48.1-SHA256.txt
+            package/ArlightBingo-1.48.2.jar
+            package/ArlightBingo-1.48.2-CLEAN-BASE-STRUCTURAL-AUDIT-SOURCE.zip
+            package/ArlightBingo-1.48.2-SHA256.txt
           if-no-files-found: error
           retention-days: 90

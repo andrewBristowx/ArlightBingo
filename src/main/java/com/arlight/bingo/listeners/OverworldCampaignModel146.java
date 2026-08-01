@@ -9,7 +9,11 @@ import java.util.Locale;
 final class OverworldCampaignModel146 {
     private OverworldCampaignModel146() { }
 
-    record BlockEdit(int x, int y, int z, Material material) { }
+    record BlockEdit(int x, int y, int z, Material material, String data) {
+        BlockEdit(int x, int y, int z, Material material) {
+            this(x, y, z, material, null);
+        }
+    }
 
     record Site(String id, int x, int baseY, int z, int radius, Style style) {
         Location floor(World world) { return new Location(world, x, baseY + 1, z); }
