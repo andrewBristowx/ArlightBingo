@@ -24,10 +24,10 @@ import java.util.Properties;
 import java.util.UUID;
 
 /**
- * Protege la aldea inicial y coordina la reconstrucción de isla y campaña Overworld 1.48.0.
+ * Protege la aldea inicial y coordina la reconstrucción de isla y campaña Overworld 1.48.1.
  * La versión anterior queda en su propia rama; esta clase no modifica revisiones
  * antiguas y sólo inicia el nuevo diseño sobre una plantilla creada en la misma
- * ejecución o sobre una construcción 1.48.0 interrumpida.
+ * ejecución o sobre una construcción 1.48.1 interrumpida.
  */
 public final class OverworldVillageSafety implements Listener {
     private static final String MARKER = "arlight-overworld-template.properties";

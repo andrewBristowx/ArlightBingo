@@ -172,6 +172,8 @@ final class OverworldCampaignBuilder148 {
         phases.add(new Phase("decorando la isla reconstruida",
                 () -> OverworldCampaignStructures148.decorations(
                         world, village, residential, commercial, military, citadel, report)));
+        phases.add(new Phase("restableciendo corredores auditados",
+                () -> OverworldCampaignAudit148.repairRoadCorridors(auditRegistry)));
     }
 
     private void addRestorePhases(String name, Site site) {
@@ -212,7 +214,7 @@ final class OverworldCampaignBuilder148 {
 
     void start() {
         purgeLegacyEntities();
-        plugin.getLogger().info("[ArlightBingo] Diseño Overworld 1.48.0: "
+        plugin.getLogger().info("[ArlightBingo] Diseño Overworld 1.48.1: "
                 + phases.size() + " fases reanudables.");
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }
@@ -279,15 +281,15 @@ final class OverworldCampaignBuilder148 {
         updateTemplateMarker();
         writeReport();
         Files.writeString(folder.resolve(OverworldCampaignLandscape148.DONE_MARKER),
-                "version=1.48.0\ncompleted=" + System.currentTimeMillis() + "\n",
+                "version=1.48.1\ncompleted=" + System.currentTimeMillis() + "\n",
                 StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING);
         Files.deleteIfExists(folder.resolve(OverworldCampaignLandscape148.PROGRESS_MARKER));
         completion.accept(layout);
-        plugin.getLogger().info("[ArlightBingo] Overworld 1.48.0 completado: isla restaurada, "
+        plugin.getLogger().info("[ArlightBingo] Overworld 1.48.1 completado: isla restaurada, "
                 + "pueblo nuevo, entrada ritual y arena de dos fases.");
         Bukkit.broadcast(ChatColor.GREEN
-                        + "[Bingo] La plantilla Overworld 1.48.0 terminó su reconstrucción.",
+                        + "[Bingo] La plantilla Overworld 1.48.1 terminó su reconstrucción.",
                 "arlightbingo.admin");
     }
 
@@ -299,7 +301,7 @@ final class OverworldCampaignBuilder148 {
 
     private void writeLayout(Layout layout) throws IOException {
         Properties properties = new Properties();
-        properties.setProperty("version", "1.48.0");
+        properties.setProperty("version", "1.48.1");
         properties.setProperty("village", format(layout.village()));
         properties.setProperty("residential", format(layout.residential()));
         properties.setProperty("commercial", format(layout.commercial()));
@@ -316,7 +318,7 @@ final class OverworldCampaignBuilder148 {
                 folder.resolve(OverworldCampaignLandscape148.LAYOUT_MARKER),
                 StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING)) {
-            properties.store(writer, "ArlightBingo 1.48.0 Overworld campaign layout");
+            properties.store(writer, "ArlightBingo 1.48.1 Overworld campaign layout");
         }
     }
 
@@ -335,7 +337,7 @@ final class OverworldCampaignBuilder148 {
                 invocationAltar.getBlockZ())));
         properties.setProperty("portal", format(portal.floor(world)));
         properties.setProperty("structureRevision",
-                "1.48.0-closed-roofs-supported-villages-coast-repair-1");
+                "1.48.1-route-audit-loop-fix-1");
         properties.setProperty("villageArchitecture", "coherent_closed_varied_village_v3");
         properties.setProperty("islandRestoration", "adaptive_shoreline_legacy_cleanup_v3");
         properties.setProperty("roadNetwork", "terrain_first_audited_routes_v8");
@@ -343,17 +345,17 @@ final class OverworldCampaignBuilder148 {
         properties.setProperty("villageSafe", "true");
         properties.setProperty("villageSafeRadius", "116");
         properties.setProperty("structuralAudit", "passed_1_48");
-        properties.setProperty("campaignLayout", "1.48.0");
+        properties.setProperty("campaignLayout", "1.48.1");
         try (Writer writer = Files.newBufferedWriter(marker, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
             properties.store(writer,
-                    "ArlightBingo Overworld template updated by campaign layout 1.48.0");
+                    "ArlightBingo Overworld template updated by campaign layout 1.48.1");
         }
         Files.deleteIfExists(pending);
     }
 
     private void writeReport() throws IOException {
-        String text = "ARLIGHTBINGO 1.48.0 - ISLA Y CAMPAÑA OVERWORLD\n"
+        String text = "ARLIGHTBINGO 1.48.1 - ISLA Y CAMPAÑA OVERWORLD\n"
                 + "columnas-isla-restauradas=" + report.restoredColumns + "\n"
                 + "columnas-zonas-adaptadas=" + report.shapedColumns + "\n"
                 + "bloques-heredados-retirados=" + report.clearedBlocks + "\n"
