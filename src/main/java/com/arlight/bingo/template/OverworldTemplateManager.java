@@ -1263,9 +1263,9 @@ public final class OverworldTemplateManager implements Listener {
 
         private void planCampaignAnchorsOnly() {
             progressConsumer.accept(new Progress(0.21D,
-                    "reservando anclas limpias para el diseño estructural 1.48.6"));
+                    "reservando anclas limpias para el diseño estructural 1.48.7"));
             if (preferredVillageCenter != null || preferredDungeonCenter != null) {
-                throw new IllegalStateException("La base 1.48.6 no puede reutilizar una plantilla "
+                throw new IllegalStateException("La base 1.48.7 no puede reutilizar una plantilla "
                         + "estructural anterior; ejecuta reset y generate");
             }
             Location villageCenter = preferredVillageCenter != null

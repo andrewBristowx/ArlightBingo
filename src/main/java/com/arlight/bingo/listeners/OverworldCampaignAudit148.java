@@ -8,14 +8,12 @@ import org.bukkit.Bukkit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.6 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.7 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -37,6 +35,8 @@ final class OverworldCampaignAudit148 {
 
     record ChimneySpec(String id, int x, int baseY, int topY, int z) { }
 
+    record PlanterSpec(String id, int x, int y, int z, Material flower) { }
+
     record TerrainSpec(Site site, int flatRadius, int blendRadius) { }
 
     enum FortificationShape { SQUARE, CIRCLE }
@@ -48,7 +48,7 @@ final class OverworldCampaignAudit148 {
 
     private record RoadColumn(int x, int z) { }
 
-    record Summary(int houses, int towers, int chimneys, int roadSamples,
+    record Summary(int houses, int towers, int chimneys, int planters, int roadSamples,
                    int villageLights, int interiorLights, int crops,
                    int unsupportedLanterns) { }
 
@@ -56,6 +56,7 @@ final class OverworldCampaignAudit148 {
         private final List<HouseSpec> houses = new ArrayList<>();
         private final List<TowerSpec> towers = new ArrayList<>();
         private final List<ChimneySpec> chimneys = new ArrayList<>();
+        private final List<PlanterSpec> planters = new ArrayList<>();
         private final List<TerrainSpec> terrain = new ArrayList<>();
         private final List<FortificationSpec> fortifications = new ArrayList<>();
         private final Map<RoadColumn, RoadCell> roadCells = new LinkedHashMap<>();
@@ -82,6 +83,10 @@ final class OverworldCampaignAudit148 {
 
         void registerChimney(ChimneySpec candidate) {
             chimneys.add(candidate);
+        }
+
+        void registerPlanter(PlanterSpec candidate) {
+            planters.add(candidate);
         }
 
         void registerTerrain(Site site, int flatRadius, int blendRadius) {
@@ -207,17 +212,29 @@ final class OverworldCampaignAudit148 {
         for (HouseSpec house : registry.houses) auditHouse(world, house, failures);
         for (TowerSpec tower : registry.towers) auditTower(world, tower, failures);
         for (ChimneySpec chimney : registry.chimneys) auditChimney(world, chimney, failures);
+        for (PlanterSpec planter : registry.planters) auditPlanter(world, planter, failures);
         for (TerrainSpec terrain : registry.terrain) {
             auditTerrainBlend(world, registry, terrain, failures);
         }
         for (FortificationSpec fortification : registry.fortifications) {
             auditFortificationFoundation(world, fortification, failures);
         }
-        Set<String> brokenRoads = new LinkedHashSet<>();
+        Map<String, RoadCell> brokenRoads = new LinkedHashMap<>();
         for (RoadCell cell : registry.roadCells.values()) {
-            if (!isWalkable(world, cell.x, cell.walkY, cell.z)) brokenRoads.add(cell.id);
+            if (!isWalkable(world, cell.x, cell.walkY, cell.z)) {
+                brokenRoads.putIfAbsent(cell.id, cell);
+            }
         }
-        for (String road : brokenRoads) failures.add("camino cortado: " + road);
+        for (Map.Entry<String, RoadCell> broken : brokenRoads.entrySet()) {
+            RoadCell cell = broken.getValue();
+            Material floor = world.getBlockAt(cell.x, cell.walkY - 1, cell.z).getType();
+            Material passage = world.getBlockAt(cell.x, cell.walkY, cell.z).getType();
+            Material head = world.getBlockAt(cell.x, cell.walkY + 1, cell.z).getType();
+            failures.add("camino cortado: " + broken.getKey()
+                    + " (x=" + cell.x + ", y=" + cell.walkY + ", z=" + cell.z
+                    + ", suelo=" + floor + ", paso=" + passage
+                    + ", cabeza=" + head + ")");
+        }
 
         int crops = countCrops(world, village, village.radius() - 4);
         if (crops > 0) failures.add("quedaron " + crops + " bloques de cultivo en el pueblo");
@@ -227,15 +244,18 @@ final class OverworldCampaignAudit148 {
 
         auditRitualApproach(world, outerAltar, ritualGate, failures);
         auditFountain(world, village, failures);
+        auditBellPavilion(world, village, failures);
+        auditArenaTerraces(world, ritualGate, failures);
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.6 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.7 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
         return new Summary(registry.houses.size(), registry.towers.size(),
-                registry.chimneys.size(), registry.roadCells.size(), light[0],
+                registry.chimneys.size(), registry.planters.size(),
+                registry.roadCells.size(), light[0],
                 interiorLights, crops, light[1]);
     }
 
@@ -568,6 +588,20 @@ final class OverworldCampaignAudit148 {
         }
     }
 
+    private static void auditPlanter(World world, PlanterSpec planter,
+                                     List<String> failures) {
+        Material flower = world.getBlockAt(planter.x, planter.y, planter.z).getType();
+        Material support = world.getBlockAt(planter.x, planter.y - 1, planter.z).getType();
+        if (flower != planter.flower) {
+            failures.add("maceta ausente o reemplazada en " + planter.id);
+            return;
+        }
+        if (support != Material.SPRUCE_PLANKS || !support.isSolid()) {
+            failures.add("maceta flotante en " + planter.id
+                    + " (soporte=" + support + ")");
+        }
+    }
+
     private static void auditTerrainBlend(World world, Registry registry, TerrainSpec spec,
                                           List<String> failures) {
         Site site = spec.site;
@@ -757,6 +791,61 @@ final class OverworldCampaignAudit148 {
             }
         }
         if (water < 20) failures.add("fuente incompleta o vacía");
+    }
+
+    private static void auditBellPavilion(World world, Site village,
+                                          List<String> failures) {
+        int y = village.baseY() + 3;
+        int bellX = village.x() + 11;
+        if (world.getBlockAt(bellX, y + 2, village.z()).getType() != Material.BELL) {
+            failures.add("campana ausente en el pabellón del pueblo");
+            return;
+        }
+        for (int chainY = y + 3; chainY <= y + 8; chainY++) {
+            if (world.getBlockAt(bellX, chainY, village.z()).getType() != Material.CHAIN) {
+                failures.add("campana sin cadena continua en el pabellón del pueblo");
+                return;
+            }
+        }
+        for (int[] point : new int[][]{{-3,-3},{3,-3},{-3,3},{3,3}}) {
+            for (int supportY = y + 1; supportY <= y + 5; supportY++) {
+                if (world.getBlockAt(bellX + point[0], supportY,
+                        village.z() + point[1]).getType() != Material.SPRUCE_FENCE) {
+                    failures.add("pabellón de campana sin soporte continuo");
+                    return;
+                }
+            }
+        }
+        if (world.getBlockAt(bellX, y + 9, village.z()).getType()
+                != Material.DARK_OAK_SLAB) {
+            failures.add("pabellón de campana sin remate de tejado");
+        }
+    }
+
+    private static void auditArenaTerraces(World world, Location ritualGate,
+                                           List<String> failures) {
+        int cx = ritualGate.getBlockX();
+        int y = ritualGate.getBlockY();
+        int cz = ritualGate.getBlockZ() + 50;
+        for (int[] sample : new int[][]{
+                {35, 0, 0}, {-35, 0, 0}, {0, 35, 0},
+                {36, 15, 1}, {-36, 15, 1}, {15, 36, 1},
+                {43, 0, 2}, {-43, 0, 2}, {0, 43, 2}}) {
+            int x = cx + sample[0];
+            int z = cz + sample[1];
+            int topY = y + sample[2];
+            if (!world.getBlockAt(x, topY, z).getType().isSolid()
+                    || world.getBlockAt(x, topY + 1, z).getType().isSolid()) {
+                failures.add("gradas cortadas o sin espacio en la arena");
+                return;
+            }
+        }
+        int aisleZ = cz - 35;
+        if (!world.getBlockAt(cx, y - 1, aisleZ).getType().isSolid()
+                || world.getBlockAt(cx, y, aisleZ).getType().isSolid()
+                || world.getBlockAt(cx, y + 1, aisleZ).getType().isSolid()) {
+            failures.add("gradas bloquean el pasillo ceremonial norte");
+        }
     }
 
     private static int frontRadius(HouseSpec house) {

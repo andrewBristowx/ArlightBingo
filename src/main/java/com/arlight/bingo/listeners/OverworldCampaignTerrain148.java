@@ -13,7 +13,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Terrain shaping and supported roads for the clean 1.48.6 Overworld campaign. */
+/** Terrain shaping and supported roads for the clean 1.48.7 Overworld campaign. */
 final class OverworldCampaignTerrain148 {
     private static final int ORGANIC_EDGE_MARGIN = 14;
     static final int WALL_FOUNDATION_DEPTH = 12;
@@ -105,11 +105,16 @@ final class OverworldCampaignTerrain148 {
                 double localFlat = flatRadius + (localBoundary - blendRadius) * 0.30D;
                 double blend = distance <= localFlat ? 0.0D
                         : smooth((distance - localFlat) / Math.max(1.0D, localBoundary - localFlat));
-                int designed = site.baseY();
+                double designed = site.baseY();
                 if (site.style() == Style.RESIDENTIAL) designed += dz < -16 ? 1 : 0;
                 if (site.style() == Style.MILITARY) designed += dz < -24 ? 2 : 0;
                 if (site.style() == Style.CITADEL) designed += dz < -18 ? 1 : dz > 24 ? -1 : 0;
-                if (site.style() == Style.BOSS) designed += dz < -20 ? 2 : dz > 24 ? -2 : 0;
+                if (site.style() == Style.BOSS) {
+                    // Keep the northern gate and its road on the same grade. A hard +2
+                    // offset previously turned the whole approach into a deep trench and
+                    // produced the bare, binary dirt terraces visible in 1.48.6.
+                    designed -= smooth((dz - 22.0D) / 28.0D);
+                }
                 if (site.style() == Style.PORTAL) {
                     double axial = Math.abs(dx) * 0.55D + Math.max(0.0D, dz) * 0.95D;
                     designed += dz > 8 ? Math.max(-4, 3 - (int) Math.round(axial / 8.0D)) : 1;
@@ -283,7 +288,10 @@ final class OverworldCampaignTerrain148 {
                 }
                 registry.registerRoadCell(id, x, walkY, z, floor);
             }
-            if (step >= 0) {
+            if (step >= 0 && "boss-north-approach".equals(id)) {
+                landscapeBossApproachShoulders(out, world, cx, walkY, cz,
+                        outwardX, outwardZ, sideX, sideZ, step, halfWidth);
+            } else if (step >= 0) {
                 for (int side : new int[]{-halfWidth - 1, halfWidth + 1}) {
                     int x = cx + outwardX * step + sideX * side;
                     int z = cz + outwardZ * step + sideZ * side;
@@ -299,10 +307,35 @@ final class OverworldCampaignTerrain148 {
         }
     }
 
+    private static void landscapeBossApproachShoulders(List<BlockEdit> out, World world,
+                                                       int cx, int walkY, int cz,
+                                                       int outwardX, int outwardZ,
+                                                       int sideX, int sideZ,
+                                                       int step, int halfWidth) {
+        for (int direction : new int[]{-1, 1}) {
+            for (int shoulder = 1; shoulder <= 7; shoulder++) {
+                int side = direction * (halfWidth + shoulder);
+                int x = cx + outwardX * step + sideX * side;
+                int z = cz + outwardZ * step + sideZ * side;
+                int bankTop = walkY - 1 + (shoulder >= 5 ? 1 : 0);
+                Material surface = shoulder <= 2
+                        ? Material.MOSSY_STONE_BRICKS
+                        : shoulder <= 4 ? Material.MOSS_BLOCK
+                        : Math.floorMod(step * 7 + side * 11, 13) < 3
+                        ? Material.MOSS_BLOCK : Material.GRASS_BLOCK;
+                clearAndFill(out, world, x, bankTop, z, surface);
+                if (shoulder == 7 && step % 8 == 4) {
+                    out.add(new BlockEdit(x, bankTop + 1, z,
+                            direction < 0 ? Material.AZALEA : Material.FLOWERING_AZALEA));
+                }
+            }
+        }
+    }
+
     private static Material designedSurface(Style style, int x, int z) {
         int sample = Math.floorMod(x * 31 + z * 17, 100);
         return switch (style) {
-            case VILLAGE, RESIDENTIAL -> sample < 9 ? Material.COARSE_DIRT : Material.GRASS_BLOCK;
+            case VILLAGE, RESIDENTIAL -> clusteredVillageSurface(x, z);
             case COMMERCIAL -> sample < 62 ? Material.MUD
                     : sample < 84 ? Material.COARSE_DIRT : Material.ROOTED_DIRT;
             case MILITARY -> sample < 42 ? Material.COARSE_DIRT
@@ -317,6 +350,24 @@ final class OverworldCampaignTerrain148 {
                     : sample < 73 ? Material.DIORITE
                     : sample < 90 ? Material.TUFF : Material.GRAVEL;
         };
+    }
+
+    private static Material clusteredVillageSurface(int x, int z) {
+        // One small round patch per selected 11x11 cell produces natural clusters.
+        // Hashing every block independently created the regular dirt checkerboard in 1.48.6.
+        int size = 11;
+        int cellX = Math.floorDiv(x, size);
+        int cellZ = Math.floorDiv(z, size);
+        int seed = Math.floorMod(cellX * 73428767 ^ cellZ * 912931, 9973);
+        if (Math.floorMod(seed, 3) == 0) return Material.GRASS_BLOCK;
+        int centerX = cellX * size + 2 + Math.floorMod(seed, size - 4);
+        int centerZ = cellZ * size + 2 + Math.floorMod(seed / 17, size - 4);
+        int dx = x - centerX;
+        int dz = z - centerZ;
+        int radius = 1 + Math.floorMod(seed / 31, 2);
+        if (dx * dx + dz * dz > radius * radius) return Material.GRASS_BLOCK;
+        return Math.floorMod(seed + dx * 7 + dz * 11, 5) == 0
+                ? Material.MOSS_BLOCK : Material.COARSE_DIRT;
     }
 
     private static Material naturalSurface(World world, int x, int y, int z) {
