@@ -1,0 +1,105 @@
+name: Finalizar ArlightBingo 1.48.13
+
+on:
+  push:
+    branches:
+      - candidate/bingo-1.48.13-corridor-connectivity-audit
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Descargar candidata
+        uses: actions/checkout@v4
+        with:
+          ref: candidate/bingo-1.48.13-corridor-connectivity-audit
+          fetch-depth: 0
+
+      - name: Aplicar fuente verificada 1.48.13
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '6b34eaceb83ce27d7bd7c35aa8d7f3388a05da6653e1534e4f07ad5541eb1ff4  payloads/1.48.13/part00' | sha256sum -c -
+          echo 'afe55d3b4a2f0f4c521efdd53fdacc2ccfb67725bb30353c951f40c6f5d7a8a8  payloads/1.48.13/part01' | sha256sum -c -
+          echo '8e4f690d0426b80c44788bf9e86eca442053645329fca6dfc0b6ea0e4e6c30ea  payloads/1.48.13/part02' | sha256sum -c -
+          echo '34876c0108a4512c5b12e68c5ac40e10a7f3a9341f55f9acd8f47953e62dd458  payloads/1.48.13/part03' | sha256sum -c -
+          echo 'ff849eadf7b56fff322c722e9f0abb8caad9810a513c2cf02f3b6ec4210e1c3d  payloads/1.48.13/part04' | sha256sum -c -
+          echo '8cec4d6f12a828e59935023910c020d0eb04d9ac9d797c99ddf6b73785bd99cf  payloads/1.48.13/part05' | sha256sum -c -
+          echo '31dc4a0221f6da64af5425ac802f7deb47da997b4fee3a802f76eea27518e864  payloads/1.48.13/part06' | sha256sum -c -
+          echo '392e1fcf44aeddfa9cdd302c2dcf1f35e0c1a9fb3652438b373f17ea7c7559d9  payloads/1.48.13/part07' | sha256sum -c -
+          cat payloads/1.48.13/part0* > /tmp/arlight-1.48.13.patch.gz.b64
+          echo '9229e85be2a3d2be3e4c94f5058b6b2af2a7b3c71ceab81f7ca19eb5d7d9f9e7  /tmp/arlight-1.48.13.patch.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/arlight-1.48.13.patch.gz.b64 > /tmp/arlight-1.48.13.patch.gz
+          echo '3cbe313e973bd1c795ae4a7e64977c51fcb28cc0fa72382de34c353709c72c02  /tmp/arlight-1.48.13.patch.gz' | sha256sum -c -
+          gzip -dc /tmp/arlight-1.48.13.patch.gz > /tmp/arlight-1.48.13.patch
+          echo 'e1b18bbebdcf6d74f9a26f419f3452fd8dcffae319b7bfafbfabd456531e72be  /tmp/arlight-1.48.13.patch' | sha256sum -c -
+          git apply --check /tmp/arlight-1.48.13.patch
+          git apply /tmp/arlight-1.48.13.patch
+          rm -rf payloads/1.48.13
+          rm -f .github/workflows/finalize-1.48.13.yml
+          python3 scripts/validate_1_48_13.py
+
+      - name: Publicar fuente limpia
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Corregir auditoría de continuidad de caminos en ArlightBingo 1.48.13'
+          git push origin HEAD:candidate/bingo-1.48.13-corridor-connectivity-audit
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Descargar ArlightCore 1.20.0 canónico
+        uses: actions/checkout@v4
+        with:
+          repository: andrewBristowx/ArlightCore
+          ref: 597c130a5d5450ac92e02430def406ef22512bc9
+          path: arlight-core
+
+      - name: Instalar ArlightCore
+        shell: bash
+        run: mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
+
+      - name: Compilar y verificar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -U clean package
+          unzip -p target/ArlightBingo-1.48.13.jar plugin.yml | grep -q '^version: 1.48.13$'
+          unzip -l target/ArlightBingo-1.48.13.jar | grep -q 'OverworldCampaignAudit148.class'
+
+      - name: Empaquetar entrega
+        shell: bash
+        run: |
+          set -euo pipefail
+          DELIVERY='ArlightBingo-1.48.13-CORRIDOR-CONNECTIVITY-AUDIT'
+          mkdir -p package/${DELIVERY}-SOURCE
+          rsync -a --exclude '.git/' --exclude 'arlight-core/' --exclude 'target/' --exclude 'dist/' --exclude 'package/' ./ package/${DELIVERY}-SOURCE/
+          cd package
+          zip -qr ${DELIVERY}-SOURCE.zip ${DELIVERY}-SOURCE
+          cp ../target/ArlightBingo-1.48.13.jar .
+          sha256sum ArlightBingo-1.48.13.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.13-SHA256.txt
+          unzip -t ${DELIVERY}-SOURCE.zip
+          sha256sum -c ArlightBingo-1.48.13-SHA256.txt
+          rm -rf ${DELIVERY}-SOURCE
+
+      - name: Subir entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.13-DELIVERY
+          path: |
+            package/ArlightBingo-1.48.13.jar
+            package/ArlightBingo-1.48.13-CORRIDOR-CONNECTIVITY-AUDIT-SOURCE.zip
+            package/ArlightBingo-1.48.13-SHA256.txt
+          if-no-files-found: error
+          retention-days: 90
