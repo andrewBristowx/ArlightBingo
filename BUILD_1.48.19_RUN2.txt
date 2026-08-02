@@ -1,0 +1,1 @@
+Trigger isolated PR verification for ArlightBingo 1.48.19.
