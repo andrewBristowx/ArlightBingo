@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - candidate/bingo-1.48.18-fortress-zone-polish
+  pull_request:
+    branches:
+      - candidate/bingo-1.48.17-targeted-route-repair
   workflow_dispatch:
 
 permissions:
