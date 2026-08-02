@@ -1,6 +1,7 @@
 package com.arlight.bingo.template;
 
 import com.arlight.bingo.BingoPlugin;
+import com.arlight.bingo.listeners.OverworldAutoRepair148;
 import com.arlight.bingo.util.ChunkyBridge;
 import com.arlight.bingo.util.CampaignMissionItems;
 import org.bukkit.Bukkit;
@@ -735,6 +736,82 @@ public final class OverworldTemplateManager implements Listener {
         for (String line : revisions.overworldAuditLines(worldName())) {
             sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + line);
         }
+    }
+
+    public void repairScan(CommandSender sender) {
+        if (isBusy()) {
+            sender.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return;
+        }
+        World world = loadReviewWorld();
+        if (world == null) {
+            sender.sendMessage(ChatColor.RED + "No se pudo cargar la revisión Overworld para escanearla.");
+            return;
+        }
+        OverworldAutoRepair148.scan(plugin, world, world.getWorldFolder().toPath(), sender);
+    }
+
+    public void repairPreview(Player player, int radius) {
+        if (isBusy()) {
+            player.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return;
+        }
+        World world = loadReviewWorld();
+        if (world == null) {
+            player.sendMessage(ChatColor.RED + "No se pudo cargar la revisión Overworld.");
+            return;
+        }
+        if (player.getWorld() != world) {
+            player.sendMessage(ChatColor.YELLOW + "Primero usa /bingo template overworld tp para ver la revisión.");
+            return;
+        }
+        OverworldAutoRepair148.preview(plugin, world, world.getWorldFolder().toPath(),
+                player, Math.max(0, radius));
+    }
+
+    public boolean repairApply(CommandSender sender, Location center, int radius) {
+        if (isBusy()) {
+            sender.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return false;
+        }
+        World world = loadReviewWorld();
+        if (world == null) {
+            sender.sendMessage(ChatColor.RED + "No se pudo cargar la revisión Overworld.");
+            return false;
+        }
+        Location effectiveCenter = center != null && center.getWorld() == world ? center : null;
+        return OverworldAutoRepair148.apply(plugin, world, world.getWorldFolder().toPath(),
+                sender, effectiveCenter, Math.max(0, radius));
+    }
+
+    public boolean repairRollback(CommandSender sender) {
+        if (isBusy()) {
+            sender.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return false;
+        }
+        World world = loadReviewWorld();
+        if (world == null) {
+            sender.sendMessage(ChatColor.RED + "No se pudo cargar la revisión Overworld.");
+            return false;
+        }
+        return OverworldAutoRepair148.rollback(plugin, world, world.getWorldFolder().toPath(), sender);
+    }
+
+    public String repairStatus() {
+        World world = loadReviewWorld();
+        if (world == null) return "mundo no disponible";
+        return OverworldAutoRepair148.status(world, world.getWorldFolder().toPath());
+    }
+
+    private World loadReviewWorld() {
+        String name = reviewWorldName();
+        World loaded = Bukkit.getWorld(name);
+        if (loaded != null) return loaded;
+        Path folder = TemplateMarkerLookup.activeFolder(plugin, name);
+        if (!Files.isDirectory(folder)) return null;
+        long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        return new WorldCreator(name).environment(World.Environment.NORMAL)
+                .type(WorldType.NORMAL).seed(seed).generateStructures(true).createWorld();
     }
 
     public void revisions(CommandSender sender) {

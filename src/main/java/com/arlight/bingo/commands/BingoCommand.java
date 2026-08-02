@@ -14,6 +14,7 @@ import com.arlight.bingo.BingoPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -43,7 +44,7 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBCOMMANDS = Arrays.asList(
             "start", "stop", "join", "leave", "card", "cardclassic", "carditem", "lobby", "arena",
-            "trigger", "world", "campaign", "template", "blacklist", "vanillaonly", "screen", "reload"
+            "trigger", "world", "campaign", "template", "repair", "blacklist", "vanillaonly", "screen", "reload"
     );
 
     @Override
@@ -70,6 +71,8 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                     return filter(Arrays.asList("status", "giveigneous", "unlocknether", "givedragon", "opengolem", "summondragon", "tp", "tpnether", "tpend", "survival", "somita"), args[1]);
                 case "template":
                     return filter(Arrays.asList("overworld", "nether", "end", "all"), args[1]);
+                case "repair":
+                    return filter(List.of("overworld"), args[1]);
                 default:
                     return List.of();
             }
@@ -118,6 +121,12 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                     if (Arrays.asList("nether", "end").contains(args[1].toLowerCase())) {
                         return filter(Arrays.asList("generate", "resume", "status", "audit",
                                 "cancel", "reset", "tp", "lootr", "testboss"), args[2]);
+                    }
+                    return List.of();
+                case "repair":
+                    if (args[1].equalsIgnoreCase("overworld")) {
+                        return filter(Arrays.asList("scan", "preview", "apply", "region",
+                                "rollback", "status"), args[2]);
                     }
                     return List.of();
                 case "trigger": {
@@ -179,7 +188,7 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (args.length == 0) {
-            sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo <start|stop|join|leave|card|screen|world|campaign|template|reload>");
+            sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo <start|stop|join|leave|card|screen|world|campaign|template|repair|reload>");
             return true;
         }
 
@@ -532,6 +541,54 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
             }
 
 
+
+            case "repair": {
+                if (!checkAdmin(sender)) return true;
+                if (!(plugin instanceof BingoPlugin bingoPlugin)) {
+                    sender.sendMessage(ChatColor.RED + "No se pudo acceder al reparador de Bingo.");
+                    return true;
+                }
+                if (args.length < 3 || !args[1].equalsIgnoreCase("overworld")) {
+                    sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo repair overworld "
+                            + "<scan|preview|apply|region|rollback|status> [radio]");
+                    return true;
+                }
+                var templates = bingoPlugin.getOverworldTemplateManager();
+                String action = args[2].toLowerCase();
+                int radius = 96;
+                if (args.length >= 4) {
+                    try { radius = Math.max(16, Math.min(256, Integer.parseInt(args[3]))); }
+                    catch (NumberFormatException ignored) {
+                        sender.sendMessage(ChatColor.RED + "El radio debe ser un número entre 16 y 256.");
+                        return true;
+                    }
+                }
+                switch (action) {
+                    case "scan" -> templates.repairScan(sender);
+                    case "status" -> sender.sendMessage(ChatColor.AQUA
+                            + "Autorreparación Overworld: " + ChatColor.WHITE
+                            + templates.repairStatus());
+                    case "preview" -> {
+                        if (!(sender instanceof Player player)) {
+                            sender.sendMessage(ChatColor.RED + "La previsualización debe usarla un jugador.");
+                        } else templates.repairPreview(player, radius);
+                    }
+                    case "apply" -> {
+                        Location center = args.length >= 4 && sender instanceof Player player
+                                ? player.getLocation() : null;
+                        templates.repairApply(sender, center, args.length >= 4 ? radius : 0);
+                    }
+                    case "region" -> {
+                        if (!(sender instanceof Player player)) {
+                            sender.sendMessage(ChatColor.RED + "La reparación regional debe usarla un jugador.");
+                        } else templates.repairApply(sender, player.getLocation(), radius);
+                    }
+                    case "rollback" -> templates.repairRollback(sender);
+                    default -> sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo repair overworld "
+                            + "<scan|preview|apply|region|rollback|status> [radio]");
+                }
+                return true;
+            }
 
             case "template": {
                 if (!checkAdmin(sender)) return true;

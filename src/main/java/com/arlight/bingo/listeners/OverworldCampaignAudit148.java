@@ -16,7 +16,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.15 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.16 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -209,6 +209,20 @@ final class OverworldCampaignAudit148 {
                     .put(column, cell);
         }
 
+        List<HouseSpec> housesSnapshot() { return List.copyOf(houses); }
+        List<TowerSpec> towersSnapshot() { return List.copyOf(towers); }
+        List<ChimneySpec> chimneysSnapshot() { return List.copyOf(chimneys); }
+        List<PlanterSpec> plantersSnapshot() { return List.copyOf(planters); }
+        List<TerrainSpec> terrainSnapshot() { return List.copyOf(terrain); }
+        List<FortificationSpec> fortificationsSnapshot() { return List.copyOf(fortifications); }
+        Map<String, List<RoadCell>> roadRoutesSnapshot() {
+            Map<String, List<RoadCell>> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, LinkedHashMap<RoadColumn, RoadCell>> entry : roadRoutes.entrySet()) {
+                copy.put(entry.getKey(), List.copyOf(entry.getValue().values()));
+            }
+            return copy;
+        }
+
         boolean hasRoadNearExcept(String excludedId, int x, int z, int radius) {
             for (int dx = -radius; dx <= radius; dx++) for (int dz = -radius; dz <= radius; dz++) {
                 Map<String, RoadCell> memberships = roadMemberships.get(
@@ -315,14 +329,14 @@ final class OverworldCampaignAudit148 {
 
         if (!roadWarnings.isEmpty()) {
             int limit = Math.min(20, roadWarnings.size());
-            Bukkit.getLogger().warning("[ArlightBingo 1.48.15] "
+            Bukkit.getLogger().warning("[ArlightBingo 1.48.16] "
                     + roadWarnings.size() + " rutas secundarias requieren revisión visual, "
                     + "pero no bloquean READY: "
                     + String.join("; ", roadWarnings.subList(0, limit)));
         }
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.15 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.16 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
