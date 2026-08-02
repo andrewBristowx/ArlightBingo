@@ -171,23 +171,19 @@ final class OverworldCampaignTerrain148 {
                 int z = cz + dz;
                 int natural = terrainY(world, x, z);
                 boolean footprint = edgeX == 0 && edgeZ == 0;
-                Material currentTop = world.getBlockAt(x, natural, z).getType();
-                if (!footprint && isRoadSurface(currentTop)) continue;
+                if (!footprint && natural >= targetY) continue;
                 double blend = footprint ? 0.0D : smooth(edgeDistance / Math.max(1.0D, apron));
                 int columnTop = (int) Math.round(targetY * (1.0D - blend) + natural * blend);
-                Material top = footprint || edgeDistance <= apron * 0.55D
-                        ? surface : naturalSurface(world, x, natural, z);
-                clearAndFill(out, world, x, columnTop, z, top);
+                if (!footprint && columnTop <= natural) continue;
+                if (footprint) {
+                    clearAndFill(out, world, x, targetY, z, surface);
+                } else {
+                    fillColumn(out, world, x, columnTop, z,
+                            edgeDistance <= apron * 0.55D ? surface
+                                    : naturalSurface(world, x, natural, z), false);
+                }
             }
         }
-    }
-
-    private static boolean isRoadSurface(Material material) {
-        return material == Material.DIRT_PATH || material == Material.COBBLESTONE
-                || material == Material.MOSSY_COBBLESTONE || material == Material.ANDESITE
-                || material == Material.POLISHED_ANDESITE || material == Material.PACKED_MUD
-                || material == Material.MUD_BRICKS || material == Material.DEEPSLATE_TILES
-                || material == Material.POLISHED_DEEPSLATE;
     }
 
     /** Places a walkable surface and fills only the air beneath it until real ground. */
@@ -334,7 +330,14 @@ final class OverworldCampaignTerrain148 {
                         : shoulder <= 4 ? Material.MOSS_BLOCK
                         : Math.floorMod(step * 7 + side * 11, 13) < 3
                         ? Material.MOSS_BLOCK : Material.GRASS_BLOCK;
-                clearAndFill(out, world, x, bankTop, z, surface);
+                int natural = terrainY(world, x, z);
+                if (natural < bankTop) {
+                    fillColumn(out, world, x, bankTop, z, surface, false);
+                } else if (natural == bankTop) {
+                    out.add(new BlockEdit(x, bankTop, z, surface));
+                } else {
+                    continue;
+                }
                 if (shoulder == 7 && step % 8 == 4) {
                     out.add(new BlockEdit(x, bankTop + 1, z,
                             direction < 0 ? Material.AZALEA : Material.FLOWERING_AZALEA));
@@ -515,28 +518,10 @@ final class OverworldCampaignTerrain148 {
                             bridge ? Material.STRIPPED_SPRUCE_LOG : Material.COBBLESTONE);
                 }
             }
-            blendRoadShoulders(out, world, cx, walkY, cz, nx, nz, halfWidth, step);
             if (step > 0 && step % 18 == 0) {
                 int lx = (int) Math.round(cx + nx * (width / 2 + 2));
                 int lz = (int) Math.round(cz + nz * (width / 2 + 2));
                 lamp(out, lx, walkY, lz);
-            }
-        }
-    }
-
-    private static void blendRoadShoulders(List<BlockEdit> out, World world,
-                                           int cx, int walkY, int cz,
-                                           double nx, double nz, int halfWidth, int step) {
-        for (int direction : new int[]{-1, 1}) {
-            for (int shoulder = 1; shoulder <= 3; shoulder++) {
-                int distance = halfWidth + shoulder;
-                int x = (int) Math.round(cx + nx * direction * distance);
-                int z = (int) Math.round(cz + nz * direction * distance);
-                int target = walkY - 1 + (shoulder == 3 ? 1 : 0);
-                Material surface = shoulder == 1 ? Material.ANDESITE
-                        : Math.floorMod(step + direction * shoulder, 7) == 0
-                        ? Material.MOSS_BLOCK : Material.COARSE_DIRT;
-                clearAndFill(out, world, x, target, z, surface);
             }
         }
     }
