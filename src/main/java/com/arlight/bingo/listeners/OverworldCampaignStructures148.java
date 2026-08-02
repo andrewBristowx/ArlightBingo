@@ -302,7 +302,8 @@ final class OverworldCampaignStructures148 {
         }
         OverworldCampaignTerrain148.supportedGateApproach(out, world,
                 "boss-north-approach", ritualGate.getBlockX(), ritualGate.getBlockY(),
-                ritualGate.getBlockZ(), 0, -1, 6, 24, 8,
+                ritualGate.getBlockZ(), 0, -1, 6, 24,
+                BOSS_GATE_CLEAR_HALF_WIDTH,
                 Material.POLISHED_DEEPSLATE, registry);
         straightRoad(out, ritualGate.getBlockX() - 16, ritualGate.getBlockY(), ritualGate.getBlockZ() + 5,
                 ritualGate.getBlockX() + 16, ritualGate.getBlockZ() + 5, 5, Material.MOSSY_STONE_BRICKS);

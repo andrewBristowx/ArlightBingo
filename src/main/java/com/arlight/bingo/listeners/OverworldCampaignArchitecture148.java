@@ -9,6 +9,11 @@ import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 import static com.arlight.bingo.listeners.OverworldCampaignAudit148.*;
 
 final class OverworldCampaignArchitecture148 {
+    static final int BOSS_GATE_TOWER_OFFSET = 15;
+    static final int BOSS_GATE_TOWER_RADIUS = 7;
+    static final int BOSS_GATE_CLEAR_HALF_WIDTH = BOSS_GATE_TOWER_OFFSET
+            - BOSS_GATE_TOWER_RADIUS - 1;
+
     private OverworldCampaignArchitecture148() { }
 
     static void house(List<BlockEdit> out, World world, Registry registry, String id,
@@ -504,11 +509,30 @@ final class OverworldCampaignArchitecture148 {
     }
 
     static void terraces(List<BlockEdit> out, int cx, int y, int cz) {
-        for (int radius = 35; radius <= 43; radius += 4) for (int degree = 0; degree < 360; degree += 2) {
-            if (degree > 250 && degree < 290) continue;
-            double a = Math.toRadians(degree);
-            out.add(e(cx + (int) Math.round(Math.cos(a) * radius), y + (radius - 35) / 4,
-                    cz + (int) Math.round(Math.sin(a) * radius), Material.DEEPSLATE_BRICKS));
+        // Three continuous, supported seating bands. The former implementation drew
+        // one-block rings at unrelated heights, which looked like cut or floating lips
+        // across the arena floor. The northern ceremonial aisle remains fully open.
+        for (int dx = -44; dx <= 44; dx++) {
+            for (int dz = -44; dz <= 44; dz++) {
+                double distance = Math.sqrt((double) dx * dx + (double) dz * dz);
+                if (distance < 34.0D || distance > 44.5D) continue;
+                boolean northOpening = dz < -18
+                        && Math.abs(dx) <= BOSS_GATE_CLEAR_HALF_WIDTH + 3;
+                if (northOpening) continue;
+
+                int level = distance < 37.5D ? 0 : distance < 41.0D ? 1 : 2;
+                int topY = y + level;
+                for (int yy = y; yy <= topY; yy++) {
+                    Material material = yy == topY
+                            ? Math.floorMod(dx * 11 + dz * 7, 13) < 2
+                            ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_DEEPSLATE
+                            : Material.DEEPSLATE_BRICKS;
+                    out.add(e(cx + dx, yy, cz + dz, material));
+                }
+                for (int yy = topY + 1; yy <= topY + 3; yy++) {
+                    out.add(e(cx + dx, yy, cz + dz, Material.AIR));
+                }
+            }
         }
     }
 
@@ -685,9 +709,14 @@ final class OverworldCampaignArchitecture148 {
                     (front == Facing.NORTH || front == Facing.SOUTH ? hx : hz) - 2);
             int z = cz + front.dz * (radius + 1) + pz * side * Math.max(3,
                     (front == Facing.NORTH || front == Facing.SOUTH ? hx : hz) - 2);
-            out.add(e(x, y - 1, z, Material.SPRUCE_SLAB));
-            out.add(e(x, y, z,
-                    variant % 2 == 0 ? Material.POTTED_POPPY : Material.POTTED_CORNFLOWER));
+            Material flower = variant % 2 == 0
+                    ? Material.POTTED_POPPY : Material.POTTED_CORNFLOWER;
+            // A full support block finishes exactly at walk level. Bottom slabs ended
+            // half a block below the pot and made every planter appear to float.
+            out.add(e(x, y - 1, z, Material.SPRUCE_PLANKS));
+            out.add(e(x, y, z, flower));
+            registry.registerPlanter(new PlanterSpec(id + "-planter-" + side,
+                    x, y, z, flower));
         }
 
         int style = Math.floorMod(variant, 4);
@@ -744,7 +773,7 @@ final class OverworldCampaignArchitecture148 {
             out.add(e(cx + x, y - 1, cz + z, floor));
             for (int yy = 0; yy <= 3; yy++) out.add(e(cx + x, y + yy, cz + z, Material.AIR));
         }
-        // Closed basin: the water cannot escape into the plaza and every side is walkable.
+        // Chamfered basin: the water cannot escape into the plaza and every side is walkable.
         for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++) {
             int edge = Math.max(Math.abs(x), Math.abs(z));
             if (edge > 4 || Math.abs(x) == 4 && Math.abs(z) == 4) continue;
@@ -753,19 +782,38 @@ final class OverworldCampaignArchitecture148 {
             if (edge == 4) out.add(e(cx + x, y, cz + z, Material.CHISELED_STONE_BRICKS));
             else out.add(e(cx + x, y, cz + z, Material.WATER));
         }
+        // A real centerpiece reads as a fountain rather than a square pool with a lamp.
         out.add(e(cx, y, cz, Material.CHISELED_STONE_BRICKS));
-        out.add(e(cx, y + 1, cz, Material.STONE_BRICK_WALL));
-        out.add(e(cx, y + 2, cz, Material.LANTERN));
+        out.add(e(cx, y + 1, cz, Material.ANDESITE_WALL));
+        out.add(e(cx, y + 2, cz, Material.SEA_LANTERN));
+        out.add(e(cx, y + 3, cz, Material.AMETHYST_CLUSTER));
 
-        // The bell has its own pavilion instead of occupying or breaking the fountain.
+        // The bell has a raised open pavilion with slender supports and a stepped roof.
+        // The previous low 7x7 plank lid read as a flat wooden box and crowded the plaza.
         int bellX = cx + 11;
-        for (int[] p : new int[][]{{-2,-2},{2,-2},{-2,2},{2,2}})
-            pillar(out, bellX + p[0], y, cz + p[1], 4,
-                    Material.STRIPPED_SPRUCE_LOG, Material.DARK_OAK_SLAB);
-        for (int x = -3; x <= 3; x++) for (int z = -3; z <= 3; z++)
-            out.add(e(bellX + x, y + 4, cz + z, Material.DARK_OAK_PLANKS));
-        out.add(e(bellX, y + 3, cz, Material.CHAIN));
-        out.add(e(bellX, y + 2, cz, Material.BELL));
+        for (int x = -4; x <= 4; x++) for (int z = -4; z <= 4; z++) {
+            if (x * x + z * z <= 18) out.add(e(bellX + x, y - 1, cz + z,
+                    Math.floorMod(x * 5 + z * 7, 11) == 0
+                            ? Material.MOSSY_COBBLESTONE : Material.POLISHED_ANDESITE));
+        }
+        for (int[] p : new int[][]{{-3,-3},{3,-3},{-3,3},{3,3}}) {
+            out.add(e(bellX + p[0], y, cz + p[1], Material.CHISELED_STONE_BRICKS));
+            for (int yy = 1; yy <= 5; yy++) {
+                out.add(e(bellX + p[0], y + yy, cz + p[1], Material.SPRUCE_FENCE));
+            }
+        }
+        for (int layer = 0; layer <= 4; layer++) {
+            int radius = 4 - layer;
+            int roofY = y + 5 + layer;
+            for (int x = -radius; x <= radius; x++) for (int z = -radius; z <= radius; z++) {
+                if (radius > 0 && Math.max(Math.abs(x), Math.abs(z)) != radius) continue;
+                out.add(e(bellX + x, roofY, cz + z,
+                        layer == 4 ? Material.DARK_OAK_SLAB : Material.DARK_OAK_PLANKS));
+            }
+        }
+        for (int yy = 3; yy <= 8; yy++) out.add(e(bellX, y + yy, cz, Material.CHAIN));
+        out.add(data(bellX, y + 2, cz, Material.BELL,
+                "minecraft:bell[attachment=ceiling,facing=north,powered=false]"));
         for (int[] p : new int[][]{{-8,-7},{8,-7},{-8,7},{8,7}}) {
             pillar(out, cx + p[0], y, cz + p[1], 3, Material.SPRUCE_FENCE, Material.LANTERN);
             bench(out, cx + p[0] + (p[0] < 0 ? 1 : -1), y, cz + p[1]);
@@ -907,10 +955,10 @@ final class OverworldCampaignArchitecture148 {
             }
         }
         // Towers are replayed last so the gatehouse cannot overwrite their ladders or floors.
-        auditedTower(out, world, registry, "boss-gate-west", cx - 15, y, cz,
-                7, 24, Material.DARK_OAK_PLANKS);
-        auditedTower(out, world, registry, "boss-gate-east", cx + 15, y, cz,
-                7, 24, Material.DARK_OAK_PLANKS);
+        auditedTower(out, world, registry, "boss-gate-west", cx - BOSS_GATE_TOWER_OFFSET,
+                y, cz, BOSS_GATE_TOWER_RADIUS, 24, Material.DARK_OAK_PLANKS);
+        auditedTower(out, world, registry, "boss-gate-east", cx + BOSS_GATE_TOWER_OFFSET,
+                y, cz, BOSS_GATE_TOWER_RADIUS, 24, Material.DARK_OAK_PLANKS);
     }
 
     static BlockEdit e(int x, int y, int z, Material material) {
