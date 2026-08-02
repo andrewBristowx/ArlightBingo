@@ -91,6 +91,10 @@ final class OverworldCampaignTerrain148 {
 
     static List<BlockEdit> shapeSite(World world, Site site, int flatRadius, int blendRadius,
                                      Report report, int minimumDx, int maximumDx) {
+        if (site.style() == Style.BOSS) {
+            return shapeBossArena(world, site, flatRadius, blendRadius,
+                    report, minimumDx, maximumDx);
+        }
         List<BlockEdit> out = new ArrayList<>();
         int extent = blendRadius + ORGANIC_EDGE_MARGIN;
         for (int dx = Math.max(-extent, minimumDx); dx <= Math.min(extent, maximumDx); dx++) {
@@ -123,6 +127,47 @@ final class OverworldCampaignTerrain148 {
                 Material top = blendedSurface(world, x, natural, z,
                         designedSurface(site.style(), x, z), blend);
                 clearAndFill(out, world, x, target, z, top);
+                report.shapedColumns++;
+            }
+        }
+        return out;
+    }
+
+
+    /**
+     * Flattens only the playable arena core. The narrow outer ring may raise low ground to
+     * support the wall, but it never cuts a natural hill. This prevents the enormous bare
+     * plateau seen around the boss in 1.48.10 while keeping the arena floor walkable.
+     */
+    private static List<BlockEdit> shapeBossArena(World world, Site site,
+                                                   int flatRadius, int blendRadius,
+                                                   Report report, int minimumDx,
+                                                   int maximumDx) {
+        List<BlockEdit> out = new ArrayList<>();
+        int extent = blendRadius;
+        for (int dx = Math.max(-extent, minimumDx); dx <= Math.min(extent, maximumDx); dx++) {
+            for (int dz = -extent; dz <= extent; dz++) {
+                double distance = Math.sqrt(dx * dx + dz * dz);
+                if (distance > blendRadius) continue;
+                int x = site.x() + dx;
+                int z = site.z() + dz;
+                int natural = terrainY(world, x, z);
+                if (distance <= flatRadius) {
+                    Material top = designedSurface(Style.BOSS, x, z);
+                    clearAndFill(out, world, x, site.baseY(), z, top);
+                    report.shapedColumns++;
+                    continue;
+                }
+                double blend = smooth((distance - flatRadius)
+                        / Math.max(1.0D, blendRadius - flatRadius));
+                int target = (int) Math.round(site.baseY() * (1.0D - blend)
+                        + natural * blend);
+                // Outside the arena floor, only support low ground. High natural terrain is
+                // preserved instead of being excavated into a circular dirt shelf.
+                if (target <= natural) continue;
+                Material top = blendedSurface(world, x, natural, z,
+                        designedSurface(Style.BOSS, x, z), blend);
+                fillColumn(out, world, x, target, z, top, false);
                 report.shapedColumns++;
             }
         }

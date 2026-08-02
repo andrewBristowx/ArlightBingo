@@ -13,7 +13,7 @@ import java.util.Map;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.10 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.11 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -28,7 +28,7 @@ final class OverworldCampaignAudit148 {
     }
 
     record HouseSpec(String id, int cx, int y, int cz, int hx, int hz,
-                     int height, boolean roofAlongX, Facing front) { }
+                     int height, boolean roofAlongX, Material plaster, Facing front) { }
 
     record TowerSpec(String id, int cx, int y, int cz, int radius, int height,
                      Facing front) { }
@@ -290,7 +290,7 @@ final class OverworldCampaignAudit148 {
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.10 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.11 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -345,6 +345,158 @@ final class OverworldCampaignAudit148 {
                 || material == Material.SAND || material == Material.RED_SAND
                 || material == Material.GRAVEL || material == Material.CLAY
                 || material == Material.TERRACOTTA || material == Material.SNOW_BLOCK;
+    }
+
+
+    /**
+     * Restores the complete structural envelope of every registered house after all roads,
+     * plazas, yards and decorations have run. Only the perimeter, gables, roof and eaves are
+     * rewritten, so furniture and usable interior space remain untouched.
+     */
+    static List<BlockEdit> repairRegisteredHouseShells(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (HouseSpec house : registry.houses) {
+            for (int x = -house.hx; x <= house.hx; x++) {
+                for (int z = -house.hz; z <= house.hz; z++) {
+                    if (Math.abs(x) != house.hx && Math.abs(z) != house.hz) continue;
+                    for (int yy = 0; yy <= house.height; yy++) {
+                        boolean doorway = houseEntrance(house, x, z) && yy <= 1;
+                        int worldX = house.cx + x;
+                        int worldY = house.y + yy;
+                        int worldZ = house.cz + z;
+                        if (doorway) {
+                            String direction = house.front.name().toLowerCase(java.util.Locale.ROOT);
+                            String half = yy == 0 ? "lower" : "upper";
+                            out.add(new BlockEdit(worldX, worldY, worldZ, Material.SPRUCE_DOOR,
+                                    "minecraft:spruce_door[facing=" + direction
+                                            + ",half=" + half
+                                            + ",hinge=left,open=false,powered=false]"));
+                            continue;
+                        }
+                        boolean xWall = Math.abs(x) == house.hx;
+                        boolean corner = xWall && Math.abs(z) == house.hz;
+                        int alongWall = xWall ? z : x;
+                        int bay = Math.floorMod(alongWall, 5);
+                        boolean frame = corner || yy == 0 || yy == house.height
+                                || yy % 5 == 0 || bay == 0;
+                        boolean window = !frame && yy % 5 >= 2 && yy % 5 <= 3
+                                && (bay == 2 || bay == 3);
+                        if (window) {
+                            String connections = xWall
+                                    ? "north=true,east=false,south=true,west=false"
+                                    : "north=false,east=true,south=false,west=true";
+                            out.add(new BlockEdit(worldX, worldY, worldZ, Material.GLASS_PANE,
+                                    "minecraft:glass_pane[" + connections
+                                            + ",waterlogged=false]"));
+                        } else {
+                            out.add(new BlockEdit(worldX, worldY, worldZ,
+                                    frame ? Material.STRIPPED_DARK_OAK_LOG : house.plaster,
+                                    null));
+                        }
+                    }
+                }
+            }
+            restoreHouseRoof(out, house);
+            restoreHouseEaves(out, house);
+        }
+        return out;
+    }
+
+    private static boolean houseEntrance(HouseSpec house, int x, int z) {
+        return switch (house.front) {
+            case NORTH -> z == -house.hz && x == 0;
+            case SOUTH -> z == house.hz && x == 0;
+            case EAST -> x == house.hx && z == 0;
+            case WEST -> x == -house.hx && z == 0;
+        };
+    }
+
+    private static void restoreHouseRoof(List<BlockEdit> out, HouseSpec house) {
+        int roofY = house.y + house.height + 1;
+        int roofHx = house.hx + 2;
+        int roofHz = house.hz + 2;
+        int layers = house.roofAlongX ? roofHz : roofHx;
+        for (int layer = 0; layer <= layers; layer++) {
+            if (house.roofAlongX) {
+                for (int x = -roofHx; x <= roofHx; x++) {
+                    out.add(new BlockEdit(house.cx + x, roofY + layer,
+                            house.cz - roofHz + layer, Material.DARK_OAK_PLANKS, null));
+                    out.add(new BlockEdit(house.cx + x, roofY + layer,
+                            house.cz + roofHz - layer, Material.DARK_OAK_PLANKS, null));
+                }
+            } else {
+                for (int z = -roofHz; z <= roofHz; z++) {
+                    out.add(new BlockEdit(house.cx - roofHx + layer, roofY + layer,
+                            house.cz + z, Material.DARK_OAK_PLANKS, null));
+                    out.add(new BlockEdit(house.cx + roofHx - layer, roofY + layer,
+                            house.cz + z, Material.DARK_OAK_PLANKS, null));
+                }
+            }
+        }
+        if (house.roofAlongX) {
+            for (int side : new int[]{-house.hx, house.hx}) {
+                for (int z = -house.hz; z <= house.hz; z++) {
+                    int top = roofY + roofHz - Math.abs(z);
+                    for (int y = roofY; y < top; y++) {
+                        Material material = y == roofY || z == 0
+                                || Math.floorMod(y + z, 5) == 0
+                                ? Material.STRIPPED_DARK_OAK_LOG : house.plaster;
+                        out.add(new BlockEdit(house.cx + side, y,
+                                house.cz + z, material, null));
+                    }
+                }
+            }
+            for (int x = -roofHx; x <= roofHx; x++) {
+                out.add(new BlockEdit(house.cx + x, roofY + roofHz,
+                        house.cz, Material.STRIPPED_DARK_OAK_LOG, null));
+            }
+        } else {
+            for (int side : new int[]{-house.hz, house.hz}) {
+                for (int x = -house.hx; x <= house.hx; x++) {
+                    int top = roofY + roofHx - Math.abs(x);
+                    for (int y = roofY; y < top; y++) {
+                        Material material = y == roofY || x == 0
+                                || Math.floorMod(y + x, 5) == 0
+                                ? Material.STRIPPED_DARK_OAK_LOG : house.plaster;
+                        out.add(new BlockEdit(house.cx + x, y,
+                                house.cz + side, material, null));
+                    }
+                }
+            }
+            for (int z = -roofHz; z <= roofHz; z++) {
+                out.add(new BlockEdit(house.cx, roofY + roofHx,
+                        house.cz + z, Material.STRIPPED_DARK_OAK_LOG, null));
+            }
+        }
+    }
+
+    private static void restoreHouseEaves(List<BlockEdit> out, HouseSpec house) {
+        int roofY = house.y + house.height + 1;
+        int roofHx = house.hx + 2;
+        int roofHz = house.hz + 2;
+        if (house.roofAlongX) {
+            for (int x = -roofHx; x <= roofHx; x++) {
+                for (int z : new int[]{-house.hz - 1, house.hz + 1}) {
+                    out.add(new BlockEdit(house.cx + x, roofY - 1,
+                            house.cz + z, Material.DARK_OAK_PLANKS, null));
+                    if (Math.floorMod(x, 4) == 0) {
+                        out.add(new BlockEdit(house.cx + x, roofY - 2,
+                                house.cz + z, Material.STRIPPED_DARK_OAK_LOG, null));
+                    }
+                }
+            }
+        } else {
+            for (int z = -roofHz; z <= roofHz; z++) {
+                for (int x : new int[]{-house.hx - 1, house.hx + 1}) {
+                    out.add(new BlockEdit(house.cx + x, roofY - 1,
+                            house.cz + z, Material.DARK_OAK_PLANKS, null));
+                    if (Math.floorMod(z, 4) == 0) {
+                        out.add(new BlockEdit(house.cx + x, roofY - 2,
+                                house.cz + z, Material.STRIPPED_DARK_OAK_LOG, null));
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -707,11 +859,14 @@ final class OverworldCampaignAudit148 {
     private static void auditTerrainBlend(World world, Registry registry, TerrainSpec spec,
                                           List<String> failures) {
         Site site = spec.site;
+        if (site.style() == Style.BOSS) return;
         for (int degree = 0; degree < 360; degree += 15) {
             double angle = Math.toRadians(degree);
             Integer previous = null;
+            int auditEnd = site.style() == Style.BOSS
+                    ? spec.blendRadius + 2 : spec.blendRadius + 18;
             for (int radius = Math.max(1, spec.flatRadius - 2);
-                 radius <= spec.blendRadius + 18; radius++) {
+                 radius <= auditEnd; radius++) {
                 int x = site.x() + (int) Math.round(Math.cos(angle) * radius);
                 int z = site.z() + (int) Math.round(Math.sin(angle) * radius);
                 if (registry.blocksTerrainAudit(x, z)) {
