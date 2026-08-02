@@ -1,0 +1,98 @@
+name: Finalizar ArlightBingo 1.48.15
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - candidate/bingo-1.48.13-corridor-connectivity-audit
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.head_ref == 'candidate/bingo-1.48.15-critical-routes-soft-secondary-audit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Descargar candidata
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Aplicar fuente verificada
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -qx '1.48.15' BUILD_VERSION.txt; then
+            echo 'La fuente 1.48.15 ya está aplicada.'
+          else
+            echo 'd080986a60fb505148195f0b17d622091091863c976c22d5ea62c15843568eaf  payloads/1.48.15/part00' | sha256sum -c -
+            echo '8fdb6fba59b2931a83bca73a706065d7c9ba9d8ce4622de43da2368492ed08b2  payloads/1.48.15/part01' | sha256sum -c -
+            echo 'a95f7d7cead862f536a8de346f1e19323052d0c15f0ac395bca8e3de47943be7  payloads/1.48.15/part02' | sha256sum -c -
+            echo '6d5facfa674bc39fb883d938b5be2878387d0bba6a180009b2511351570daee4  payloads/1.48.15/part03' | sha256sum -c -
+            cat payloads/1.48.15/part0* > /tmp/bingo.patch.gz.b64
+            base64 --decode /tmp/bingo.patch.gz.b64 > /tmp/bingo.patch.gz
+            echo 'a9df88ff2219c810b1cbb1e9b736f5f0161999cef85a336be558b6745682edfd  /tmp/bingo.patch.gz' | sha256sum -c -
+            gzip -dc /tmp/bingo.patch.gz > /tmp/bingo.patch
+            echo 'f897d4b637e3f438de034a41d351e17a86d9b8983daaa02e60c4c04c00142df4  /tmp/bingo.patch' | sha256sum -c -
+            git apply --check /tmp/bingo.patch
+            git apply /tmp/bingo.patch
+            git restore .github/workflows/build.yml
+            rm -rf payloads/1.48.15
+            python3 scripts/validate_1_48_15.py
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add -A
+            git commit -m 'Corregir auditoría de rutas críticas en ArlightBingo 1.48.15'
+            git push origin HEAD:${{ github.head_ref }}
+          fi
+          python3 scripts/validate_1_48_15.py
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Descargar ArlightCore canónico
+        uses: actions/checkout@v4
+        with:
+          repository: andrewBristowx/ArlightCore
+          ref: 597c130a5d5450ac92e02430def406ef22512bc9
+          path: arlight-core
+
+      - name: Compilar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
+          mvn -B -U clean package
+          unzip -p target/ArlightBingo-1.48.15.jar plugin.yml | grep -q '^version: 1.48.15$'
+
+      - name: Empaquetar entrega
+        shell: bash
+        run: |
+          set -euo pipefail
+          DELIVERY='ArlightBingo-1.48.15-CRITICAL-ROUTES-SOFT-SECONDARY-AUDIT'
+          mkdir -p package/${DELIVERY}-SOURCE
+          rsync -a --exclude '.git/' --exclude 'arlight-core/' --exclude 'target/' --exclude 'package/' ./ package/${DELIVERY}-SOURCE/
+          cd package
+          zip -qr ${DELIVERY}-SOURCE.zip ${DELIVERY}-SOURCE
+          cp ../target/ArlightBingo-1.48.15.jar .
+          sha256sum ArlightBingo-1.48.15.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.15-SHA256.txt
+          unzip -t ${DELIVERY}-SOURCE.zip
+          sha256sum -c ArlightBingo-1.48.15-SHA256.txt
+          rm -rf ${DELIVERY}-SOURCE
+
+      - name: Subir entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.15-DELIVERY
+          path: |
+            package/ArlightBingo-1.48.15.jar
+            package/ArlightBingo-1.48.15-CRITICAL-ROUTES-SOFT-SECONDARY-AUDIT-SOURCE.zip
+            package/ArlightBingo-1.48.15-SHA256.txt
+          if-no-files-found: error
+          retention-days: 90
