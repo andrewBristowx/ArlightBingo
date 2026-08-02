@@ -530,10 +530,10 @@ final class OverworldCampaignTerrain148 {
         // Two outside-rim segments keep the full route beyond the arena's radius.
         // A single diagonal chord would cross the approved floor and northern wall.
         Location northRim = point(world, boss.x() + 58,
-                boss.baseY() + 1, boss.z() - 58);
+                boss.baseY() + 1, boss.z() - 62);
         Location flank = point(world, boss.x() + 74, boss.baseY() + 1, boss.z() + 8);
         road(out, world, "boss-portal-north-rim", point(world, boss.x() + 3,
-                        boss.baseY() + 1, boss.z() - 55), northRim, 6,
+                        boss.baseY() + 1, boss.z() - 62), northRim, 6,
                 Material.DEEPSLATE_TILES, -0.10D, registry);
         road(out, world, "boss-portal-east-rim", northRim, flank, 6,
                 Material.DEEPSLATE_TILES, -0.10D, registry);
@@ -542,6 +542,248 @@ final class OverworldCampaignTerrain148 {
                 Material.DEEPSLATE_TILES, -0.12D, registry);
         report.roads = 8;
         return out;
+    }
+
+    static List<BlockEdit> polishCriticalFortressZones(World world, Site citadel, Site boss,
+                                                        Location ritualGate,
+                                                        OverworldCampaignAudit148.Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        polishBossNorthApproach(out, world, boss, ritualGate, registry);
+        polishBossPortalRimJunction(out, world, boss, registry);
+        furnishCitadelCourtyard(out, world, citadel, registry);
+        sealCitadelTowerCorridors(out, world, citadel, registry);
+        return out;
+    }
+
+    static List<BlockEdit> reinforceBossWallFoundation(World world, Site boss) {
+        List<BlockEdit> out = new ArrayList<>();
+        int topY = boss.baseY();
+        int bottom = Math.max(world.getMinHeight() + 2, topY - WALL_FOUNDATION_DEPTH - 4);
+        // Run after every arena, road and decoration phase. This final foundation belt cannot
+        // be erased by later terrain work and guarantees the exact radius checked by audit.
+        for (int radius = 48; radius <= 51; radius++) {
+            for (int degree = 0; degree < 360; degree++) {
+                double angle = Math.toRadians(degree);
+                int x = boss.x() + (int) Math.round(Math.cos(angle) * radius);
+                int z = boss.z() + (int) Math.round(Math.sin(angle) * radius);
+                for (int y = topY; y >= bottom; y--) {
+                    Material material = y >= topY - 4
+                            ? Material.DEEPSLATE_BRICKS : Material.COBBLESTONE;
+                    out.add(new BlockEdit(x, y, z, material));
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void polishBossNorthApproach(List<BlockEdit> out, World world, Site boss,
+                                                Location ritualGate,
+                                                OverworldCampaignAudit148.Registry registry) {
+        int cx = ritualGate.getBlockX();
+        int topY = ritualGate.getBlockY();
+        int cz = ritualGate.getBlockZ();
+        for (int step = 0; step <= 18; step++) {
+            int z = cz - 18 + step;
+            int walkY = topY - 6 + Math.min(6, step / 3);
+            int half = step < 5 ? 4 : 5;
+            for (int x = cx - half; x <= cx + half; x++) {
+                supportedPathCell(out, world, x, walkY, z,
+                        Math.floorMod(x + z, 9) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS);
+                for (int y = walkY; y <= walkY + 5; y++) {
+                    out.add(new BlockEdit(x, y, z, Material.AIR));
+                }
+                registry.registerRoadCell("boss-north-monumental-stairs", x, walkY, z,
+                        Material.STONE_BRICKS);
+            }
+            for (int side : new int[]{-1, 1}) {
+                int wallX = cx + side * (half + 1);
+                for (int y = walkY - 1; y <= walkY + 2; y++) {
+                    out.add(new BlockEdit(wallX, y, z,
+                            Math.floorMod(z + y, 11) == 0
+                                    ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
+                }
+                out.add(new BlockEdit(wallX, walkY + 3, z, Material.STONE_BRICK_WALL));
+            }
+        }
+        // Remove the temporary wooden mound that previously interrupted the approach.
+        for (int x = cx - 7; x <= cx + 7; x++) {
+            for (int z = cz - 10; z <= cz - 3; z++) {
+                for (int y = topY - 3; y <= topY + 5; y++) {
+                    Material type = world.getBlockAt(x, y, z).getType();
+                    if (type.name().contains("PLANK") || type.name().contains("STAIRS")
+                            || type.name().contains("SLAB")) {
+                        out.add(new BlockEdit(x, y, z, Material.AIR));
+                    }
+                }
+            }
+        }
+    }
+
+    private static void polishBossPortalRimJunction(List<BlockEdit> out, World world, Site boss,
+                                                     OverworldCampaignAudit148.Registry registry) {
+        int y = boss.baseY() + 1;
+        int z = boss.z() - 62;
+        for (int x = boss.x() + 3; x <= boss.x() + 60; x++) {
+            for (int lateral = -3; lateral <= 3; lateral++) {
+                int wz = z + lateral;
+                supportedPathCell(out, world, x, y, wz, Material.DEEPSLATE_TILES);
+                for (int yy = y; yy <= y + 5; yy++) {
+                    out.add(new BlockEdit(x, yy, wz, Material.AIR));
+                }
+                registry.registerRoadCell("boss-portal-north-rim", x, y, wz,
+                        Material.DEEPSLATE_TILES);
+            }
+            if (Math.floorMod(x, 8) == 0) {
+                for (int side : new int[]{-1, 1}) {
+                    int wz = z + side * 5;
+                    out.add(new BlockEdit(x, y, wz, Material.POLISHED_DEEPSLATE_WALL));
+                    out.add(new BlockEdit(x, y + 1, wz, Material.SOUL_LANTERN));
+                }
+            }
+        }
+        // A broad, paved turning apron keeps the route outside the solid gatehouse towers.
+        for (int x = boss.x() - 5; x <= boss.x() + 10; x++) {
+            for (int wz = z - 4; wz <= z + 6; wz++) {
+                supportedPathCell(out, world, x, y, wz,
+                        Math.floorMod(x + wz, 10) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS);
+                for (int yy = y; yy <= y + 5; yy++) out.add(new BlockEdit(x, yy, wz, Material.AIR));
+            }
+        }
+    }
+
+    private static void furnishCitadelCourtyard(List<BlockEdit> out, World world, Site citadel,
+                                                OverworldCampaignAudit148.Registry registry) {
+        int cx = citadel.x();
+        int y = citadel.baseY() + 1;
+        int cz = citadel.z();
+        int bypassX = cx + 25;
+
+        // 1.48.18 registered a straight route through the great hall. The house shell
+        // correctly restored its walls afterwards, so the auditor always saw a blocked road
+        // and the same phase also erased roughly twenty-five pieces of furniture. The new
+        // route is a continuous, seven-wide fortified bypass around the east side.
+        paveRegisteredCitadelSegment(out, world, registry, "citadel-central-court",
+                cx, y, cz - 56, cx, cz - 32, 2);
+        paveRegisteredCitadelSegment(out, world, registry, "citadel-central-court",
+                cx, y, cz - 32, bypassX, cz - 32, 2);
+        paveRegisteredCitadelSegment(out, world, registry, "citadel-central-court",
+                bypassX, y, cz - 32, bypassX, cz + 32, 2);
+        paveRegisteredCitadelSegment(out, world, registry, "citadel-central-court",
+                bypassX, y, cz + 32, cx, cz + 32, 2);
+        // Join the great-hall front path without entering its footprint.
+        paveRegisteredCitadelSegment(out, world, registry, "citadel-central-court",
+                cx, y, cz + 20, cx, cz + 32, 2);
+        paveRegisteredCitadelSegment(out, world, registry, "citadel-central-court",
+                cx, y, cz + 32, cx, cz + 56, 2);
+
+        // Two occupied side courts reduce the oversized empty plaza without touching the
+        // great hall, the bypass or any of the four audited corner towers.
+        for (int sideX : new int[]{-1, 1}) {
+            int ox = cx + (sideX < 0 ? -35 : 42);
+            int oz = cz;
+            for (int x = ox - 7; x <= ox + 7; x++) {
+                for (int z = oz - 6; z <= oz + 6; z++) {
+                    Material floor = Math.floorMod(x * 5 + z * 3, 9) == 0
+                            ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE;
+                    supportedPathCell(out, world, x, y, z, floor);
+                }
+            }
+            for (int dx : new int[]{-6, 6}) {
+                out.add(new BlockEdit(ox + dx, y, oz - 5, Material.SPRUCE_LOG));
+                out.add(new BlockEdit(ox + dx, y + 1, oz - 5, Material.SPRUCE_FENCE));
+                out.add(new BlockEdit(ox + dx, y + 2, oz - 5, Material.LANTERN));
+            }
+            for (int dz = -3; dz <= 3; dz += 3) {
+                out.add(new BlockEdit(ox + sideX * 5, y, oz + dz, Material.BARREL));
+                out.add(new BlockEdit(ox + sideX * 4, y, oz + dz, Material.SPRUCE_TRAPDOOR));
+            }
+            if (sideX < 0) {
+                for (int dx = -4; dx <= 4; dx += 4) {
+                    out.add(new BlockEdit(ox + dx, y, oz + 4, Material.IRON_BARS));
+                    out.add(new BlockEdit(ox + dx, y + 1, oz + 4, Material.WHITE_WOOL));
+                }
+            } else {
+                out.add(new BlockEdit(ox, y, oz, Material.SMITHING_TABLE));
+                out.add(new BlockEdit(ox + 2, y, oz, Material.ANVIL));
+                out.add(new BlockEdit(ox - 2, y, oz, Material.CHEST));
+            }
+        }
+    }
+
+    private static void paveRegisteredCitadelSegment(List<BlockEdit> out, World world,
+                                                      OverworldCampaignAudit148.Registry registry,
+                                                      String id, int x1, int walkY, int z1,
+                                                      int x2, int z2, int halfWidth) {
+        int dx = Integer.compare(x2, x1);
+        int dz = Integer.compare(z2, z1);
+        int length = Math.max(Math.abs(x2 - x1), Math.abs(z2 - z1));
+        int sideX = -dz;
+        int sideZ = dx;
+        for (int step = 0; step <= length; step++) {
+            int centerX = x1 + dx * step;
+            int centerZ = z1 + dz * step;
+            for (int side = -halfWidth; side <= halfWidth; side++) {
+                int x = centerX + sideX * side;
+                int z = centerZ + sideZ * side;
+                Material floor = Math.floorMod(step * 7 + side * 11, 13) == 0
+                        ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_ANDESITE;
+                supportedPathCell(out, world, x, walkY, z, floor);
+                for (int yy = walkY; yy <= walkY + 4; yy++) {
+                    out.add(new BlockEdit(x, yy, z, Material.AIR));
+                }
+                registry.registerRoadCell(id, x, walkY, z, floor);
+            }
+            if (step > 3 && step < length - 3 && step % 9 == 0) {
+                for (int side : new int[]{-halfWidth - 2, halfWidth + 2}) {
+                    int x = centerX + sideX * side;
+                    int z = centerZ + sideZ * side;
+                    out.add(new BlockEdit(x, walkY, z, Material.STONE_BRICK_WALL));
+                    out.add(new BlockEdit(x, walkY + 1, z, Material.LANTERN));
+                }
+            }
+        }
+    }
+
+    private static void sealCitadelTowerCorridors(List<BlockEdit> out, World world, Site citadel,
+                                                  OverworldCampaignAudit148.Registry registry) {
+        int cx = citadel.x();
+        int y = citadel.baseY() + 1;
+        int cz = citadel.z();
+        int[][] gates = {
+                {cx, cz - 56, 0, 1},
+                {cx, cz + 56, 0, 1},
+                {cx - 56, cz, 1, 0},
+                {cx + 56, cz, 1, 0}
+        };
+        for (int[] gate : gates) {
+            int gx = gate[0], gz = gate[1], alongX = gate[2], alongZ = gate[3];
+            for (int forward = -8; forward <= 8; forward++) {
+                for (int lateral = -4; lateral <= 4; lateral++) {
+                    int x = gx + alongX * forward + alongZ * lateral;
+                    int z = gz + alongZ * forward + alongX * lateral;
+                    supportedPathCell(out, world, x, y, z, Material.STONE_BRICKS);
+                    for (int yy = y; yy <= y + 5; yy++) {
+                        out.add(new BlockEdit(x, yy, z, Material.AIR));
+                    }
+                    registry.registerRoadCell("citadel-gate-polish-" + gx + "-" + gz,
+                            x, y, z, Material.STONE_BRICKS);
+                }
+            }
+            for (int side : new int[]{-1, 1}) {
+                int sx = gx + alongZ * side * 5;
+                int sz = gz + alongX * side * 5;
+                for (int forward = -8; forward <= 8; forward++) {
+                    int x = sx + alongX * forward;
+                    int z = sz + alongZ * forward;
+                    for (int yy = y - 1; yy <= y + 2; yy++) {
+                        out.add(new BlockEdit(x, yy, z, Material.STONE_BRICKS));
+                    }
+                    out.add(new BlockEdit(x, y + 3, z, Material.STONE_BRICK_WALL));
+                }
+            }
+        }
     }
 
     private static Location gateToward(World world, Site from, Site toward) {

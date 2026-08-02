@@ -1,0 +1,23 @@
+PRUEBA ARLIGHTBINGO 1.48.19
+
+1. Apagar completamente el servidor.
+2. Sustituir el JAR anterior por ArlightBingo-1.48.19.jar.
+3. No usar /reload.
+4. Ejecutar:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.19-test1
+   /bingo template overworld status
+5. Al finalizar:
+   /bingo template overworld audit
+   /bingo template overworld tp
+   /bingo repair overworld status
+
+Comprobar:
+- El gran salon conserva paredes, puerta y al menos 93 piezas de mobiliario.
+- citadel-central-court rodea el salon y no atraviesa su interior.
+- La ruta conecta la puerta norte, el camino frontal del salon y la puerta sur.
+- Ninguna parte del bypass invade las cuatro torres.
+- La auditoria no muestra cimiento flotante en boss-wall.
+- Las reparaciones automaticas, si son necesarias, aparecen por zona y no como una mezcla global.
+
+No regenerar Nether ni End.

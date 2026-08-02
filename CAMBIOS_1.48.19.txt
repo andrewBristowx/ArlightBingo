@@ -1,0 +1,16 @@
+ARLIGHTBINGO 1.48.19 - RECUPERACION POR ZONAS
+
+1. El corredor citadel-central-court deja de atravesar el gran salon.
+   Ahora usa un bypass fortificado de cinco bloques de ancho por el lado este,
+   entre la huella protegida del salon y las torres auditadas.
+2. El camino frontal del gran salon se conecta al bypass sin tocar paredes ni mobiliario.
+3. El mobiliario del citadel-great-hall se restaura en una fase final y se agregan
+   bancos/archivos laterales para mantener un margen sobre el objetivo de 93 piezas.
+4. La cimentacion del boss-wall se refuerza al final de todas las fases en los radios
+   48-51, por debajo del suelo, para evitar puntos flotantes producidos por ediciones posteriores.
+5. La autorreparacion procesa una zona por pasada: gran salon, muralla del boss y despues rutas.
+   Un fallo posterior ya no mezcla miles de cambios no relacionados con una correccion valida.
+6. Se elimina la antigua calle local recta que atravesaba la huella del gran salon.
+7. Los patios laterales se colocan fuera de las torres y del nuevo bypass.
+
+La version sigue siendo candidata hasta validar una generacion limpia en Arclight 1.21.1.

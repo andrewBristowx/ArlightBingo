@@ -92,6 +92,34 @@ final class OverworldCampaignArchitecture148 {
         decorateHouseInterior(out, id, cx, y, cz, hx, hz, floors, front);
     }
 
+    static List<BlockEdit> restoreCitadelGreatHallInterior(Site citadel) {
+        List<BlockEdit> out = new java.util.ArrayList<>();
+        int cx = citadel.x();
+        int y = citadel.baseY() + 1;
+        int cz = citadel.z();
+        int hx = 21;
+        int hz = 13;
+        int floors = 3;
+        decorateHouseInterior(out, "citadel-great-hall", cx, y, cz,
+                hx, hz, floors, Facing.SOUTH);
+
+        // Extra side benches and archives provide a margin above the 93-piece audit target.
+        // They stay outside the central nave and the ladder shaft.
+        for (int floor = 0; floor < floors; floor++) {
+            int walkY = y + floor * 5 + (floor == 0 ? 0 : 1);
+            for (int x = -15; x <= 15; x += 3) {
+                out.add(e(cx + x, walkY, cz - 8, Material.SPRUCE_SLAB));
+                out.add(e(cx + x, walkY, cz + 8, Material.SPRUCE_SLAB));
+            }
+            for (int z : new int[]{-6, 0, 6}) {
+                out.add(e(cx - 18, walkY, cz + z, Material.BOOKSHELF));
+                out.add(e(cx + 18, walkY, cz + z,
+                        floor == 0 ? Material.BARREL : Material.CHEST));
+            }
+        }
+        return out;
+    }
+
     static void roof(List<BlockEdit> out, int cx, int y, int cz, int wallHx, int wallHz,
                      boolean alongX, Material plaster) {
         int hx = wallHx + 2, hz = wallHz + 2;
