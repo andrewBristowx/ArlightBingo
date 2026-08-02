@@ -1,0 +1,12 @@
+ARLIGHTBINGO 1.48.10 - SEGURIDAD DE CAMINOS Y RECUPERACIÓN DE ALDEAS
+
+- Las calles internas y los caminos de casas ya no se vuelven a reproducir al final.
+- La restauración final solo actúa sobre caminos externos y nunca borra bloques estructurales.
+- Los conectores de casas se reducen a tres bloques de ancho y un máximo de ocho pasos.
+- Los accesos dejan de limpiar cuatro bloques de altura y respetan edificios vecinos.
+- Las plataformas de edificios solo rellenan terreno bajo; ya no recortan laderas altas.
+- Los hombros de caminos dejan de excavar franjas anchas de tierra.
+- La subida del boss conserva terreno alto y solo rellena huecos bajos.
+- Se mantienen los interiores, aleros cerrados y la puerta monumental de 1.48.9.
+
+Regenerar únicamente la plantilla Overworld.
