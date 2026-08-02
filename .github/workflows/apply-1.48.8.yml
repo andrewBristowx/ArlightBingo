@@ -1,0 +1,47 @@
+name: Aplicar ArlightBingo 1.48.8
+
+on:
+  push:
+    branches:
+      - agent/bingo-1.48.8-interior-landmark-furnishing-audit
+    paths:
+      - '.github/arlight-1.48.8/**'
+      - '.github/workflows/apply-1.48.8.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Descargar rama candidata
+        uses: actions/checkout@v4
+        with:
+          ref: agent/bingo-1.48.8-interior-landmark-furnishing-audit
+          fetch-depth: 0
+
+      - name: Aplicar cambios verificados
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode .github/arlight-1.48.8/changes.patch.gz.b64 > /tmp/arlight-1.48.8.patch.gz
+          gzip -dc /tmp/arlight-1.48.8.patch.gz > /tmp/arlight-1.48.8.patch
+          echo 'ea1b072c920ec2a983c72a31ca4083c398aa85faaf250afb2f51493913c06a6d  /tmp/arlight-1.48.8.patch' | sha256sum -c -
+          git apply --check /tmp/arlight-1.48.8.patch
+          git apply /tmp/arlight-1.48.8.patch
+          python3 scripts/validate_1_48_8.py
+          rm -rf .github/arlight-1.48.8
+          rm -f .github/workflows/apply-1.48.8.yml
+
+      - name: Publicar candidata
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Añadir interiores y lugares decorados en ArlightBingo 1.48.8'
+          git push origin HEAD:agent/bingo-1.48.8-interior-landmark-furnishing-audit
