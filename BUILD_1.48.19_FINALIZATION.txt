@@ -1,0 +1,5 @@
+ArlightBingo 1.48.19 fortress zoned finalization candidate.
+Base canonica: 1.48.18.
+No fusionar hasta validar la generacion completa en Arclight 1.21.1.
+Fuente Drive: 17lvSpGeTlf6UDxhkU_mFhmhsCdh-blcy
+SHA-256 fuente: ea87895d1a37a513ec78c6316c15a1e66a52d37019902fa611a5918c1287f2b1
