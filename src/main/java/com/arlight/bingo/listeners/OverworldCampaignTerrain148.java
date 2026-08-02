@@ -222,12 +222,34 @@ final class OverworldCampaignTerrain148 {
                 if (!footprint && columnTop <= natural) continue;
                 if (footprint) {
                     clearAndFill(out, world, x, targetY, z, surface);
+                    boolean perimeter = Math.abs(dx) >= hx - 1 || Math.abs(dz) >= hz - 1;
+                    if (perimeter && targetY - natural >= 4) {
+                        addBuildingRetainingFace(out, x, natural, targetY, z, dx, dz, hx, hz);
+                    }
                 } else {
                     fillColumn(out, world, x, columnTop, z,
                             edgeDistance <= apron * 0.55D ? surface
                                     : naturalSurface(world, x, natural, z), false);
                 }
             }
+        }
+    }
+
+    private static void addBuildingRetainingFace(List<BlockEdit> out, int x, int natural,
+                                                  int targetY, int z, int dx, int dz,
+                                                  int hx, int hz) {
+        boolean exposedX = Math.abs(dx) >= hx - 1;
+        boolean exposedZ = Math.abs(dz) >= hz - 1;
+        if (!exposedX && !exposedZ) return;
+        int bottom = Math.max(natural + 1, targetY - 14);
+        for (int y = bottom; y <= targetY; y++) {
+            int sample = Math.floorMod(x * 13 + y * 7 + z * 17, 11);
+            Material wall = y >= targetY - 2 ? Material.STONE_BRICKS
+                    : sample < 2 ? Material.MOSSY_STONE_BRICKS : Material.COBBLESTONE;
+            out.add(new BlockEdit(x, y, z, wall));
+        }
+        if (targetY - natural >= 8 && Math.floorMod(x + z, 4) == 0) {
+            out.add(new BlockEdit(x, targetY + 1, z, Material.STONE_BRICK_WALL));
         }
     }
 
@@ -380,14 +402,38 @@ final class OverworldCampaignTerrain148 {
                     fillColumn(out, world, x, bankTop, z, surface, false);
                 } else if (natural == bankTop) {
                     out.add(new BlockEdit(x, bankTop, z, surface));
+                } else if (shoulder <= 3) {
+                    // The road clearance may expose a vertical dirt face. Cover that face
+                    // with a bounded retaining wall instead of cutting the whole hillside.
+                    int wallTop = Math.min(natural, bankTop + 7);
+                    for (int y = bankTop; y <= wallTop; y++) {
+                        Material wall = Math.floorMod(step * 5 + side * 7 + y, 9) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
+                        out.add(new BlockEdit(x, y, z, wall));
+                    }
+                    if (wallTop < natural) {
+                        out.add(new BlockEdit(x, wallTop + 1, z, Material.STONE_BRICK_WALL));
+                    }
                 } else {
-                    continue;
+                    replaceNaturalTop(out, world, x, natural, z, surface);
                 }
-                if (shoulder == 7 && step % 8 == 4) {
-                    out.add(new BlockEdit(x, bankTop + 1, z,
+                if (shoulder == 7 && step % 8 == 4 && natural <= bankTop + 1) {
+                    out.add(new BlockEdit(x, Math.max(bankTop, natural) + 1, z,
                             direction < 0 ? Material.AZALEA : Material.FLOWERING_AZALEA));
                 }
             }
+        }
+    }
+
+    private static void replaceNaturalTop(List<BlockEdit> out, World world,
+                                          int x, int natural, int z, Material preferred) {
+        Material current = world.getBlockAt(x, natural, z).getType();
+        if (current == Material.DIRT || current == Material.COARSE_DIRT
+                || current == Material.ROOTED_DIRT || current == Material.STONE
+                || current == Material.GRAVEL || current == Material.ANDESITE) {
+            Material surface = preferred == Material.MOSSY_STONE_BRICKS
+                    ? Material.MOSS_BLOCK : Material.GRASS_BLOCK;
+            out.add(new BlockEdit(x, natural, z, surface));
         }
     }
 

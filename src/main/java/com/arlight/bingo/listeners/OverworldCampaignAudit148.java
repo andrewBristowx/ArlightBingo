@@ -16,7 +16,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.16 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.17 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -329,14 +329,14 @@ final class OverworldCampaignAudit148 {
 
         if (!roadWarnings.isEmpty()) {
             int limit = Math.min(20, roadWarnings.size());
-            Bukkit.getLogger().warning("[ArlightBingo 1.48.16] "
+            Bukkit.getLogger().warning("[ArlightBingo 1.48.17] "
                     + roadWarnings.size() + " rutas secundarias requieren revisión visual, "
                     + "pero no bloquean READY: "
                     + String.join("; ", roadWarnings.subList(0, limit)));
         }
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.16 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.17 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);

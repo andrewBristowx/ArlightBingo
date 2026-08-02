@@ -280,7 +280,8 @@ final class OverworldCampaignStructures148 {
                 site.x() + 12, site.z() + 52, 5, Material.MOSSY_STONE_BRICKS);
         serviceYard(out, site.x() - 28, y, site.z() + 35, 17, 11, false);
         serviceYard(out, site.x() + 28, y, site.z() + 35, 17, 11, false);
-        report.structures += 7;
+        citadelCourtyardDetails(out, site.x(), y, site.z());
+        report.structures += 9;
         return out;
     }
 
