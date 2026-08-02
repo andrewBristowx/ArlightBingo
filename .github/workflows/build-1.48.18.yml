@@ -29,7 +29,7 @@ jobs:
           set -euo pipefail
           python3 -m pip install --quiet gdown
           gdown 1C_Vjrce8vzlBjV7asV4Py7oBk5XDJiQM -O source.zip
-          echo '357e92c9d0bc64e4bfedd73a98bc7453b561d7619d983ac1f889c7c1cf031de8  source.zip' | sha256sum -c -
+          echo 'ec5acb39b8d4ffc96c8d6fd9b594bbe6290e57a2d8099164df4d71456cf87c9a  source.zip' | sha256sum -c -
           unzip -q source.zip
           mv ArlightBingo-1.48.18-FORTRESS-ZONE-POLISH-SOURCE source
 
@@ -43,6 +43,7 @@ jobs:
           grep -q 'puliendo puerta norte, patios y corredores críticos' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
           grep -q 'polishCriticalFortressZones' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
           grep -q 'boss.z() - 62' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          ! grep -q 'Material.STONE_BRICKS, true)' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
 
       - name: Descargar ArlightCore
         uses: actions/checkout@v4
