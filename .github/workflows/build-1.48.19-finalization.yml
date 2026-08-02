@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pip install --quiet gdown
-          gdown 17lvSpGeTlf6UDxhkU_mFhmhsCdh-blcy -O source.zip
+          gdown 1MFWNRjUrfYvC0JVzNx7LB2-weOv6w0ci -O source.zip
           echo 'ea87895d1a37a513ec78c6316c15a1e66a52d37019902fa611a5918c1287f2b1  source.zip' | sha256sum -c -
           unzip -q source.zip
           mv ArlightBingo-1.48.19-FORTRESS-ZONED-FINALIZATION-SOURCE source
