@@ -217,6 +217,13 @@ public class BingoPlugin extends JavaPlugin {
         getConfig().addDefault("template-worlds.overworld.safe-village.enabled", true);
         getConfig().addDefault("template-worlds.overworld.safe-village.radius", 112);
         getConfig().addDefault("template-worlds.overworld.safe-village.purge-interval-ticks", 40L);
+        getConfig().addDefault("template-worlds.overworld.autorepair.enabled", true);
+        getConfig().addDefault("template-worlds.overworld.autorepair.max-passes", 3);
+        getConfig().addDefault("template-worlds.overworld.autorepair.blocks-per-tick", 900);
+        getConfig().addDefault("template-worlds.overworld.autorepair.max-millis-per-tick", 5L);
+        getConfig().addDefault("template-worlds.overworld.autorepair.preview-radius", 96);
+        getConfig().addDefault("template-worlds.overworld.autorepair.rollback.enabled", true);
+
 
         getConfig().addDefault("template-worlds.revisions.keep-latest", 3);
         getConfig().addDefault("template-worlds.revisions.require-explicit-promotion", true);

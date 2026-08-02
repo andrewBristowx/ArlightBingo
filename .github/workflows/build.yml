@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.48.15
+name: Compilar ArlightBingo 1.48.16
 
 on:
   workflow_dispatch:
@@ -30,21 +30,21 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verificar fuente 1.48.15
+      - name: Verificar fuente 1.48.16
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '<version>1.48.15</version>' pom.xml
-          grep -q '^version: 1.48.15$' src/main/resources/plugin.yml
-          grep -q '^1.48.15$' BUILD_VERSION.txt
-          grep -q '^ArlightBingo 1.48.15 CRITICAL-ROUTES-SOFT-SECONDARY-AUDIT$' SOURCE_VERSION.txt
-          grep -q '1.48.15-critical-routes-soft-secondary-audit-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
-          grep -q 'passed_1_48_15_critical_routes_soft_secondary_audit' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
-          grep -q 'repairRegisteredTowerLandings' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
-          grep -q 'repairRegisteredChimneys' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
-          grep -q 'int x = cx + side \* 5' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
-          grep -q 'if (target <= natural) continue;' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
-          python3 scripts/validate_1_48_15.py
+          grep -q '<version>1.48.16</version>' pom.xml
+          grep -q '^version: 1.48.16$' src/main/resources/plugin.yml
+          grep -q '^1.48.16$' BUILD_VERSION.txt
+          grep -q '^1.48.16$' SOURCE_VERSION.txt
+          grep -q 'passed_1_48_16_transactional_autorepair' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q 'class OverworldAutoRepair148' src/main/java/com/arlight/bingo/listeners/OverworldAutoRepair148.java
+          grep -q 'repairScan' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
+          grep -q 'repairPreview' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
+          grep -q 'repairRollback' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
+          grep -q 'template-worlds.overworld.autorepair.enabled' src/main/java/com/arlight/bingo/BingoPlugin.java
+          python3 scripts/validate_1_48_16.py
 
       - name: Descargar ArlightCore 1.20.0 canónico
         uses: actions/checkout@v4
@@ -66,35 +66,36 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp target/ArlightBingo-1.48.15.jar dist/
-          unzip -p dist/ArlightBingo-1.48.15.jar plugin.yml | grep -q '^version: 1.48.15$'
-          unzip -l dist/ArlightBingo-1.48.15.jar | grep -q 'OverworldCampaignBuilder148.class'
-          unzip -l dist/ArlightBingo-1.48.15.jar | grep -q 'OverworldCampaignTerrain148.class'
-          unzip -l dist/ArlightBingo-1.48.15.jar | grep -q 'OverworldCampaignArchitecture148.class'
-          unzip -l dist/ArlightBingo-1.48.15.jar | grep -q 'OverworldCampaignAudit148.class'
+          cp target/ArlightBingo-1.48.16.jar dist/
+          unzip -p dist/ArlightBingo-1.48.16.jar plugin.yml | grep -q '^version: 1.48.16$'
+          unzip -l dist/ArlightBingo-1.48.16.jar | grep -q 'OverworldAutoRepair148.class'
+          unzip -l dist/ArlightBingo-1.48.16.jar | grep -q 'OverworldCampaignBuilder148.class'
+          unzip -l dist/ArlightBingo-1.48.16.jar | grep -q 'OverworldCampaignAudit148.class'
+          unzip -l dist/ArlightBingo-1.48.16.jar | grep -q 'OverworldTemplateManager.class'
+          unzip -l dist/ArlightBingo-1.48.16.jar | grep -q 'BingoCommand.class'
 
       - name: Empaquetar entrega
         shell: bash
         run: |
           set -euo pipefail
-          DELIVERY='ArlightBingo-1.48.15-CRITICAL-ROUTES-SOFT-SECONDARY-AUDIT'
+          DELIVERY='ArlightBingo-1.48.16-TRANSACTIONAL-AUTOREPAIR'
           mkdir -p package/${DELIVERY}-SOURCE
           rsync -a --exclude '.git/' --exclude 'arlight-core/' --exclude 'target/' --exclude 'dist/' --exclude 'package/' ./ package/${DELIVERY}-SOURCE/
           cd package
           zip -qr ${DELIVERY}-SOURCE.zip ${DELIVERY}-SOURCE
-          cp ../dist/ArlightBingo-1.48.15.jar .
-          sha256sum ArlightBingo-1.48.15.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.15-SHA256.txt
+          cp ../dist/ArlightBingo-1.48.16.jar .
+          sha256sum ArlightBingo-1.48.16.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.16-SHA256.txt
           unzip -t ${DELIVERY}-SOURCE.zip
-          sha256sum -c ArlightBingo-1.48.15-SHA256.txt
+          sha256sum -c ArlightBingo-1.48.16-SHA256.txt
           rm -rf ${DELIVERY}-SOURCE
 
       - name: Subir entrega completa
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.48.15-DELIVERY
+          name: ArlightBingo-1.48.16-DELIVERY
           path: |
-            package/ArlightBingo-1.48.15.jar
-            package/ArlightBingo-1.48.15-CRITICAL-ROUTES-SOFT-SECONDARY-AUDIT-SOURCE.zip
-            package/ArlightBingo-1.48.15-SHA256.txt
+            package/ArlightBingo-1.48.16.jar
+            package/ArlightBingo-1.48.16-TRANSACTIONAL-AUTOREPAIR-SOURCE.zip
+            package/ArlightBingo-1.48.16-SHA256.txt
           if-no-files-found: error
           retention-days: 90
