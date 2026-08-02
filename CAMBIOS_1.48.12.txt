@@ -1,0 +1,14 @@
+ARLIGHTBINGO 1.48.12 - DESCANSILLOS DE TORRES Y CHIMENEAS
+
+Correcciones sobre 1.48.11
+- Los accesos de torre reciben una pasada final independiente después de murallas, muebles y relieve.
+- Los dos primeros tramos del descansillo son de cinco bloques y la conexión exterior se estrecha a tres.
+- Los bancos del santuario se desplazan fuera de las entradas de portal-north-gate-west/east.
+- Las chimeneas se reconstruyen después de restaurar tejados, evitando que el techo sustituya su campfire final.
+- La auditoría informa coordenadas relativas y materiales reales cuando un descansillo falla.
+- La auditoría de chimeneas informa el bloque encontrado en lugar del remate esperado.
+
+Alcance
+- Conserva la seguridad de caminos, envolventes de viviendas y terreno del boss de 1.48.10/1.48.11.
+- Requiere regenerar únicamente la plantilla Overworld.
+- Nether y End no cambian.
