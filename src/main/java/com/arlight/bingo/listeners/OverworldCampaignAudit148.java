@@ -13,7 +13,7 @@ import java.util.Map;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.9 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.10 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -154,6 +154,36 @@ final class OverworldCampaignAudit148 {
             return false;
         }
 
+        boolean blocksStructureBody(int x, int y, int z) {
+            for (HouseSpec house : houses) {
+                if (y < house.y - 1 || y > house.y + house.height + 7) continue;
+                if (Math.abs(x - house.cx) <= house.hx + 1
+                        && Math.abs(z - house.cz) <= house.hz + 1) return true;
+            }
+            for (TowerSpec tower : towers) {
+                if (y < tower.y - 1 || y > tower.y + tower.height + 4) continue;
+                if (Math.abs(x - tower.cx) <= tower.radius + 1
+                        && Math.abs(z - tower.cz) <= tower.radius + 1) return true;
+            }
+            return false;
+        }
+
+        boolean blocksOtherStructure(String ownerId, int x, int y, int z) {
+            for (HouseSpec house : houses) {
+                if (house.id.equals(ownerId)) continue;
+                if (y < house.y - 1 || y > house.y + house.height + 7) continue;
+                if (Math.abs(x - house.cx) <= house.hx + 1
+                        && Math.abs(z - house.cz) <= house.hz + 1) return true;
+            }
+            for (TowerSpec tower : towers) {
+                if (tower.id.equals(ownerId)) continue;
+                if (y < tower.y - 1 || y > tower.y + tower.height + 4) continue;
+                if (Math.abs(x - tower.cx) <= tower.radius + 1
+                        && Math.abs(z - tower.cz) <= tower.radius + 1) return true;
+            }
+            return false;
+        }
+
         void registerRoadCell(String id, int x, int walkY, int z, Material floor) {
             roadCells.put(new RoadColumn(x, z), new RoadCell(id, x, walkY, z, floor));
         }
@@ -260,7 +290,7 @@ final class OverworldCampaignAudit148 {
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.9 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.10 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -276,15 +306,45 @@ final class OverworldCampaignAudit148 {
      * gates and decoration are intentionally built afterwards, so the registered road cells
      * are replayed once at the end to keep every declared corridor open at its audited height.
      */
-    static List<BlockEdit> repairRoadCorridors(Registry registry) {
+    static List<BlockEdit> repairRoadCorridors(World world, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         for (RoadCell cell : registry.roadCells.values()) {
+            // Local streets are already written before their buildings, and house paths are
+            // written by the house itself. Replaying either category after construction was
+            // the exact cause of the open walls and roofs reported in 1.48.9.
+            if (cell.id.startsWith("local-street-")
+                    || cell.id.startsWith("house-path-")) continue;
+            if (registry.blocksStructureBody(cell.x, cell.walkY, cell.z)) continue;
+            if (!roadColumnMayBeCleared(world, cell.x, cell.walkY, cell.z)) continue;
             out.add(new BlockEdit(cell.x, cell.walkY - 1, cell.z, cell.floor));
-            for (int y = cell.walkY; y <= cell.walkY + 3; y++) {
+            for (int y = cell.walkY; y <= cell.walkY + 2; y++) {
                 out.add(new BlockEdit(cell.x, y, cell.z, Material.AIR));
             }
         }
         return out;
+    }
+
+    private static boolean roadColumnMayBeCleared(World world, int x, int walkY, int z) {
+        for (int y = walkY; y <= walkY + 2; y++) {
+            Material material = world.getBlockAt(x, y, z).getType();
+            if (material.isAir() || !material.isSolid()) continue;
+            if (isNaturalRoadObstacle(material)) continue;
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isNaturalRoadObstacle(Material material) {
+        return material == Material.GRASS_BLOCK || material == Material.DIRT
+                || material == Material.COARSE_DIRT || material == Material.ROOTED_DIRT
+                || material == Material.PODZOL || material == Material.MYCELIUM
+                || material == Material.MOSS_BLOCK || material == Material.MUD
+                || material == Material.STONE || material == Material.DEEPSLATE
+                || material == Material.GRANITE || material == Material.DIORITE
+                || material == Material.ANDESITE || material == Material.TUFF
+                || material == Material.SAND || material == Material.RED_SAND
+                || material == Material.GRAVEL || material == Material.CLAY
+                || material == Material.TERRACOTTA || material == Material.SNOW_BLOCK;
     }
 
     /**
@@ -293,15 +353,15 @@ final class OverworldCampaignAudit148 {
      * remaining cells are the supported outdoor landing. Keeping this separate from the
      * public-road replay prevents a late road brush from deleting a valid door.
      */
-    static List<BlockEdit> repairRegisteredEntrances(Registry registry) {
+    static List<BlockEdit> repairRegisteredEntrances(World world, Registry registry) {
         List<BlockEdit> out = new ArrayList<>();
         for (HouseSpec house : registry.houses) {
-            replayEntrance(out, house.cx, house.y, house.cz, frontRadius(house),
-                    house.front, 1, 2, Material.COBBLESTONE);
+            replayEntrance(out, world, registry, house.id, house.cx, house.y, house.cz,
+                    frontRadius(house), house.front, 1, 2, Material.COBBLESTONE);
         }
         for (TowerSpec tower : registry.towers) {
-            replayEntrance(out, tower.cx, tower.y, tower.cz, tower.radius,
-                    tower.front, 2, 3, Material.STONE_BRICKS);
+            replayEntrance(out, world, registry, tower.id, tower.cx, tower.y, tower.cz,
+                    tower.radius, tower.front, 2, 3, Material.STONE_BRICKS);
         }
         return out;
     }
@@ -336,13 +396,25 @@ final class OverworldCampaignAudit148 {
         return out;
     }
 
-    private static void replayEntrance(List<BlockEdit> out, int cx, int y, int cz,
+    private static void replayEntrance(List<BlockEdit> out, World world, Registry registry,
+                                       String ownerId, int cx, int y, int cz,
                                        int radius, Facing front, int landingHalfWidth,
                                        int clearance, Material floor) {
         int sideX = -front.dz;
         int sideZ = front.dx;
         for (int step = 0; step <= 5; step++) {
             int sideRadius = step == 0 ? 0 : landingHalfWidth;
+            boolean blocked = false;
+            for (int side = -sideRadius; side <= sideRadius; side++) {
+                int probeX = cx + front.dx * (radius + step) + sideX * side;
+                int probeZ = cz + front.dz * (radius + step) + sideZ * side;
+                if (step > 0 && (registry.blocksOtherStructure(ownerId, probeX, y, probeZ)
+                        || !roadColumnMayBeCleared(world, probeX, y, probeZ))) {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (blocked) break;
             for (int side = -sideRadius; side <= sideRadius; side++) {
                 int x = cx + front.dx * (radius + step) + sideX * side;
                 int z = cz + front.dz * (radius + step) + sideZ * side;
@@ -512,7 +584,7 @@ final class OverworldCampaignAudit148 {
 
         String pathId = "house-path-" + house.id;
         boolean connected = false;
-        for (int step = 0; step <= 18; step++) {
+        for (int step = 0; step <= 8; step++) {
             int x = house.cx + house.front.dx * (frontRadius(house) + step);
             int z = house.cz + house.front.dz * (frontRadius(house) + step);
             if (!world.getBlockAt(x, house.y - 1, z).getType().isSolid()
@@ -521,7 +593,7 @@ final class OverworldCampaignAudit148 {
                 failures.add("entrada bloqueada o camino incompleto en " + house.id);
                 return;
             }
-            if (step >= 5 && registry.hasRoadNearExcept(pathId, x, z, 2)) {
+            if (step >= 4 && registry.hasRoadNearExcept(pathId, x, z, 2)) {
                 connected = true;
                 break;
             }

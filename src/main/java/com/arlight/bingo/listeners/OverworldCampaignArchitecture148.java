@@ -190,33 +190,25 @@ final class OverworldCampaignArchitecture148 {
                                   int hx, int hz, Facing front) {
         int radius = front == Facing.NORTH || front == Facing.SOUTH ? hz : hx;
         String pathId = "house-path-" + houseId;
-        for (int step = 0; step <= 18; step++) {
+        // House connectors are intentionally short and only three blocks wide. They are
+        // written after the public street, but are never replayed after all buildings exist.
+        // This prevents a later repair phase from cutting through a neighbouring house.
+        for (int step = 0; step <= 8; step++) {
             int px = cx + front.dx * (radius + step);
             int pz = cz + front.dz * (radius + step);
-            boolean reachesStreet = step >= 5
+            boolean reachesStreet = step >= 4
                     && registry.hasRoadNearExcept(pathId, px, pz, 2);
-            int sideRadius = step == 0 ? 0 : step < 3 ? 1 : 2;
+            int sideRadius = step == 0 ? 0 : 1;
             for (int side = -sideRadius; side <= sideRadius; side++) {
                 int x = px + (front.dx == 0 ? side : 0);
                 int z = pz + (front.dz == 0 ? side : 0);
-                Material floor = Math.floorMod(step * 3 + side * 5, 13) < 2
-                        ? Material.MOSSY_COBBLESTONE
-                        : Math.abs(side) == sideRadius && step > 2
-                        ? Material.ANDESITE : Material.COBBLESTONE;
+                Material floor = Math.floorMod(step * 3 + side * 5, 11) == 0
+                        ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE;
                 OverworldCampaignTerrain148.supportedPathCell(out, world, x, y, z, floor);
-                for (int yy = 0; yy <= 3; yy++) out.add(e(x, y + yy, z, Material.AIR));
+                for (int yy = 0; yy <= 2; yy++) out.add(e(x, y + yy, z, Material.AIR));
                 registry.registerRoadCell(pathId, x, y, z, floor);
             }
-            if (reachesStreet) {
-                for (int landing = -2; landing <= 2; landing++) {
-                    int x = px + (front.dx == 0 ? landing : 0);
-                    int z = pz + (front.dz == 0 ? landing : 0);
-                    OverworldCampaignTerrain148.supportedPathCell(out, world, x, y, z,
-                            Material.POLISHED_ANDESITE);
-                    registry.registerRoadCell(pathId, x, y, z, Material.POLISHED_ANDESITE);
-                }
-                break;
-            }
+            if (reachesStreet) break;
         }
     }
 
@@ -1256,18 +1248,9 @@ final class OverworldCampaignArchitecture148 {
                             : Math.floorMod(step * 3 + ox * 5 + oz * 7, 17) < 3
                             ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE;
                     out.add(e(x, cy - 1, z, surface));
-                    out.add(e(x, cy - 2, z, Material.STONE_BRICKS));
-                    out.add(e(x, cy - 3, z, Material.STONE));
-                    for (int yy = 0; yy <= 3; yy++) out.add(e(x, cy + yy, z, Material.AIR));
+                    out.add(e(x, cy - 2, z, Material.COBBLESTONE));
+                    for (int yy = 0; yy <= 2; yy++) out.add(e(x, cy + yy, z, Material.AIR));
                     registry.registerRoadCell(id, x, cy, z, surface);
-                }
-            }
-            if (step % 12 == 6) {
-                for (int side : new int[]{-halfWidth - 2, halfWidth + 2}) {
-                    int x = (int) Math.round(cx + nx * side);
-                    int z = (int) Math.round(cz + nz * side);
-                    out.add(e(x, cy - 1, z, Material.MOSS_BLOCK));
-                    out.add(e(x, cy, z, side < 0 ? Material.AZALEA : Material.FLOWERING_AZALEA));
                 }
             }
         }
