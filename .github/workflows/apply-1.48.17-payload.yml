@@ -1,23 +1,22 @@
 name: Aplicar fuente ArlightBingo 1.48.17
 
 on:
-  push:
-    branches:
-      - candidate/bingo-1.48.17-targeted-route-repair
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 jobs:
   apply-source:
-    if: github.actor != 'github-actions[bot]'
+    if: github.head_ref == 'candidate/bingo-1.48.17-targeted-route-repair'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - name: Descargar rama candidata
         uses: actions/checkout@v4
         with:
-          ref: candidate/bingo-1.48.17-targeted-route-repair
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: Descargar y verificar cambios 1.48.17
@@ -39,4 +38,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git commit -m 'Aplicar reparación enfocada de rutas 1.48.17'
-          git push origin HEAD:candidate/bingo-1.48.17-targeted-route-repair
+          git push origin HEAD:${{ github.head_ref }}
