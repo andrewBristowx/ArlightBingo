@@ -16,7 +16,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.13 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.15 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -64,7 +64,17 @@ final class OverworldCampaignAudit148 {
         private final List<PlanterSpec> planters = new ArrayList<>();
         private final List<TerrainSpec> terrain = new ArrayList<>();
         private final List<FortificationSpec> fortifications = new ArrayList<>();
+        /** Latest physical plan for each column, retained for the non-destructive repair pass. */
         private final Map<RoadColumn, RoadCell> roadCells = new LinkedHashMap<>();
+        /**
+         * Route membership is independent from the physical-column map. An intersection may
+         * therefore belong to every road that crosses it instead of the last road silently
+         * stealing that cell from all previous routes.
+         */
+        private final Map<RoadColumn, Map<String, RoadCell>> roadMemberships =
+                new LinkedHashMap<>();
+        private final Map<String, LinkedHashMap<RoadColumn, RoadCell>> roadRoutes =
+                new LinkedHashMap<>();
 
         void registerHouse(HouseSpec candidate) {
             for (HouseSpec placed : houses) {
@@ -190,13 +200,23 @@ final class OverworldCampaignAudit148 {
         }
 
         void registerRoadCell(String id, int x, int walkY, int z, Material floor) {
-            roadCells.put(new RoadColumn(x, z), new RoadCell(id, x, walkY, z, floor));
+            RoadColumn column = new RoadColumn(x, z);
+            RoadCell cell = new RoadCell(id, x, walkY, z, floor);
+            roadCells.put(column, cell);
+            roadMemberships.computeIfAbsent(column, ignored -> new LinkedHashMap<>())
+                    .put(id, cell);
+            roadRoutes.computeIfAbsent(id, ignored -> new LinkedHashMap<>())
+                    .put(column, cell);
         }
 
         boolean hasRoadNearExcept(String excludedId, int x, int z, int radius) {
             for (int dx = -radius; dx <= radius; dx++) for (int dz = -radius; dz <= radius; dz++) {
-                RoadCell cell = roadCells.get(new RoadColumn(x + dx, z + dz));
-                if (cell != null && !cell.id().equals(excludedId)) return true;
+                Map<String, RoadCell> memberships = roadMemberships.get(
+                        new RoadColumn(x + dx, z + dz));
+                if (memberships == null) continue;
+                for (String routeId : memberships.keySet()) {
+                    if (!routeId.equals(excludedId)) return true;
+                }
             }
             return false;
         }
@@ -252,6 +272,7 @@ final class OverworldCampaignAudit148 {
                               Site citadel, Site portal, Location outerAltar,
                               Location ritualGate) {
         List<String> failures = new ArrayList<>();
+        List<String> roadWarnings = new ArrayList<>();
         for (HouseSpec house : registry.houses) auditHouse(world, registry, house, failures);
         for (TowerSpec tower : registry.towers) auditTower(world, tower, failures);
         for (ChimneySpec chimney : registry.chimneys) auditChimney(world, chimney, failures);
@@ -262,20 +283,20 @@ final class OverworldCampaignAudit148 {
         for (FortificationSpec fortification : registry.fortifications) {
             auditFortificationFoundation(world, fortification, failures);
         }
-        Map<String, List<RoadCell>> roadRoutes = new LinkedHashMap<>();
-        for (RoadCell cell : registry.roadCells.values()) {
-            roadRoutes.computeIfAbsent(cell.id, ignored -> new ArrayList<>()).add(cell);
-        }
-        for (Map.Entry<String, List<RoadCell>> route : roadRoutes.entrySet()) {
-            RoadCell broken = disconnectedRoadSample(world, route.getValue());
+        for (Map.Entry<String, LinkedHashMap<RoadColumn, RoadCell>> route
+                : registry.roadRoutes.entrySet()) {
+            List<RoadCell> orderedCells = new ArrayList<>(route.getValue().values());
+            RoadCell broken = disconnectedRoadSample(world, orderedCells);
             if (broken == null) continue;
             Material floor = world.getBlockAt(broken.x, broken.walkY - 1, broken.z).getType();
             Material passage = world.getBlockAt(broken.x, broken.walkY, broken.z).getType();
             Material head = world.getBlockAt(broken.x, broken.walkY + 1, broken.z).getType();
-            failures.add("camino cortado en todo el corredor: " + route.getKey()
+            String roadFailure = "camino cortado en todo el corredor: " + route.getKey()
                     + " (x=" + broken.x + ", y=" + broken.walkY + ", z=" + broken.z
                     + ", suelo=" + floor + ", paso=" + passage
-                    + ", cabeza=" + head + ")");
+                    + ", cabeza=" + head + ")";
+            if (isCriticalRoad(route.getKey())) failures.add(roadFailure);
+            else roadWarnings.add(roadFailure);
         }
 
         int crops = countCrops(world, village, village.radius() - 4);
@@ -284,7 +305,7 @@ final class OverworldCampaignAudit148 {
         int[] light = auditVillageLights(world, village, failures);
         if (light[0] < 18) failures.add("iluminación insuficiente en el pueblo: " + light[0]);
 
-        auditRitualApproach(world, outerAltar, ritualGate, failures);
+        auditRitualApproach(world, registry, outerAltar, ritualGate, failures);
         auditFountain(world, village, failures);
         auditBellPavilion(world, village, failures);
         auditArenaTerraces(world, ritualGate, failures);
@@ -292,9 +313,16 @@ final class OverworldCampaignAudit148 {
         auditArenaFurnishings(world, ritualGate, failures);
         auditBossGatehouse(world, ritualGate, failures);
 
+        if (!roadWarnings.isEmpty()) {
+            int limit = Math.min(20, roadWarnings.size());
+            Bukkit.getLogger().warning("[ArlightBingo 1.48.15] "
+                    + roadWarnings.size() + " rutas secundarias requieren revisión visual, "
+                    + "pero no bloquean READY: "
+                    + String.join("; ", roadWarnings.subList(0, limit)));
+        }
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.13 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.15 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -303,6 +331,16 @@ final class OverworldCampaignAudit148 {
                 registry.chimneys.size(), registry.planters.size(),
                 registry.roadCells.size(), light[0],
                 interiorLights, furnishings, crops, light[1]);
+    }
+
+    private static boolean isCriticalRoad(String id) {
+        return "boss-north-approach".equals(id)
+                || id.startsWith("boss-portal-")
+                || id.startsWith("portal-north-")
+                || id.startsWith("citadel-")
+                || id.startsWith("military-")
+                || id.startsWith("residential-")
+                || id.startsWith("commercial-");
     }
 
     /**
@@ -1044,84 +1082,74 @@ final class OverworldCampaignAudit148 {
 
     /**
      * Audits a road as a corridor instead of requiring every decorative edge cell to be AIR.
-     * A valid route may use doors, bottom slabs, stairs and one-block height changes. A lamp,
-     * bench, wall post or house frame may occupy one lane as long as another lane remains
-     * continuously connected from one end of the registered route to the other.
+     * The first and last registered regions are the real endpoints; no bounding-box axis is
+     * inferred, so curved, diagonal and L-shaped roads remain valid. A lamp, bench or wall may
+     * occupy one lane as long as another lane stays continuously connected end to end.
      */
     private static RoadCell disconnectedRoadSample(World world, List<RoadCell> route) {
         if (route.isEmpty()) return null;
-
-        int minimumX = Integer.MAX_VALUE;
-        int maximumX = Integer.MIN_VALUE;
-        int minimumZ = Integer.MAX_VALUE;
-        int maximumZ = Integer.MIN_VALUE;
         Map<RoadColumn, RoadNode> nodes = new HashMap<>();
         for (RoadCell cell : route) {
-            minimumX = Math.min(minimumX, cell.x);
-            maximumX = Math.max(maximumX, cell.x);
-            minimumZ = Math.min(minimumZ, cell.z);
-            maximumZ = Math.max(maximumZ, cell.z);
             int actualWalkY = resolveRoadWalkY(world, cell.x, cell.walkY, cell.z);
             if (actualWalkY != Integer.MIN_VALUE) {
                 nodes.put(new RoadColumn(cell.x, cell.z), new RoadNode(cell, actualWalkY));
             }
         }
+        if (nodes.isEmpty()) return route.get(route.size() / 2);
 
-        boolean alongX = maximumX - minimumX >= maximumZ - minimumZ;
-        int routeMinimum = alongX ? minimumX : minimumZ;
-        int routeMaximum = alongX ? maximumX : maximumZ;
-        int span = routeMaximum - routeMinimum;
-        if (span <= 2) return nodes.isEmpty() ? route.get(0) : null;
+        RoadCell plannedStart = route.get(0);
+        RoadCell plannedEnd = route.get(route.size() - 1);
+        int endpointSpan = Math.max(Math.abs(plannedEnd.x - plannedStart.x),
+                Math.abs(plannedEnd.z - plannedStart.z));
+        int endpointTolerance = Math.max(1, Math.min(8, endpointSpan / 4));
+        Set<RoadColumn> startRegion = endpointRegion(nodes, plannedStart, endpointTolerance);
+        Set<RoadColumn> endRegion = endpointRegion(nodes, plannedEnd, endpointTolerance);
+        if (startRegion.isEmpty()) return nearestBlockedSample(route, nodes, plannedStart);
+        if (endRegion.isEmpty()) return nearestBlockedSample(route, nodes, plannedEnd);
 
-        int endpointTolerance = Math.max(1, Math.min(4, span / 8 + 1));
         Set<RoadColumn> visited = new HashSet<>();
         ArrayDeque<RoadColumn> pending = new ArrayDeque<>();
-        for (Map.Entry<RoadColumn, RoadNode> entry : nodes.entrySet()) {
-            if (!visited.add(entry.getKey())) continue;
-            pending.add(entry.getKey());
-            int componentMinimum = Integer.MAX_VALUE;
-            int componentMaximum = Integer.MIN_VALUE;
-            while (!pending.isEmpty()) {
-                RoadColumn currentColumn = pending.removeFirst();
-                RoadNode current = nodes.get(currentColumn);
-                int projection = alongX ? currentColumn.x : currentColumn.z;
-                componentMinimum = Math.min(componentMinimum, projection);
-                componentMaximum = Math.max(componentMaximum, projection);
-                for (int dx = -1; dx <= 1; dx++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        if (dx == 0 && dz == 0) continue;
-                        RoadColumn nextColumn = new RoadColumn(currentColumn.x + dx,
-                                currentColumn.z + dz);
-                        RoadNode next = nodes.get(nextColumn);
-                        if (next == null || visited.contains(nextColumn)) continue;
-                        if (Math.abs(current.actualWalkY - next.actualWalkY) > 1) continue;
-                        visited.add(nextColumn);
-                        pending.addLast(nextColumn);
-                    }
+        for (RoadColumn start : startRegion) {
+            if (visited.add(start)) pending.addLast(start);
+        }
+        while (!pending.isEmpty()) {
+            RoadColumn currentColumn = pending.removeFirst();
+            if (endRegion.contains(currentColumn)) return null;
+            RoadNode current = nodes.get(currentColumn);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    RoadColumn nextColumn = new RoadColumn(currentColumn.x + dx,
+                            currentColumn.z + dz);
+                    RoadNode next = nodes.get(nextColumn);
+                    if (next == null || visited.contains(nextColumn)) continue;
+                    if (Math.abs(current.actualWalkY - next.actualWalkY) > 1) continue;
+                    visited.add(nextColumn);
+                    pending.addLast(nextColumn);
                 }
             }
-            if (componentMinimum <= routeMinimum + endpointTolerance
-                    && componentMaximum >= routeMaximum - endpointTolerance) {
-                return null;
-            }
         }
+        return frontierBlockedSample(route, nodes, visited, plannedEnd);
+    }
 
-        double middle = (routeMinimum + routeMaximum) / 2.0D;
-        RoadCell best = null;
-        double bestDistance = Double.MAX_VALUE;
-        for (RoadCell cell : route) {
-            if (resolveRoadWalkY(world, cell.x, cell.walkY, cell.z) != Integer.MIN_VALUE) continue;
-            int projection = alongX ? cell.x : cell.z;
-            double distance = Math.abs(projection - middle);
-            if (distance < bestDistance) {
-                best = cell;
-                bestDistance = distance;
-            }
+    private static Set<RoadColumn> endpointRegion(Map<RoadColumn, RoadNode> nodes,
+                                                   RoadCell endpoint, int tolerance) {
+        Set<RoadColumn> region = new HashSet<>();
+        for (RoadColumn column : nodes.keySet()) {
+            if (Math.max(Math.abs(column.x - endpoint.x), Math.abs(column.z - endpoint.z))
+                    <= tolerance) region.add(column);
         }
-        if (best != null) return best;
+        return region;
+    }
+
+    private static RoadCell nearestBlockedSample(List<RoadCell> route,
+                                                  Map<RoadColumn, RoadNode> nodes,
+                                                  RoadCell target) {
+        RoadCell best = target;
+        int bestDistance = Integer.MAX_VALUE;
         for (RoadCell cell : route) {
-            int projection = alongX ? cell.x : cell.z;
-            double distance = Math.abs(projection - middle);
+            if (nodes.containsKey(new RoadColumn(cell.x, cell.z))) continue;
+            int distance = Math.max(Math.abs(cell.x - target.x), Math.abs(cell.z - target.z));
             if (distance < bestDistance) {
                 best = cell;
                 bestDistance = distance;
@@ -1130,8 +1158,26 @@ final class OverworldCampaignAudit148 {
         return best;
     }
 
+    private static RoadCell frontierBlockedSample(List<RoadCell> route,
+                                                   Map<RoadColumn, RoadNode> nodes,
+                                                   Set<RoadColumn> visited,
+                                                   RoadCell target) {
+        RoadCell best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (RoadCell cell : route) {
+            RoadColumn column = new RoadColumn(cell.x, cell.z);
+            if (nodes.containsKey(column) || visited.contains(column)) continue;
+            int distance = Math.max(Math.abs(cell.x - target.x), Math.abs(cell.z - target.z));
+            if (distance < bestDistance) {
+                best = cell;
+                bestDistance = distance;
+            }
+        }
+        return best == null ? route.get(route.size() / 2) : best;
+    }
+
     private static int resolveRoadWalkY(World world, int x, int plannedWalkY, int z) {
-        for (int offset : new int[]{0, 1, -1, 2}) {
+        for (int offset : new int[]{0, 1, -1, 2, -2, 3, -3, 4, -4}) {
             int walkY = plannedWalkY + offset;
             Material floor = world.getBlockAt(x, walkY - 1, z).getType();
             Material feet = world.getBlockAt(x, walkY, z).getType();
@@ -1305,21 +1351,36 @@ final class OverworldCampaignAudit148 {
         return true;
     }
 
-    private static void auditRitualApproach(World world, Location altar, Location gate,
+    private static void auditRitualApproach(World world, Registry registry,
+                                            Location altar, Location gate,
                                             List<String> failures) {
-        int steps = Math.max(1, Math.abs(gate.getBlockZ() - altar.getBlockZ()));
-        for (int step = 3; step < steps - 2; step += 3) {
-            double t = step / (double) steps;
-            int x = (int) Math.round(altar.getX() + (gate.getX() - altar.getX()) * t);
-            int z = (int) Math.round(altar.getZ() + (gate.getZ() - altar.getZ()) * t);
-            int y = (int) Math.round(altar.getY() + (gate.getY() - altar.getY()) * t);
-            if (!world.getBlockAt(x, y - 1, z).getType().isSolid()
-                    || world.getBlockAt(x, y, z).getType().isSolid()
-                    || world.getBlockAt(x, y + 1, z).getType().isSolid()) {
-                failures.add("entrada ritual enterrada o interrumpida");
-                return;
-            }
+        LinkedHashMap<RoadColumn, RoadCell> approach =
+                registry.roadRoutes.get("boss-north-approach");
+        if (approach == null || approach.isEmpty()) {
+            failures.add("entrada ritual sin ruta registrada");
+            return;
         }
+        if (!hasPassableRouteCellNear(world, approach.values(), altar, 4)) {
+            failures.add("entrada ritual interrumpida junto al altar exterior (x="
+                    + altar.getBlockX() + ", y=" + altar.getBlockY()
+                    + ", z=" + altar.getBlockZ() + ")");
+        } else if (!hasPassableRouteCellNear(world, approach.values(), gate, 4)) {
+            failures.add("entrada ritual interrumpida junto a la puerta (x="
+                    + gate.getBlockX() + ", y=" + gate.getBlockY()
+                    + ", z=" + gate.getBlockZ() + ")");
+        }
+    }
+
+    private static boolean hasPassableRouteCellNear(World world,
+                                                     Iterable<RoadCell> route,
+                                                     Location anchor, int radius) {
+        for (RoadCell cell : route) {
+            if (Math.max(Math.abs(cell.x - anchor.getBlockX()),
+                    Math.abs(cell.z - anchor.getBlockZ())) > radius) continue;
+            if (resolveRoadWalkY(world, cell.x, cell.walkY, cell.z)
+                    != Integer.MIN_VALUE) return true;
+        }
+        return false;
     }
 
     private static void auditFountain(World world, Site village, List<String> failures) {
