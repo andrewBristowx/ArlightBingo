@@ -1,0 +1,24 @@
+PRUEBA DE ARLIGHTBINGO 1.48.8
+
+1. Apaga completamente el servidor. No uses /reload.
+2. Conserva 1.48.7 y 1.48.6 como retrocesos.
+3. Instala únicamente 1.48.8.
+4. Regenera solo Overworld:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.8-test1
+   /bingo template overworld status
+5. Cuando el estado sea READY:
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+Revisión dirigida
+- Entra en las diez casas del pueblo inicial y confirma que cada una tenga función visual distinta.
+- Revisa viviendas, posadas, almacenes, tiendas, barracones, armería y gran salón.
+- Sube por las escaleras: ningún mueble debe bloquear el acceso ni los desembarcos.
+- Revisa todas las torres; cada nivel debe tener utilería y luz.
+- Confirma mercancías visibles en los puestos del mercado.
+- Revisa el santuario: cuatro braseros, atriles, bancos y cofres.
+- Revisa la arena: braseros y suministros sin cerrar el pasillo ceremonial norte.
+- Confirma que READY/FAILED siga siendo terminal y no aparezca una segunda construcción.
+
+No regeneres Nether ni End.
