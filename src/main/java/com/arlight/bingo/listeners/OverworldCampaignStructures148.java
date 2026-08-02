@@ -241,7 +241,8 @@ final class OverworldCampaignStructures148 {
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 35,
                 Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
-        villageStreet(out, registry, site.x(), y, site.z() - 50, site.x(), y, site.z() + 61, 9);
+        // The former straight local street crossed the complete footprint of the great hall.
+        // 1.48.19 uses a fortified bypass registered later by the terrain phase instead.
         house(out, world, registry, "citadel-great-hall", site.x(), y, site.z(),
                 43, 27, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
         auditedTower(out, world, registry, "citadel-tower-southwest",

@@ -105,7 +105,7 @@ public final class OverworldAutoRepair148 {
         putLocation(properties, "invocationAltar", invocationAltar);
         putLocation(properties, "ritualGate", ritualGate);
         atomicProperties(folder.resolve(CONTEXT_FILE), properties,
-                "ArlightBingo 1.48.17 deterministic Overworld autorepair context");
+                "ArlightBingo 1.48.19 deterministic Overworld autorepair context");
 
         Path temporary = folder.resolve(REGISTRY_FILE + ".tmp");
         try (BufferedWriter writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8,
@@ -383,42 +383,60 @@ public final class OverworldAutoRepair148 {
             default -> "widened-corridor";
         };
 
-        if (houses) {
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredHouseShells(context.registry()));
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredEntrances(world, context.registry()));
-        }
-        if (chimneys || houses) {
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredChimneys(context.registry()));
-        }
-        if (towers || roads || fortification) {
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredVerticalAccess(context.registry()));
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredTowerLandings(world, context.registry()));
-        }
-        if (roads || fortification) {
-            if (!roadIssues.isEmpty()) {
-                edits.addAll(repairDiagnosedRoads(world, context.registry(), roadIssues, attempt));
-                edits.addAll(stabilizeDiagnosedRoadEdges(world, context.registry(), roadIssues, attempt));
-            } else {
-                edits.addAll(OverworldCampaignAudit148.repairRoadCorridors(world, context.registry()));
+        boolean greatHallFurniture = inspection.issues().stream().anyMatch(issue ->
+                issue.contains("citadel-great-hall") && issue.contains("mobiliario"));
+        boolean bossWallFoundation = inspection.issues().stream().anyMatch(issue ->
+                issue.contains("cimiento de muralla flotante en boss-wall"));
+
+        // Repair one structural zone per pass. A failure in another zone therefore cannot
+        // cause a successful great-hall or wall repair to be mixed with thousands of unrelated
+        // edits. Three passes cover the known hall -> wall -> road sequence deterministically.
+        if (greatHallFurniture) {
+            edits.addAll(OverworldCampaignArchitecture148.restoreCitadelGreatHallInterior(
+                    context.citadel()));
+            strategy = "zone-great-hall-furniture";
+        } else if (bossWallFoundation) {
+            edits.addAll(OverworldCampaignTerrain148.reinforceBossWallFoundation(
+                    world, context.boss()));
+            strategy = "zone-boss-wall-foundation";
+        } else {
+            if (houses) {
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredHouseShells(context.registry()));
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredEntrances(world, context.registry()));
             }
-            edits.addAll(repairRitualThreshold(world, context));
-        }
-        if (fortification) edits.addAll(repairBossGate(world, context));
-        if (terrain) {
-            int previousFailures = intProperty(memory, "failure.terrain", 0);
-            edits.addAll(repairTerrainTransitions(world, context.registry(),
-                    Math.max(2, 4 - Math.min(2, previousFailures + attempt))));
-        }
-        if (categories.contains("unknown") || edits.isEmpty()) {
-            // Safest complete recovery set. It never calls a broad structure generator.
-            edits.addAll(OverworldCampaignAudit148.repairRoadCorridors(world, context.registry()));
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredHouseShells(context.registry()));
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredEntrances(world, context.registry()));
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredVerticalAccess(context.registry()));
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredTowerLandings(world, context.registry()));
-            edits.addAll(OverworldCampaignAudit148.repairRegisteredChimneys(context.registry()));
-            edits.addAll(repairTerrainTransitions(world, context.registry(), 3));
-            strategy = strategy + "+fallback";
+            if (chimneys || houses) {
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredChimneys(context.registry()));
+            }
+            if (towers || roads || fortification) {
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredVerticalAccess(context.registry()));
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredTowerLandings(world, context.registry()));
+            }
+            if (roads || fortification) {
+                if (!roadIssues.isEmpty()) {
+                    edits.addAll(repairDiagnosedRoads(world, context.registry(), roadIssues, attempt));
+                    edits.addAll(stabilizeDiagnosedRoadEdges(world, context.registry(), roadIssues, attempt));
+                } else {
+                    edits.addAll(OverworldCampaignAudit148.repairRoadCorridors(world, context.registry()));
+                }
+                edits.addAll(repairRitualThreshold(world, context));
+            }
+            if (fortification) edits.addAll(repairBossGate(world, context));
+            if (terrain) {
+                int previousFailures = intProperty(memory, "failure.terrain", 0);
+                edits.addAll(repairTerrainTransitions(world, context.registry(),
+                        Math.max(2, 4 - Math.min(2, previousFailures + attempt))));
+            }
+            if (categories.contains("unknown") || edits.isEmpty()) {
+                // Safest complete recovery set. It never calls a broad structure generator.
+                edits.addAll(OverworldCampaignAudit148.repairRoadCorridors(world, context.registry()));
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredHouseShells(context.registry()));
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredEntrances(world, context.registry()));
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredVerticalAccess(context.registry()));
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredTowerLandings(world, context.registry()));
+                edits.addAll(OverworldCampaignAudit148.repairRegisteredChimneys(context.registry()));
+                edits.addAll(repairTerrainTransitions(world, context.registry(), 3));
+                strategy = strategy + "+fallback";
+            }
         }
 
         List<BlockEdit> normalized = normalize(edits, center, radius, world);
@@ -700,7 +718,7 @@ public final class OverworldAutoRepair148 {
     private static Context loadContext(World world, Path folder) throws IOException {
         Properties properties = loadProperties(folder.resolve(CONTEXT_FILE));
         if (properties.isEmpty() || !Files.isRegularFile(folder.resolve(REGISTRY_FILE))) {
-            throw new IOException("La plantilla no tiene contexto de autorreparación 1.48.17. "
+            throw new IOException("La plantilla no tiene contexto de autorreparación 1.48.19. "
                     + "Regenera una revisión con esta versión.");
         }
         OverworldCampaignAudit148.Registry registry = new OverworldCampaignAudit148.Registry();
@@ -981,7 +999,7 @@ public final class OverworldAutoRepair148 {
     private static void writeScan(Path folder, Inspection inspection,
                                   RepairPlan plan) throws IOException {
         StringBuilder text = new StringBuilder();
-        text.append("ARLIGHTBINGO 1.48.17 AUTOREPAIR SCAN\n")
+        text.append("ARLIGHTBINGO 1.48.19 AUTOREPAIR SCAN\n")
                 .append("time=").append(Instant.now()).append('\n')
                 .append("clean=").append(inspection.clean()).append('\n')
                 .append("categories=").append(String.join(",", inspection.categories())).append('\n')
