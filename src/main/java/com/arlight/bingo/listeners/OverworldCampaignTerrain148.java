@@ -13,7 +13,7 @@ import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Terrain shaping and supported roads for the clean 1.48.7 Overworld campaign. */
+/** Terrain shaping and supported roads for the clean 1.48.8 Overworld campaign. */
 final class OverworldCampaignTerrain148 {
     private static final int ORGANIC_EDGE_MARGIN = 14;
     static final int WALL_FOUNDATION_DEPTH = 12;

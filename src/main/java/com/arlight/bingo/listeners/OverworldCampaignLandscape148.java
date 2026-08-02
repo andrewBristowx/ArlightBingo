@@ -34,7 +34,7 @@ import java.util.UUID;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Coordinates the clean 1.48.7 template build and its two-stage boss ritual. */
+/** Coordinates the clean 1.48.8 template build and its two-stage boss ritual. */
 public final class OverworldCampaignLandscape148 {
     static final String TEMPLATE_MARKER = "arlight-overworld-template.properties";
     static final String PENDING_TEMPLATE_MARKER = "arlight-overworld-template-1.48.pending";
@@ -188,7 +188,7 @@ public final class OverworldCampaignLandscape148 {
             if (!"campaign_1_48_anchor_only".equals(
                     base.getProperty("baseConstruction", ""))) {
                 failBuild(folder, new IllegalStateException(
-                        "1.48.7 exige una base limpia sin estructuras heredadas; usa reset y generate"));
+                        "1.48.8 exige una base limpia sin estructuras heredadas; usa reset y generate"));
                 return;
             }
             Location village = parse(world, base.getProperty("village"));
@@ -197,12 +197,12 @@ public final class OverworldCampaignLandscape148 {
             Location portal = parse(world, base.getProperty("portal"));
             if (village == null || citadel == null || boss == null || portal == null) {
                 failBuild(folder, new IllegalStateException(
-                        "No se inició 1.48.7: faltan anclas en " + sourceMarker));
+                        "No se inició 1.48.8: faltan anclas en " + sourceMarker));
                 return;
             }
 
             Files.writeString(progress,
-                    "version=1.48.7\nstarted=" + System.currentTimeMillis() + "\n",
+                    "version=1.48.8\nstarted=" + System.currentTimeMillis() + "\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
             Files.deleteIfExists(folder.resolve(GATE_OPEN_MARKER));
@@ -228,16 +228,16 @@ public final class OverworldCampaignLandscape148 {
 
     private void failBuild(Path folder, Throwable error) {
         String reason = root(error).replace('\n', ' ').replace('\r', ' ');
-        plugin.getLogger().severe("Falló el diseño Overworld 1.48.7: " + reason);
+        plugin.getLogger().severe("Falló el diseño Overworld 1.48.8: " + reason);
         try {
             Files.deleteIfExists(folder.resolve(PROGRESS_MARKER));
             Files.writeString(folder.resolve(FAILED_MARKER),
-                    "version=1.48.7\nfailed=" + System.currentTimeMillis()
+                    "version=1.48.8\nfailed=" + System.currentTimeMillis()
                             + "\nreason=" + reason + "\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException markerError) {
-            plugin.getLogger().severe("No se pudo guardar el estado FAILED de Overworld 1.48.7: "
+            plugin.getLogger().severe("No se pudo guardar el estado FAILED de Overworld 1.48.8: "
                     + markerError.getMessage());
         }
     }
@@ -267,7 +267,7 @@ public final class OverworldCampaignLandscape148 {
             layouts.put(world.getUID(), layout);
             return layout;
         } catch (IOException | IllegalArgumentException exception) {
-            plugin.getLogger().warning("No se pudo leer el diseño 1.48.7 en "
+            plugin.getLogger().warning("No se pudo leer el diseño 1.48.8 en "
                     + world.getName() + ": " + exception.getMessage());
             return null;
         }
@@ -388,7 +388,7 @@ public final class OverworldCampaignLandscape148 {
     private void writeMarker(Path marker, Player player, String stage) {
         try {
             Files.writeString(marker,
-                    "version=1.48.7\nstage=" + stage + "\nplayer=" + player.getUniqueId()
+                    "version=1.48.8\nstage=" + stage + "\nplayer=" + player.getUniqueId()
                             + "\ntime=" + System.currentTimeMillis() + "\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
