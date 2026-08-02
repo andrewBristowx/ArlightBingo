@@ -1,0 +1,47 @@
+name: Publicar fuente ArlightBingo 1.48.19
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - ci/bingo-1.48.19-build-base
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'candidate/bingo-1.48.19-zoned-audit-recovery'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar rama candidata
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Descargar fuente verificada
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet gdown
+          gdown 1fam0gKETsBUKdkEhzgUSvqhByPUPkyuq -O /tmp/source.zip
+          echo '8df044e6ecaaeb74f5278056c8f823748415d18fe389251415430ce476ac6f40  /tmp/source.zip' | sha256sum -c -
+          mkdir /tmp/source
+          unzip -q /tmp/source.zip -d /tmp/source
+
+      - name: Publicar código en la rama
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=/tmp/source/ArlightBingo-1.48.19-ZONED-AUDIT-RECOVERY-SOURCE
+          rsync -a --exclude '.git/' --exclude '.github/' --exclude 'target/' --exclude 'build/' "$SOURCE/" ./
+          git config user.name 'Arlight Build Agent'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'La fuente 1.48.19 ya estaba publicada.'
+            exit 0
+          fi
+          git commit -m 'Publicar fuente ArlightBingo 1.48.19'
+          git push origin HEAD:${{ github.head_ref }}
