@@ -1,0 +1,42 @@
+name: Aplicar fuente ArlightBingo 1.48.17
+
+on:
+  push:
+    branches:
+      - candidate/bingo-1.48.17-targeted-route-repair
+
+permissions:
+  contents: write
+
+jobs:
+  apply-source:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Descargar rama candidata
+        uses: actions/checkout@v4
+        with:
+          ref: candidate/bingo-1.48.17-targeted-route-repair
+          fetch-depth: 0
+
+      - name: Descargar y verificar cambios 1.48.17
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet gdown
+          gdown 1vMmosygGur7utjN-dO1iNfX2dY2C7uiV -O /tmp/ArlightBingo-1.48.17-PAYLOAD.zip
+          echo '7b3e54b5ee86d35116cc7ac162f748e63a3fbed0a976afe7759c21485c8a55fb  /tmp/ArlightBingo-1.48.17-PAYLOAD.zip' | sha256sum -c -
+          unzip -q -o /tmp/ArlightBingo-1.48.17-PAYLOAD.zip -d .
+          python3 scripts/validate_1_48_17.py
+          rm -f .github/workflows/apply-1.48.17-payload.yml
+
+      - name: Publicar fuente 1.48.17
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Aplicar reparación enfocada de rutas 1.48.17'
+          git push origin HEAD:candidate/bingo-1.48.17-targeted-route-repair
