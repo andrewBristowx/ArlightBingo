@@ -88,6 +88,7 @@ final class OverworldCampaignArchitecture148 {
                         "minecraft:ladder[facing=west,waterlogged=false]"));
             }
         }
+        decorateHouseInterior(out, id, cx, y, cz, hx, hz, floors, front);
     }
 
     static void roof(List<BlockEdit> out, int cx, int y, int cz, int wallHx, int wallHz,
@@ -233,6 +234,7 @@ final class OverworldCampaignArchitecture148 {
                     Material.LIGHT, "minecraft:light[level=13,waterlogged=false]"));
             out.add(data(cx + Math.max(1, radius / 2), windowY, cz,
                     Material.LIGHT, "minecraft:light[level=13,waterlogged=false]"));
+            decorateTowerLevel(out, cx, walkY, cz, radius, level);
         }
         int ladderZ = cz + Math.min(2, radius - 2);
         for (int yy = y; yy < y + height; yy++) {
@@ -291,6 +293,10 @@ final class OverworldCampaignArchitecture148 {
         for (int x = -4; x <= 4; x++) for (int z = -3; z <= 3; z++) out.add(e(cx + x, y + 4, cz + z,
                 ((x + z) & 1) == 0 ? (red ? Material.RED_WOOL : Material.YELLOW_WOOL) : Material.WHITE_WOOL));
         out.add(e(cx, y, cz, Material.BARREL));
+        out.add(e(cx - 2, y, cz, red ? Material.RED_GLAZED_TERRACOTTA : Material.HAY_BLOCK));
+        out.add(e(cx + 2, y, cz, red ? Material.PUMPKIN : Material.MELON));
+        out.add(e(cx, y, cz + 1, Material.SPRUCE_PLANKS));
+        out.add(e(cx, y + 1, cz + 1, red ? Material.FLOWER_POT : Material.CAKE));
     }
 
     static void animalYard(List<BlockEdit> out, int cx, int y, int cz,
@@ -369,7 +375,18 @@ final class OverworldCampaignArchitecture148 {
     static void trainingYard(List<BlockEdit> out, int cx, int y, int cz) {
         for (int x = -12; x <= 12; x++) for (int z = -9; z <= 9; z++)
             out.add(e(cx + x, y - 1, cz + z, ((x + z) & 7) == 0 ? Material.GRAVEL : Material.COARSE_DIRT));
-        for (int x : new int[]{-8,0,8}) pillar(out, cx + x, y, cz, 3, Material.STRIPPED_OAK_LOG, Material.CARVED_PUMPKIN);
+        for (int x : new int[]{-8,0,8}) {
+            pillar(out, cx + x, y, cz + 2, 2, Material.STRIPPED_OAK_LOG, Material.TARGET);
+            out.add(e(cx + x, y, cz - 4, Material.GRINDSTONE));
+        }
+        for (int x : new int[]{-11, 11}) {
+            out.add(e(cx + x, y, cz - 6, Material.BARREL));
+            out.add(e(cx + x, y + 1, cz - 6, Material.IRON_BARS));
+            out.add(e(cx + x, y + 2, cz - 6, Material.CHAIN));
+        }
+        out.add(e(cx, y, cz - 7, Material.SMITHING_TABLE));
+        out.add(e(cx - 2, y, cz - 7, Material.ANVIL));
+        out.add(e(cx + 2, y, cz - 7, Material.CHEST));
     }
 
     static void fortWall(List<BlockEdit> out, int cx, int y, int cz, int radius, int height, boolean southGate) {
@@ -724,6 +741,294 @@ final class OverworldCampaignArchitecture148 {
         else if (style == 1) sideAwning(out, cx, y, cz, hx, hz, false);
         else if (style == 2 && floors > 1) balcony(out, cx, y + 5, cz, hx, hz, front);
         else rearWorkshop(out, cx, y, cz, hx, hz, front);
+    }
+
+
+    private static void decorateHouseInterior(List<BlockEdit> out, String id,
+                                              int cx, int y, int cz, int hx, int hz,
+                                              int floors, Facing front) {
+        int lateralRadius = front == Facing.NORTH || front == Facing.SOUTH ? hx : hz;
+        int inwardRadius = front == Facing.NORTH || front == Facing.SOUTH ? hz : hx;
+        String role = id.toLowerCase(java.util.Locale.ROOT);
+        for (int floor = 0; floor < floors; floor++) {
+            int walkY = y + floor * 5 + (floor == 0 ? 0 : 1);
+            Material carpet = role.contains("military") || role.contains("citadel")
+                    ? Material.GRAY_CARPET
+                    : role.contains("commercial") || role.contains("bakery")
+                    ? Material.RED_CARPET : Material.BROWN_CARPET;
+            interiorRug(out, cx, walkY, cz, hx, hz, floors, front, carpet);
+            if (floor > 0) {
+                if (role.contains("inn") || role.contains("lodge")
+                        || role.contains("home") || role.contains("barracks")) {
+                    bedroom(out, cx, walkY, cz, hx, hz, floors, front,
+                            role.contains("barracks") ? Material.GRAY_BED : Material.RED_BED);
+                } else {
+                    storageRoom(out, cx, walkY, cz, hx, hz, floors, front,
+                            role.contains("warehouse") || role.contains("supply"));
+                }
+                continue;
+            }
+            if (role.contains("smithy") || role.contains("armory")) {
+                workshop(out, cx, walkY, cz, hx, hz, floors, front);
+            } else if (role.contains("bakery")) {
+                kitchen(out, cx, walkY, cz, hx, hz, floors, front, true);
+                shopCounter(out, cx, walkY, cz, hx, hz, floors, front);
+            } else if (role.contains("cartographer")) {
+                study(out, cx, walkY, cz, hx, hz, floors, front, true);
+            } else if (role.contains("hall") || role.contains("great-hall")) {
+                longTable(out, cx, walkY, cz, hx, hz, floors, front);
+                study(out, cx, walkY, cz, hx, hz, floors, front, false);
+            } else if (role.contains("barn") || role.contains("warehouse")
+                    || role.contains("supply")) {
+                storageRoom(out, cx, walkY, cz, hx, hz, floors, front, true);
+            } else if (role.contains("shop")) {
+                shopCounter(out, cx, walkY, cz, hx, hz, floors, front);
+                study(out, cx, walkY, cz, hx, hz, floors, front, false);
+            } else if (role.contains("inn") || role.contains("lodge")) {
+                longTable(out, cx, walkY, cz, hx, hz, floors, front);
+                kitchen(out, cx, walkY, cz, hx, hz, floors, front, false);
+            } else if (role.contains("barracks")) {
+                bedroom(out, cx, walkY, cz, hx, hz, floors, front, Material.GRAY_BED);
+                workshop(out, cx, walkY, cz, hx, hz, floors, front);
+            } else {
+                bedroom(out, cx, walkY, cz, hx, hz, floors, front, Material.RED_BED);
+                kitchen(out, cx, walkY, cz, hx, hz, floors, front, false);
+                diningSet(out, cx, walkY, cz, hx, hz, floors, front);
+            }
+        }
+    }
+
+    private static void interiorRug(List<BlockEdit> out, int cx, int y, int cz,
+                                    int hx, int hz, int floors, Facing front,
+                                    Material carpet) {
+        for (int lateral = -2; lateral <= 2; lateral++) {
+            for (int inward = -1; inward <= 1; inward++) {
+                putInterior(out, cx, y, cz, hx, hz, floors, front,
+                        lateral, inward, 0, carpet);
+            }
+        }
+    }
+
+    private static void diningSet(List<BlockEdit> out, int cx, int y, int cz,
+                                  int hx, int hz, int floors, Facing front) {
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 0, 1, 0,
+                Material.DARK_OAK_FENCE);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 0, 1, 1,
+                Material.SPRUCE_PRESSURE_PLATE);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, -2, 1, 0,
+                Material.SPRUCE_SLAB);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 2, 1, 0,
+                Material.SPRUCE_SLAB);
+    }
+
+    private static void longTable(List<BlockEdit> out, int cx, int y, int cz,
+                                  int hx, int hz, int floors, Facing front) {
+        for (int inward = -2; inward <= 3; inward += 2) {
+            putInterior(out, cx, y, cz, hx, hz, floors, front, 0, inward, 0,
+                    Material.DARK_OAK_FENCE);
+            putInterior(out, cx, y, cz, hx, hz, floors, front, 0, inward, 1,
+                    Material.SPRUCE_PRESSURE_PLATE);
+            putInterior(out, cx, y, cz, hx, hz, floors, front, -2, inward, 0,
+                    Material.SPRUCE_SLAB);
+            putInterior(out, cx, y, cz, hx, hz, floors, front, 2, inward, 0,
+                    Material.SPRUCE_SLAB);
+        }
+    }
+
+    private static void bedroom(List<BlockEdit> out, int cx, int y, int cz,
+                                int hx, int hz, int floors, Facing front,
+                                Material bed) {
+        placeBed(out, cx, y, cz, hx, hz, floors, front, -3, 2, bed);
+        if ((front == Facing.NORTH || front == Facing.SOUTH ? hx : hz) >= 7) {
+            placeBed(out, cx, y, cz, hx, hz, floors, front, 3, 2, bed);
+        }
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 0, 3, 0,
+                Material.BARREL);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 0, 2, 0,
+                Material.FLOWER_POT);
+    }
+
+    private static void kitchen(List<BlockEdit> out, int cx, int y, int cz,
+                                int hx, int hz, int floors, Facing front,
+                                boolean bakery) {
+        int back = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hz : hx) - 2);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, -2, back, 0,
+                bakery ? Material.SMOKER : Material.FURNACE);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 0, back, 0,
+                Material.BARREL);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 2, back, 0,
+                Material.WATER_CAULDRON);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, -1, back - 1, 0,
+                bakery ? Material.CAKE : Material.CRAFTING_TABLE);
+    }
+
+    private static void workshop(List<BlockEdit> out, int cx, int y, int cz,
+                                 int hx, int hz, int floors, Facing front) {
+        int back = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hz : hx) - 2);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, -3, back, 0,
+                Material.BLAST_FURNACE);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, -1, back, 0,
+                Material.SMITHING_TABLE);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 1, back, 0,
+                Material.ANVIL);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 3, back, 0,
+                Material.GRINDSTONE);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 0, 1, 0,
+                Material.BARREL);
+    }
+
+    private static void study(List<BlockEdit> out, int cx, int y, int cz,
+                              int hx, int hz, int floors, Facing front,
+                              boolean cartography) {
+        int back = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hz : hx) - 2);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, -3, back, 0,
+                Material.BOOKSHELF);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, -2, back, 0,
+                Material.BOOKSHELF);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, -1, back, 0,
+                cartography ? Material.CARTOGRAPHY_TABLE : Material.LECTERN);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 1, back, 0,
+                Material.LECTERN);
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 3, back, 0,
+                Material.CHEST);
+    }
+
+    private static void storageRoom(List<BlockEdit> out, int cx, int y, int cz,
+                                    int hx, int hz, int floors, Facing front,
+                                    boolean bulk) {
+        int back = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hz : hx) - 2);
+        for (int lateral = -4; lateral <= 4; lateral += 2) {
+            putInterior(out, cx, y, cz, hx, hz, floors, front, lateral, back, 0,
+                    Math.floorMod(lateral, 4) == 0 ? Material.BARREL : Material.CHEST);
+            if (bulk) putInterior(out, cx, y, cz, hx, hz, floors, front,
+                    lateral, back, 1, Material.HAY_BLOCK);
+        }
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 0, 0, 0,
+                bulk ? Material.COMPOSTER : Material.CRAFTING_TABLE);
+    }
+
+    private static void shopCounter(List<BlockEdit> out, int cx, int y, int cz,
+                                    int hx, int hz, int floors, Facing front) {
+        for (int lateral = -3; lateral <= 3; lateral++) {
+            putInterior(out, cx, y, cz, hx, hz, floors, front, lateral, 2, 0,
+                    Math.abs(lateral) == 3 ? Material.BARREL : Material.SPRUCE_PLANKS);
+            putInterior(out, cx, y, cz, hx, hz, floors, front, lateral, 2, 1,
+                    Material.SPRUCE_SLAB);
+        }
+        putInterior(out, cx, y, cz, hx, hz, floors, front, 0, 3, 0,
+                Material.CHEST);
+    }
+
+    private static void placeBed(List<BlockEdit> out, int cx, int y, int cz,
+                                 int hx, int hz, int floors, Facing front,
+                                 int lateral, int inward, Material bed) {
+        Facing bedFacing = opposite(front);
+        int footX = localX(cx, front, lateral, inward);
+        int footZ = localZ(cz, front, lateral, inward);
+        int headX = footX + bedFacing.dx;
+        int headZ = footZ + bedFacing.dz;
+        if (!insideInterior(footX, footZ, cx, cz, hx, hz)
+                || !insideInterior(headX, headZ, cx, cz, hx, hz)
+                || ladderConflict(footX, footZ, cx, cz, hx, hz, floors)
+                || ladderConflict(headX, headZ, cx, cz, hx, hz, floors)) return;
+        String facing = bedFacing.name().toLowerCase(java.util.Locale.ROOT);
+        String name = bed.name().toLowerCase(java.util.Locale.ROOT);
+        out.add(data(footX, y, footZ, bed,
+                "minecraft:" + name + "[facing=" + facing
+                        + ",occupied=false,part=foot]"));
+        out.add(data(headX, y, headZ, bed,
+                "minecraft:" + name + "[facing=" + facing
+                        + ",occupied=false,part=head]"));
+    }
+
+    private static void putInterior(List<BlockEdit> out, int cx, int y, int cz,
+                                    int hx, int hz, int floors, Facing front,
+                                    int lateral, int inward, int dy, Material material) {
+        int x = localX(cx, front, lateral, inward);
+        int z = localZ(cz, front, lateral, inward);
+        if (!insideInterior(x, z, cx, cz, hx, hz)
+                || ladderConflict(x, z, cx, cz, hx, hz, floors)) return;
+        out.add(e(x, y + dy, z, material));
+    }
+
+    private static int localX(int cx, Facing front, int lateral, int inward) {
+        return cx - front.dz * lateral - front.dx * inward;
+    }
+
+    private static int localZ(int cz, Facing front, int lateral, int inward) {
+        return cz + front.dx * lateral - front.dz * inward;
+    }
+
+    private static boolean insideInterior(int x, int z, int cx, int cz, int hx, int hz) {
+        return x > cx - hx && x < cx + hx && z > cz - hz && z < cz + hz;
+    }
+
+    private static boolean ladderConflict(int x, int z, int cx, int cz,
+                                          int hx, int hz, int floors) {
+        if (floors <= 1) return false;
+        int ladderX = cx + hx - 1;
+        int ladderZ = cz + Math.min(2, hz - 2);
+        return Math.abs(x - ladderX) <= 1 && Math.abs(z - ladderZ) <= 1;
+    }
+
+    private static Facing opposite(Facing facing) {
+        return switch (facing) {
+            case NORTH -> Facing.SOUTH;
+            case SOUTH -> Facing.NORTH;
+            case EAST -> Facing.WEST;
+            case WEST -> Facing.EAST;
+        };
+    }
+
+    private static void decorateTowerLevel(List<BlockEdit> out, int cx, int y, int cz,
+                                           int radius, int level) {
+        out.add(e(cx + radius - 2, y, cz - radius + 2,
+                level % 12 == 0 ? Material.TARGET : Material.CHEST));
+        out.add(e(cx + radius - 3, y, cz - radius + 2, Material.BARREL));
+        out.add(e(cx - radius + 2, y, cz + radius - 2,
+                level % 12 == 0 ? Material.GRINDSTONE : Material.CAULDRON));
+        for (int x = -1; x <= 1; x++) {
+            out.add(e(cx + x, y, cz, level % 12 == 0
+                    ? Material.GRAY_CARPET : Material.BROWN_CARPET));
+        }
+    }
+
+    static void portalSanctuaryFurnishings(List<BlockEdit> out, int cx, int y, int cz) {
+        for (int side : new int[]{-1, 1}) {
+            int x = cx + side * 8;
+            for (int z = -3; z <= 3; z += 3) {
+                out.add(e(x, y, cz + z, Material.SPRUCE_SLAB));
+                out.add(e(x - side, y, cz + z, Material.LECTERN));
+            }
+            out.add(e(cx + side * 6, y, cz + 6, Material.CHEST));
+            out.add(e(cx + side * 5, y, cz + 6, Material.POLISHED_ANDESITE));
+            out.add(e(cx + side * 5, y + 1, cz + 6, Material.WHITE_CANDLE));
+        }
+        for (int[] p : new int[][]{{-10,-7},{10,-7},{-10,7},{10,7}}) {
+            out.add(e(cx + p[0], y, cz + p[1], Material.POLISHED_DEEPSLATE));
+            out.add(e(cx + p[0], y + 1, cz + p[1], Material.SOUL_CAMPFIRE));
+        }
+        out.add(e(cx, y, cz + 7, Material.ENDER_CHEST));
+        out.add(e(cx, y, cz + 5, Material.AMETHYST_BLOCK));
+        out.add(e(cx, y + 1, cz + 5, Material.AMETHYST_CLUSTER));
+    }
+
+    static void arenaFurnishings(List<BlockEdit> out, int cx, int y, int cz) {
+        for (int i = 0; i < 8; i++) {
+            double angle = Math.PI * 2.0D * i / 8.0D;
+            int x = cx + (int) Math.round(Math.cos(angle) * 27.0D);
+            int z = cz + (int) Math.round(Math.sin(angle) * 27.0D);
+            if (z < cz - 18 && Math.abs(x - cx) <= BOSS_GATE_CLEAR_HALF_WIDTH + 4) continue;
+            out.add(e(x, y, z, Material.CHISELED_DEEPSLATE));
+            out.add(e(x, y + 1, z, Material.SOUL_CAMPFIRE));
+        }
+        for (int side : new int[]{-1, 1}) {
+            int x = cx + side * 22;
+            for (int z = cz + 8; z <= cz + 16; z += 4) {
+                out.add(e(x, y, z, Material.BARREL));
+                out.add(e(x - side, y, z, z % 8 == 0 ? Material.CHEST : Material.GRINDSTONE));
+            }
+        }
     }
 
     private static void sideAwning(List<BlockEdit> out, int cx, int y, int cz,

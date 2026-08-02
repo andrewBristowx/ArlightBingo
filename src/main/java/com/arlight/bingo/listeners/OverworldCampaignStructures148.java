@@ -314,6 +314,7 @@ final class OverworldCampaignStructures148 {
         outerRitualAltar(out, outerAltar.getBlockX(), outerAltar.getBlockY(), outerAltar.getBlockZ());
         invocationAltar(out, invocationAltar.getBlockX(), invocationAltar.getBlockY(), invocationAltar.getBlockZ());
         terraces(out, site.x(), y, site.z());
+        arenaFurnishings(out, site.x(), y, site.z());
         // Broken rear pylons keep the arena monumental without four corner towers.
         int rearIndex = 0;
         for (int[] rear : new int[][]{{-31,34},{31,34}}) {
@@ -356,6 +357,7 @@ final class OverworldCampaignStructures148 {
             pillar(out, site.x() + x, y, site.z() + z, 8,
                     Material.POLISHED_ANDESITE, Material.LANTERN);
         }
+        portalSanctuaryFurnishings(out, site.x(), y, site.z());
         report.structures += 2;
         return out;
     }
