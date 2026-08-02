@@ -21,42 +21,42 @@ final class OverworldCampaignStructures148 {
         int upperY = site.baseY() + 5;
 
         // Streets are written first. Houses then preserve their complete envelopes and doors.
-        villageStreet(out, site.x(), lowerY, site.z() + 67,
+        villageStreet(out, registry, site.x(), lowerY, site.z() + 67,
                 site.x(), plazaY, site.z() + 17, 5);
-        villageStreet(out, site.x(), plazaY, site.z() + 15,
+        villageStreet(out, registry, site.x(), plazaY, site.z() + 15,
                 site.x(), upperY, site.z() - 57, 5);
-        villageStreet(out, site.x() - 54, plazaY, site.z(),
+        villageStreet(out, registry, site.x() - 54, plazaY, site.z(),
                 site.x() + 66, plazaY, site.z(), 5);
         // Every front path reaches this public network; none ends as a decorative stub.
-        villageStreet(out, site.x() - 15, lowerY, site.z() + 43,
+        villageStreet(out, registry, site.x() - 15, lowerY, site.z() + 43,
                 site.x(), lowerY, site.z() + 43, 3);
-        villageStreet(out, site.x(), lowerY, site.z() + 42,
+        villageStreet(out, registry, site.x(), lowerY, site.z() + 42,
                 site.x() + 16, lowerY, site.z() + 42, 3);
-        villageStreet(out, site.x() - 44, lowerY, site.z() + 61,
+        villageStreet(out, registry, site.x() - 44, lowerY, site.z() + 61,
                 site.x(), lowerY, site.z() + 61, 3);
-        villageStreet(out, site.x() - 21, plazaY, site.z() + 18,
+        villageStreet(out, registry, site.x() - 21, plazaY, site.z() + 18,
                 site.x(), plazaY, site.z() + 18, 3);
-        villageStreet(out, site.x(), plazaY, site.z() + 18,
+        villageStreet(out, registry, site.x(), plazaY, site.z() + 18,
                 site.x() + 22, plazaY, site.z() + 18, 3);
-        villageStreet(out, site.x() - 22, upperY, site.z() - 38,
+        villageStreet(out, registry, site.x() - 22, upperY, site.z() - 38,
                 site.x() - 12, upperY, site.z() - 28, 3);
-        villageStreet(out, site.x() - 12, upperY, site.z() - 28,
+        villageStreet(out, registry, site.x() - 12, upperY, site.z() - 28,
                 site.x(), upperY, site.z() - 28, 3);
-        villageStreet(out, site.x() + 22, upperY, site.z() - 39,
+        villageStreet(out, registry, site.x() + 22, upperY, site.z() - 39,
                 site.x() + 12, upperY, site.z() - 29, 3);
-        villageStreet(out, site.x() + 12, upperY, site.z() - 29,
+        villageStreet(out, registry, site.x() + 12, upperY, site.z() - 29,
                 site.x(), upperY, site.z() - 28, 3);
-        villageStreet(out, site.x(), upperY, site.z() - 33,
+        villageStreet(out, registry, site.x(), upperY, site.z() - 33,
                 site.x(), upperY, site.z() - 28, 3);
-        villageStreet(out, site.x() + 54, plazaY, site.z(),
+        villageStreet(out, registry, site.x() + 54, plazaY, site.z(),
                 site.x() + 72, plazaY, site.z() + 4, 5);
-        villageStreet(out, site.x() - 56, lowerY, site.z() + 47,
+        villageStreet(out, registry, site.x() - 56, lowerY, site.z() + 47,
                 site.x() - 45, lowerY, site.z() + 53, 3);
-        villageStreet(out, site.x() - 45, lowerY, site.z() + 53,
+        villageStreet(out, registry, site.x() - 45, lowerY, site.z() + 53,
                 site.x() - 44, lowerY, site.z() + 61, 3);
-        villageStreet(out, site.x() + 56, upperY, site.z() - 49,
+        villageStreet(out, registry, site.x() + 56, upperY, site.z() - 49,
                 site.x() + 67, upperY, site.z() - 53, 3);
-        villageStreet(out, site.x() + 67, upperY, site.z() - 53,
+        villageStreet(out, registry, site.x() + 67, upperY, site.z() - 53,
                 site.x() + 67, plazaY, site.z() + 4, 3);
         villagePlaza(out, site.x(), plazaY, site.z());
 
@@ -116,12 +116,12 @@ final class OverworldCampaignStructures148 {
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 15,
                 Material.COBBLESTONE, Material.MOSSY_COBBLESTONE);
-        villageStreet(out, site.x(), y, site.z() - 43, site.x(), y, site.z() + 43, 5);
-        villageStreet(out, site.x() - 42, y, site.z(), site.x() + 42, y, site.z(), 5);
-        villageStreet(out, site.x() - 16, y, site.z() - 21, site.x(), y, site.z() - 21, 3);
-        villageStreet(out, site.x(), y, site.z() - 19, site.x() + 17, y, site.z() - 19, 3);
-        villageStreet(out, site.x() - 19, y, site.z() + 20, site.x(), y, site.z() + 20, 3);
-        villageStreet(out, site.x(), y, site.z() + 25, site.x() + 17, y, site.z() + 25, 3);
+        villageStreet(out, registry, site.x(), y, site.z() - 43, site.x(), y, site.z() + 43, 5);
+        villageStreet(out, registry, site.x() - 42, y, site.z(), site.x() + 42, y, site.z(), 5);
+        villageStreet(out, registry, site.x() - 16, y, site.z() - 21, site.x(), y, site.z() - 21, 3);
+        villageStreet(out, registry, site.x(), y, site.z() - 19, site.x() + 17, y, site.z() - 19, 3);
+        villageStreet(out, registry, site.x() - 19, y, site.z() + 20, site.x(), y, site.z() + 20, 3);
+        villageStreet(out, registry, site.x(), y, site.z() + 25, site.x() + 17, y, site.z() + 25, 3);
         villageHouse(out, world, registry, "residential-home-northwest", site.x() - 27, y,
                 site.z() - 21, 15, 11, 2, true, Material.LIGHT_GRAY_TERRACOTTA,
                 21, Facing.EAST);
@@ -152,15 +152,15 @@ final class OverworldCampaignStructures148 {
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 19,
                 Material.POLISHED_ANDESITE, Material.MUD_BRICKS);
-        villageStreet(out, site.x(), y, site.z() - 48, site.x(), y, site.z() + 47, 5);
-        villageStreet(out, site.x() - 45, y, site.z() + 5, site.x() + 45, y, site.z() + 5, 5);
-        villageStreet(out, site.x() - 16, y, site.z() - 19,
+        villageStreet(out, registry, site.x(), y, site.z() - 48, site.x(), y, site.z() + 47, 5);
+        villageStreet(out, registry, site.x() - 45, y, site.z() + 5, site.x() + 45, y, site.z() + 5, 5);
+        villageStreet(out, registry, site.x() - 16, y, site.z() - 19,
                 site.x(), y, site.z() - 19, 3);
-        villageStreet(out, site.x(), y, site.z() - 15,
+        villageStreet(out, registry, site.x(), y, site.z() - 15,
                 site.x() + 17, y, site.z() - 15, 3);
-        villageStreet(out, site.x() - 17, y, site.z() + 25,
+        villageStreet(out, registry, site.x() - 17, y, site.z() + 25,
                 site.x(), y, site.z() + 25, 3);
-        villageStreet(out, site.x(), y, site.z() + 27,
+        villageStreet(out, registry, site.x(), y, site.z() + 27,
                 site.x() + 17, y, site.z() + 27, 3);
         market(out, site.x(), y, site.z());
         villageHouse(out, world, registry, "commercial-warehouse", site.x() - 31, y,
@@ -194,14 +194,14 @@ final class OverworldCampaignStructures148 {
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 22,
                 Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
-        villageStreet(out, site.x(), y, site.z() - 46, site.x(), y, site.z() + 51, 7);
-        villageStreet(out, site.x(), y, site.z() + 25,
+        villageStreet(out, registry, site.x(), y, site.z() - 46, site.x(), y, site.z() + 51, 7);
+        villageStreet(out, registry, site.x(), y, site.z() + 25,
                 site.x() + 12, y, site.z() + 25, 3);
         // Paved branches keep the large military plateau readable and connect the
         // northern towers instead of leaving an empty coarse-dirt field.
-        villageStreet(out, site.x() - 4, y, site.z() - 20,
+        villageStreet(out, registry, site.x() - 4, y, site.z() - 20,
                 site.x() - 39, y, site.z() - 33, 3);
-        villageStreet(out, site.x() + 4, y, site.z() - 20,
+        villageStreet(out, registry, site.x() + 4, y, site.z() - 20,
                 site.x() + 39, y, site.z() - 33, 3);
         house(out, world, registry, "military-barracks", site.x(), y, site.z() + 5,
                 27, 19, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
@@ -224,7 +224,7 @@ final class OverworldCampaignStructures148 {
                 15, 11, 1, true, Material.GRAY_TERRACOTTA, Facing.EAST);
         // Build this connector after the raised supply-house pad. In 1.48.4 the
         // pad was appended later and could rewrite the exact public-street join.
-        villageStreet(out, site.x() - 13, y + 2, site.z() - 23,
+        villageStreet(out, registry, site.x() - 13, y + 2, site.z() - 23,
                 site.x(), y, site.z() - 23, 3);
         spawnerShrines(out, site, y, Material.AMETHYST_BLOCK);
         // The former +6,+3 position was inside the barracks and erased one of its
@@ -241,7 +241,7 @@ final class OverworldCampaignStructures148 {
         int y = site.baseY() + 1;
         circleFloor(out, site.x(), y - 1, site.z(), 35,
                 Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
-        villageStreet(out, site.x(), y, site.z() - 50, site.x(), y, site.z() + 61, 9);
+        villageStreet(out, registry, site.x(), y, site.z() - 50, site.x(), y, site.z() + 61, 9);
         house(out, world, registry, "citadel-great-hall", site.x(), y, site.z(),
                 43, 27, 3, true, Material.GRAY_TERRACOTTA, Facing.SOUTH);
         auditedTower(out, world, registry, "citadel-tower-southwest",
@@ -290,8 +290,8 @@ final class OverworldCampaignStructures148 {
         int y = site.baseY() + 1;
         // Build one continuous ceremonial approach before the arena. The entrance,
         // outer altar and inner invocation point therefore share the same walkable axis.
-        straightRoad(out, outerAltar.getBlockX(), outerAltar.getBlockY(),
-                outerAltar.getBlockZ(), invocationAltar.getBlockX(),
+        straightRoad(out, ritualGate.getBlockX(), ritualGate.getBlockY(),
+                ritualGate.getBlockZ() + 6, invocationAltar.getBlockX(),
                 invocationAltar.getBlockZ(), 7, Material.POLISHED_ANDESITE);
         circleFloor(out, site.x(), y - 1, site.z(), 45,
                 Material.DEEPSLATE_TILES, Material.MOSSY_STONE_BRICKS);
