@@ -1,0 +1,100 @@
+name: Finalizar ArlightBingo 1.48.16
+
+on:
+  push:
+    branches:
+      - candidate/bingo-1.48.16-transactional-autorepair
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Descargar rama candidata
+        uses: actions/checkout@v4
+        with:
+          ref: candidate/bingo-1.48.16-transactional-autorepair
+          fetch-depth: 0
+
+      - name: Descargar fuente verificada desde Drive
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet gdown
+          gdown 1vDT5xoWec11-MiN6_qppThZSIpRypk25 -O /tmp/ArlightBingo-1.48.16-SOURCE.zip
+          echo 'deff959fb39be37c965f2c9472bbc89f9916576a3b1370b6d92ed9b20eba8eb8  /tmp/ArlightBingo-1.48.16-SOURCE.zip' | sha256sum -c -
+          rm -rf /tmp/arlight-1.48.16
+          mkdir -p /tmp/arlight-1.48.16
+          unzip -q /tmp/ArlightBingo-1.48.16-SOURCE.zip -d /tmp/arlight-1.48.16
+
+      - name: Publicar fuente 1.48.16
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude '.github/workflows/' \
+            --exclude 'target/' \
+            /tmp/arlight-1.48.16/ArlightBingo-1.48.16-AUTOREPAIR/ ./
+          python3 scripts/validate_1_48_16.py
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Añadir autorreparación transaccional Overworld 1.48.16'
+          git push origin HEAD:candidate/bingo-1.48.16-transactional-autorepair
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Descargar ArlightCore 1.20.0 canónico
+        uses: actions/checkout@v4
+        with:
+          repository: andrewBristowx/ArlightCore
+          ref: 597c130a5d5450ac92e02430def406ef22512bc9
+          path: arlight-core
+
+      - name: Instalar ArlightCore
+        shell: bash
+        run: mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
+
+      - name: Compilar ArlightBingo 1.48.16
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -U clean package
+          unzip -p target/ArlightBingo-1.48.16.jar plugin.yml | grep -q '^version: 1.48.16$'
+          unzip -l target/ArlightBingo-1.48.16.jar | grep -q 'OverworldAutoRepair148.class'
+
+      - name: Empaquetar entrega
+        shell: bash
+        run: |
+          set -euo pipefail
+          DELIVERY='ArlightBingo-1.48.16-TRANSACTIONAL-AUTOREPAIR'
+          mkdir -p package/${DELIVERY}-SOURCE
+          rsync -a --exclude '.git/' --exclude 'arlight-core/' --exclude 'target/' --exclude 'package/' ./ package/${DELIVERY}-SOURCE/
+          cd package
+          zip -qr ${DELIVERY}-SOURCE.zip ${DELIVERY}-SOURCE
+          cp ../target/ArlightBingo-1.48.16.jar .
+          sha256sum ArlightBingo-1.48.16.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.16-SHA256.txt
+          unzip -t ${DELIVERY}-SOURCE.zip
+          sha256sum -c ArlightBingo-1.48.16-SHA256.txt
+          rm -rf ${DELIVERY}-SOURCE
+
+      - name: Subir entrega 1.48.16
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.16-DELIVERY
+          path: |
+            package/ArlightBingo-1.48.16.jar
+            package/ArlightBingo-1.48.16-TRANSACTIONAL-AUTOREPAIR-SOURCE.zip
+            package/ArlightBingo-1.48.16-SHA256.txt
+          if-no-files-found: error
+          retention-days: 90
