@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - candidate/bingo-1.48.16-transactional-autorepair
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - candidate/bingo-1.48.15-critical-routes-soft-secondary-audit
   workflow_dispatch:
 
 permissions:
