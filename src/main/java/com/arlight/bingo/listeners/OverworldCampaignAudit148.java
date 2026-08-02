@@ -13,7 +13,7 @@ import java.util.Map;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.11 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.12 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -290,7 +290,7 @@ final class OverworldCampaignAudit148 {
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.11 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.12 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -548,6 +548,53 @@ final class OverworldCampaignAudit148 {
         return out;
     }
 
+
+    /**
+     * Rebuilds the usable exterior threshold of every tower after fortifications,
+     * furnishings and terrain integration. The first two rows are five blocks wide;
+     * the route then narrows to three blocks. This keeps a real landing in front of the
+     * door without cutting nearby gatehouse walls or sanctuary furniture.
+     */
+    static List<BlockEdit> repairRegisteredTowerLandings(World world, Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (TowerSpec tower : registry.towers) {
+            int sideX = -tower.front.dz;
+            int sideZ = tower.front.dx;
+            for (int step = 1; step <= 5; step++) {
+                int sideRadius = step <= 2 ? 2 : 1;
+                for (int side = -sideRadius; side <= sideRadius; side++) {
+                    int x = tower.cx + tower.front.dx * (tower.radius + step) + sideX * side;
+                    int z = tower.cz + tower.front.dz * (tower.radius + step) + sideZ * side;
+                    Material floor = Math.floorMod(step + side, 7) == 0
+                            ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
+                    OverworldCampaignTerrain148.supportedPathCell(out, world, x, tower.y, z, floor);
+                    for (int yy = 0; yy <= 2; yy++) {
+                        out.add(new BlockEdit(x, tower.y + yy, z, Material.AIR));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Replays every registered chimney after the complete house shell has been restored.
+     * Roof repair previously overwrote the campfire cap at exactly the same coordinates;
+     * making chimneys the final architectural phase guarantees a continuous flue and cap.
+     */
+    static List<BlockEdit> repairRegisteredChimneys(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (ChimneySpec chimney : registry.chimneys) {
+            out.add(new BlockEdit(chimney.x, chimney.baseY, chimney.z, Material.SMOKER));
+            for (int y = chimney.baseY + 1; y <= chimney.topY; y++) {
+                out.add(new BlockEdit(chimney.x, y, chimney.z, Material.BRICKS));
+            }
+            out.add(new BlockEdit(chimney.x, chimney.topY + 1, chimney.z,
+                    Material.CAMPFIRE));
+        }
+        return out;
+    }
+
     private static void replayEntrance(List<BlockEdit> out, World world, Registry registry,
                                        String ownerId, int cx, int y, int cz,
                                        int radius, Facing front, int landingHalfWidth,
@@ -771,14 +818,18 @@ final class OverworldCampaignAudit148 {
         // Step zero is the already-validated closed door. Only the outdoor
         // landing must be empty; treating the door as AIR rejected every valid tower.
         for (int step = 1; step <= 5; step++) {
-            int sideRadius = 2;
+            int sideRadius = step <= 2 ? 2 : 1;
             for (int side = -sideRadius; side <= sideRadius; side++) {
                 int x = tower.cx + tower.front.dx * (tower.radius + step) + sideX * side;
                 int z = tower.cz + tower.front.dz * (tower.radius + step) + sideZ * side;
-                if (!world.getBlockAt(x, tower.y - 1, z).getType().isSolid()
-                        || world.getBlockAt(x, tower.y, z).getType().isSolid()
-                        || world.getBlockAt(x, tower.y + 1, z).getType().isSolid()) {
-                    failures.add("entrada de torre enterrada o sin descansillo: " + tower.id);
+                Material floor = world.getBlockAt(x, tower.y - 1, z).getType();
+                Material feet = world.getBlockAt(x, tower.y, z).getType();
+                Material head = world.getBlockAt(x, tower.y + 1, z).getType();
+                if (!floor.isSolid() || blocksPassage(feet) || blocksPassage(head)) {
+                    failures.add("entrada de torre enterrada o sin descansillo: " + tower.id
+                            + " (paso=" + step + ", lado=" + side
+                            + ", suelo=" + floor + ", pies=" + feet
+                            + ", cabeza=" + head + ")");
                     return;
                 }
             }
@@ -836,9 +887,10 @@ final class OverworldCampaignAudit148 {
                 return;
             }
         }
-        if (world.getBlockAt(chimney.x, chimney.topY + 1, chimney.z).getType()
-                != Material.CAMPFIRE) {
-            failures.add("chimenea sin remate en " + chimney.id);
+        Material cap = world.getBlockAt(chimney.x, chimney.topY + 1, chimney.z).getType();
+        if (cap != Material.CAMPFIRE) {
+            failures.add("chimenea sin remate en " + chimney.id
+                    + " (esperado=CAMPFIRE, encontrado=" + cap + ")");
         }
     }
 
