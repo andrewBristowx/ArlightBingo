@@ -1,0 +1,1 @@
+Server-side generation and visual inspection remain required before merge.

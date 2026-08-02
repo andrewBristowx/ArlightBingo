@@ -1,0 +1,1 @@
+Scope: Overworld only. Preserve 1.48.18. Do not regenerate Nether or End.
