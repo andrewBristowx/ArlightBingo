@@ -289,7 +289,10 @@ final class OverworldCampaignArchitecture148 {
         int sideX = -entrance.dz;
         int sideZ = entrance.dx;
         for (int step = 0; step <= 5; step++) {
-            int sideRadius = step == 0 ? 0 : 2;
+            // A broad two-block-deep threshold gives the door a real landing, while the
+            // remaining approach narrows to three blocks so gatehouse furniture and walls
+            // cannot invade or be erased by a five-wide corridor.
+            int sideRadius = step == 0 ? 0 : step <= 2 ? 2 : 1;
             int clearance = step == 0 ? 1 : 3;
             for (int side = -sideRadius; side <= sideRadius; side++) {
                 int x = cx + entrance.dx * (radius + step) + sideX * side;
@@ -1081,7 +1084,10 @@ final class OverworldCampaignArchitecture148 {
 
     static void portalSanctuaryFurnishings(List<BlockEdit> out, int cx, int y, int cz) {
         for (int side : new int[]{-1, 1}) {
-            int x = cx + side * 8;
+            // The previous x=±8 benches occupied the final cells of both north-gate
+            // tower landings. Pulling them inward keeps the sanctuary furnished without
+            // blocking either tower door or its three-block approach.
+            int x = cx + side * 5;
             for (int z = -3; z <= 3; z += 3) {
                 out.add(e(x, y, cz + z, Material.SPRUCE_SLAB));
                 out.add(e(x - side, y, cz + z, Material.LECTERN));
