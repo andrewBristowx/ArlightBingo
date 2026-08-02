@@ -502,10 +502,10 @@ final class OverworldCampaignAudit148 {
                     + ": " + furnishings + "/" + furnishingTarget + " piezas");
             return;
         }
-        int roofY = house.y + house.height + 1;
+        int eaveRoofY = house.y + house.height + 1;
         int eaveX = house.roofAlongX ? house.cx : house.cx + house.hx + 1;
         int eaveZ = house.roofAlongX ? house.cz + house.hz + 1 : house.cz;
-        if (world.getBlockAt(eaveX, roofY - 1, eaveZ).getType().isAir()) {
+        if (world.getBlockAt(eaveX, eaveRoofY - 1, eaveZ).getType().isAir()) {
             failures.add("hueco bajo alero en " + house.id);
             return;
         }
@@ -661,7 +661,8 @@ final class OverworldCampaignAudit148 {
         int cx = ritualGate.getBlockX();
         int y = ritualGate.getBlockY();
         int cz = ritualGate.getBlockZ();
-        for (int x = -BOSS_GATE_CLEAR_HALF_WIDTH; x <= BOSS_GATE_CLEAR_HALF_WIDTH; x++) {
+        for (int x = -OverworldCampaignArchitecture148.BOSS_GATE_CLEAR_HALF_WIDTH;
+             x <= OverworldCampaignArchitecture148.BOSS_GATE_CLEAR_HALF_WIDTH; x++) {
             for (int yy = 0; yy <= 5; yy++) {
                 if (world.getBlockAt(cx + x, y + yy, cz + 2).getType().isSolid()) {
                     failures.add("puerta del boss bloqueada o incompleta");
