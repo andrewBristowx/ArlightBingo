@@ -1,1 +1,1 @@
-Reintento ultrafragmentado de ArlightBingo 1.48.12
+Compilar fuente aplicada de ArlightBingo 1.48.12
