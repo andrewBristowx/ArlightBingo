@@ -171,19 +171,23 @@ final class OverworldCampaignTerrain148 {
                 int z = cz + dz;
                 int natural = terrainY(world, x, z);
                 boolean footprint = edgeX == 0 && edgeZ == 0;
-                if (!footprint && natural >= targetY) continue;
+                Material currentTop = world.getBlockAt(x, natural, z).getType();
+                if (!footprint && isRoadSurface(currentTop)) continue;
                 double blend = footprint ? 0.0D : smooth(edgeDistance / Math.max(1.0D, apron));
                 int columnTop = (int) Math.round(targetY * (1.0D - blend) + natural * blend);
-                if (!footprint && columnTop <= natural) continue;
-                if (footprint) {
-                    clearAndFill(out, world, x, targetY, z, surface);
-                } else {
-                    fillColumn(out, world, x, columnTop, z,
-                            edgeDistance <= apron * 0.55D ? surface
-                                    : naturalSurface(world, x, natural, z), false);
-                }
+                Material top = footprint || edgeDistance <= apron * 0.55D
+                        ? surface : naturalSurface(world, x, natural, z);
+                clearAndFill(out, world, x, columnTop, z, top);
             }
         }
+    }
+
+    private static boolean isRoadSurface(Material material) {
+        return material == Material.DIRT_PATH || material == Material.COBBLESTONE
+                || material == Material.MOSSY_COBBLESTONE || material == Material.ANDESITE
+                || material == Material.POLISHED_ANDESITE || material == Material.PACKED_MUD
+                || material == Material.MUD_BRICKS || material == Material.DEEPSLATE_TILES
+                || material == Material.POLISHED_DEEPSLATE;
     }
 
     /** Places a walkable surface and fills only the air beneath it until real ground. */
@@ -276,20 +280,22 @@ final class OverworldCampaignTerrain148 {
         int sideX = -outwardZ;
         int sideZ = outwardX;
         for (int step = -inside; step <= outside; step++) {
+            int cellY = "boss-north-approach".equals(id) && step >= 0
+                    ? bossApproachWalkY(walkY, step) : walkY;
             for (int side = -halfWidth; side <= halfWidth; side++) {
                 int x = cx + outwardX * step + sideX * side;
                 int z = cz + outwardZ * step + sideZ * side;
-                supportColumn(out, world, x, walkY, z, 5, Material.STONE_BRICKS);
-                out.add(new BlockEdit(x, walkY - 1, z,
-                        Math.floorMod(step + side, 9) == 0
-                                ? Material.MOSSY_STONE_BRICKS : floor));
-                for (int y = walkY; y <= walkY + 6; y++) {
-                    out.add(new BlockEdit(x, y, z, Material.AIR));
+                supportColumn(out, world, x, cellY, z, 5, Material.STONE_BRICKS);
+                Material pathFloor = Math.floorMod(step + side, 9) == 0
+                        ? Material.MOSSY_STONE_BRICKS : floor;
+                out.add(new BlockEdit(x, cellY - 1, z, pathFloor));
+                for (int clearY = cellY; clearY <= cellY + 6; clearY++) {
+                    out.add(new BlockEdit(x, clearY, z, Material.AIR));
                 }
-                registry.registerRoadCell(id, x, walkY, z, floor);
+                registry.registerRoadCell(id, x, cellY, z, pathFloor);
             }
             if (step >= 0 && "boss-north-approach".equals(id)) {
-                landscapeBossApproachShoulders(out, world, cx, walkY, cz,
+                landscapeBossApproachShoulders(out, world, cx, cellY, cz,
                         outwardX, outwardZ, sideX, sideZ, step, halfWidth);
             } else if (step >= 0) {
                 for (int side : new int[]{-halfWidth - 1, halfWidth + 1}) {
@@ -305,6 +311,11 @@ final class OverworldCampaignTerrain148 {
                 }
             }
         }
+    }
+
+    static int bossApproachWalkY(int gateY, int outwardStep) {
+        if (outwardStep <= 1) return gateY;
+        return gateY - Math.min(4, (outwardStep - 1) / 6);
     }
 
     private static void landscapeBossApproachShoulders(List<BlockEdit> out, World world,
@@ -418,7 +429,8 @@ final class OverworldCampaignTerrain148 {
                 Material.MOSSY_COBBLESTONE, -0.17D, registry);
         road(out, world, "citadel-boss", point(world, citadel.x(),
                         citadel.baseY() + 1, citadel.z() + 60),
-                point(world, boss.x(), boss.baseY() + 1, boss.z() - 68), 7,
+                point(world, boss.x(), bossApproachWalkY(boss.baseY() + 1, 24),
+                        boss.z() - 74), 7,
                 Material.POLISHED_ANDESITE, 0.0D, registry);
 
         // Two outside-rim segments keep the full route beyond the arena's radius.
@@ -472,6 +484,8 @@ final class OverworldCampaignTerrain148 {
             int desired = Math.max(expected - 2, Math.min(expected + 2, natural));
             if (step == 0) {
                 walkY = start.getBlockY();
+            } else if (step == steps) {
+                walkY = endY;
             } else {
                 // Reserve enough remaining blocks to reach the declared waypoint by one
                 // vertical block per step. Consecutive segments therefore share one exact
@@ -501,10 +515,28 @@ final class OverworldCampaignTerrain148 {
                             bridge ? Material.STRIPPED_SPRUCE_LOG : Material.COBBLESTONE);
                 }
             }
+            blendRoadShoulders(out, world, cx, walkY, cz, nx, nz, halfWidth, step);
             if (step > 0 && step % 18 == 0) {
                 int lx = (int) Math.round(cx + nx * (width / 2 + 2));
                 int lz = (int) Math.round(cz + nz * (width / 2 + 2));
                 lamp(out, lx, walkY, lz);
+            }
+        }
+    }
+
+    private static void blendRoadShoulders(List<BlockEdit> out, World world,
+                                           int cx, int walkY, int cz,
+                                           double nx, double nz, int halfWidth, int step) {
+        for (int direction : new int[]{-1, 1}) {
+            for (int shoulder = 1; shoulder <= 3; shoulder++) {
+                int distance = halfWidth + shoulder;
+                int x = (int) Math.round(cx + nx * direction * distance);
+                int z = (int) Math.round(cz + nz * direction * distance);
+                int target = walkY - 1 + (shoulder == 3 ? 1 : 0);
+                Material surface = shoulder == 1 ? Material.ANDESITE
+                        : Math.floorMod(step + direction * shoulder, 7) == 0
+                        ? Material.MOSS_BLOCK : Material.COARSE_DIRT;
+                clearAndFill(out, world, x, target, z, surface);
             }
         }
     }

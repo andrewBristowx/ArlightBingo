@@ -57,7 +57,8 @@ final class OverworldCampaignArchitecture148 {
                     out.add(e(cx + x, fy, cz + z, Material.SPRUCE_PLANKS));
         }
         roof(out, cx, y + height + 1, cz, hx, hz, roofAlongX, plaster);
-        frontPath(out, world, cx, y, cz, hx, hz, front, 5);
+        closeEaves(out, cx, y + height + 1, cz, hx, hz, roofAlongX);
+        frontPath(out, world, registry, id, cx, y, cz, hx, hz, front);
         int frontRadius = front == Facing.NORTH || front == Facing.SOUTH ? hz : hx;
         int doorX = cx + front.dx * frontRadius;
         int doorZ = cz + front.dz * frontRadius;
@@ -129,6 +130,29 @@ final class OverworldCampaignArchitecture148 {
         }
     }
 
+    private static void closeEaves(List<BlockEdit> out, int cx, int roofY, int cz,
+                                    int wallHx, int wallHz, boolean alongX) {
+        int hx = wallHx + 2;
+        int hz = wallHz + 2;
+        if (alongX) {
+            for (int x = -hx; x <= hx; x++) {
+                for (int z : new int[]{-wallHz - 1, wallHz + 1}) {
+                    out.add(e(cx + x, roofY - 1, cz + z, Material.DARK_OAK_PLANKS));
+                    if (Math.floorMod(x, 4) == 0)
+                        out.add(e(cx + x, roofY - 2, cz + z, Material.STRIPPED_DARK_OAK_LOG));
+                }
+            }
+        } else {
+            for (int z = -hz; z <= hz; z++) {
+                for (int x : new int[]{-wallHx - 1, wallHx + 1}) {
+                    out.add(e(cx + x, roofY - 1, cz + z, Material.DARK_OAK_PLANKS));
+                    if (Math.floorMod(z, 4) == 0)
+                        out.add(e(cx + x, roofY - 2, cz + z, Material.STRIPPED_DARK_OAK_LOG));
+                }
+            }
+        }
+    }
+
     private static boolean entrance(Facing front, int x, int z, int hx, int hz) {
         return switch (front) {
             case NORTH -> z == -hz && x == 0;
@@ -161,21 +185,37 @@ final class OverworldCampaignArchitecture148 {
                 "minecraft:glass_pane[" + connections + ",waterlogged=false]");
     }
 
-    private static void frontPath(List<BlockEdit> out, World world, int cx, int y, int cz,
-                                  int hx, int hz, Facing front, int length) {
+    private static void frontPath(List<BlockEdit> out, World world, Registry registry,
+                                  String houseId, int cx, int y, int cz,
+                                  int hx, int hz, Facing front) {
         int radius = front == Facing.NORTH || front == Facing.SOUTH ? hz : hx;
-        for (int step = 0; step <= length; step++) {
+        String pathId = "house-path-" + houseId;
+        for (int step = 0; step <= 18; step++) {
             int px = cx + front.dx * (radius + step);
             int pz = cz + front.dz * (radius + step);
-            int sideRadius = step == 0 ? 0 : 1;
-            int clearance = step == 0 ? 1 : 2;
+            boolean reachesStreet = step >= 5
+                    && registry.hasRoadNearExcept(pathId, px, pz, 2);
+            int sideRadius = step == 0 ? 0 : step < 3 ? 1 : 2;
             for (int side = -sideRadius; side <= sideRadius; side++) {
                 int x = px + (front.dx == 0 ? side : 0);
                 int z = pz + (front.dz == 0 ? side : 0);
-                Material floor = Math.floorMod(step + side, 5) == 0
-                        ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE;
+                Material floor = Math.floorMod(step * 3 + side * 5, 13) < 2
+                        ? Material.MOSSY_COBBLESTONE
+                        : Math.abs(side) == sideRadius && step > 2
+                        ? Material.ANDESITE : Material.COBBLESTONE;
                 OverworldCampaignTerrain148.supportedPathCell(out, world, x, y, z, floor);
-                for (int yy = 0; yy <= clearance; yy++) out.add(e(x, y + yy, z, Material.AIR));
+                for (int yy = 0; yy <= 3; yy++) out.add(e(x, y + yy, z, Material.AIR));
+                registry.registerRoadCell(pathId, x, y, z, floor);
+            }
+            if (reachesStreet) {
+                for (int landing = -2; landing <= 2; landing++) {
+                    int x = px + (front.dx == 0 ? landing : 0);
+                    int z = pz + (front.dz == 0 ? landing : 0);
+                    OverworldCampaignTerrain148.supportedPathCell(out, world, x, y, z,
+                            Material.POLISHED_ANDESITE);
+                    registry.registerRoadCell(pathId, x, y, z, Material.POLISHED_ANDESITE);
+                }
+                break;
             }
         }
     }
@@ -757,6 +797,9 @@ final class OverworldCampaignArchitecture148 {
                     : role.contains("commercial") || role.contains("bakery")
                     ? Material.RED_CARPET : Material.BROWN_CARPET;
             interiorRug(out, cx, walkY, cz, hx, hz, floors, front, carpet);
+            ceilingBeams(out, cx, walkY, cz, hx, hz, floors, front);
+            interiorColumns(out, cx, walkY, cz, hx, hz, floors, front);
+            sideWallStorage(out, cx, walkY, cz, hx, hz, floors, front, floor);
             if (floor > 0) {
                 if (role.contains("inn") || role.contains("lodge")
                         || role.contains("home") || role.contains("barracks")) {
@@ -778,6 +821,7 @@ final class OverworldCampaignArchitecture148 {
             } else if (role.contains("hall") || role.contains("great-hall")) {
                 longTable(out, cx, walkY, cz, hx, hz, floors, front);
                 study(out, cx, walkY, cz, hx, hz, floors, front, false);
+                greatHallDetails(out, cx, walkY, cz, hx, hz, floors, front);
             } else if (role.contains("barn") || role.contains("warehouse")
                     || role.contains("supply")) {
                 storageRoom(out, cx, walkY, cz, hx, hz, floors, front, true);
@@ -795,6 +839,56 @@ final class OverworldCampaignArchitecture148 {
                 kitchen(out, cx, walkY, cz, hx, hz, floors, front, false);
                 diningSet(out, cx, walkY, cz, hx, hz, floors, front);
             }
+        }
+    }
+
+    private static void ceilingBeams(List<BlockEdit> out, int cx, int y, int cz,
+                                     int hx, int hz, int floors, Facing front) {
+        int lateralMax = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hx : hz) - 2);
+        int inwardMax = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hz : hx) - 2);
+        for (int inward = -inwardMax; inward <= inwardMax; inward += 4) {
+            for (int lateral = -lateralMax; lateral <= lateralMax; lateral++) {
+                putInterior(out, cx, y, cz, hx, hz, floors, front,
+                        lateral, inward, 4, Material.STRIPPED_SPRUCE_LOG);
+            }
+        }
+    }
+
+    private static void interiorColumns(List<BlockEdit> out, int cx, int y, int cz,
+                                        int hx, int hz, int floors, Facing front) {
+        int lateral = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hx : hz) - 2);
+        int inward = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hz : hx) - 2);
+        for (int sx : new int[]{-1, 1}) for (int sz : new int[]{-1, 1}) {
+            for (int dy = 1; dy <= 3; dy++) {
+                putInterior(out, cx, y, cz, hx, hz, floors, front,
+                        sx * lateral, sz * inward, dy, Material.STRIPPED_DARK_OAK_LOG);
+            }
+        }
+    }
+
+    private static void sideWallStorage(List<BlockEdit> out, int cx, int y, int cz,
+                                        int hx, int hz, int floors, Facing front, int floor) {
+        int lateral = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hx : hz) - 2);
+        int inward = Math.max(2, (front == Facing.NORTH || front == Facing.SOUTH ? hz : hx) - 3);
+        for (int side : new int[]{-1, 1}) {
+            putInterior(out, cx, y, cz, hx, hz, floors, front,
+                    side * lateral, inward, 0, floor % 2 == 0 ? Material.BARREL : Material.CHEST);
+            putInterior(out, cx, y, cz, hx, hz, floors, front,
+                    side * lateral, inward - 2, 0, Material.BOOKSHELF);
+            putInterior(out, cx, y, cz, hx, hz, floors, front,
+                    side * lateral, inward - 3, 0, Material.SPRUCE_SLAB);
+        }
+    }
+
+    private static void greatHallDetails(List<BlockEdit> out, int cx, int y, int cz,
+                                         int hx, int hz, int floors, Facing front) {
+        int back = Math.max(3, (front == Facing.NORTH || front == Facing.SOUTH ? hz : hx) - 3);
+        for (int lateral = -5; lateral <= 5; lateral += 2) {
+            putInterior(out, cx, y, cz, hx, hz, floors, front,
+                    lateral, back, 0, Math.abs(lateral) == 5 ? Material.BOOKSHELF : Material.CHISELED_BOOKSHELF);
+        }
+        for (int lateral : new int[]{-4, 4}) {
+            putInterior(out, cx, y, cz, hx, hz, floors, front, lateral, 0, 0, Material.TARGET);
         }
     }
 
@@ -1036,6 +1130,8 @@ final class OverworldCampaignArchitecture148 {
         int side = east ? 1 : -1;
         int x = cx + side * (hx + 2);
         for (int z = -Math.min(4, hz - 1); z <= Math.min(4, hz - 1); z++) {
+            out.add(e(x, y - 1, cz + z, Material.COBBLESTONE));
+            out.add(e(x + side, y - 1, cz + z, Material.COBBLESTONE));
             out.add(e(x, y + 3, cz + z, Material.DARK_OAK_PLANKS));
             out.add(e(x + side, y + 3, cz + z, Material.DARK_OAK_PLANKS));
         }
@@ -1063,6 +1159,8 @@ final class OverworldCampaignArchitecture148 {
         for (int depth = 1; depth <= 3; depth++) for (int side = -3; side <= 3; side++) {
             int x = cx - front.dx * (radius + depth) + (front.dx == 0 ? side : 0);
             int z = cz - front.dz * (radius + depth) + (front.dz == 0 ? side : 0);
+            out.add(e(x, y - 1, z, Math.floorMod(depth + side, 5) == 0
+                    ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE));
             out.add(e(x, y + 3, z, Material.DARK_OAK_PLANKS));
             if (depth == 3 && Math.abs(side) == 3)
                 pillar(out, x, y, z, 3, Material.STRIPPED_SPRUCE_LOG, Material.DARK_OAK_SLAB);
@@ -1123,32 +1221,53 @@ final class OverworldCampaignArchitecture148 {
             pillar(out, cx + p[0], y, cz + p[1], 3, Material.SPRUCE_FENCE, Material.LANTERN);
             bench(out, cx + p[0] + (p[0] < 0 ? 1 : -1), y, cz + p[1]);
         }
+        for (int[] p : new int[][]{{-14,0},{14,0},{0,-11},{0,11}}) {
+            out.add(e(cx + p[0], y - 1, cz + p[1], Material.CHISELED_STONE_BRICKS));
+            out.add(e(cx + p[0], y, cz + p[1], Material.SPRUCE_SLAB));
+        }
+        for (int[] p : new int[][]{{-13,-9},{13,-9},{-13,9},{13,9}}) {
+            out.add(e(cx + p[0], y - 1, cz + p[1], Material.MOSS_BLOCK));
+            out.add(e(cx + p[0], y, cz + p[1], Material.FLOWERING_AZALEA));
+            out.add(e(cx + p[0] + (p[0] < 0 ? 1 : -1), y, cz + p[1], Material.SPRUCE_SLAB));
+        }
     }
 
-    static void villageStreet(List<BlockEdit> out, int x1, int y1, int z1,
-                              int x2, int y2, int z2, int width) {
+    static void villageStreet(List<BlockEdit> out, Registry registry,
+                              int x1, int y1, int z1, int x2, int y2, int z2, int width) {
         int steps = Math.max(Math.abs(x2 - x1), Math.abs(z2 - z1));
         double dx = x2 - x1, dz = z2 - z1;
         double length = Math.max(1.0D, Math.sqrt(dx * dx + dz * dz));
         double nx = -dz / length, nz = dx / length;
         int halfWidth = Math.max(1, width / 2);
+        String id = "local-street-" + x1 + "-" + z1 + "-" + x2 + "-" + z2;
         for (int step = 0; step <= steps; step++) {
             double t = steps == 0 ? 0.0D : step / (double) steps;
-            double bend = Math.sin(Math.PI * t) * Math.min(2.5D, length * 0.035D);
+            double bend = Math.sin(Math.PI * t) * Math.min(2.0D, length * 0.025D);
             int cx = (int) Math.round(x1 + (x2 - x1) * t + nx * bend);
-            int cy = (int) Math.round(y1 + (y2 - y1) * t);
+            int cy = step == steps ? y2 : (int) Math.round(y1 + (y2 - y1) * t);
             int cz = (int) Math.round(z1 + (z2 - z1) * t + nz * bend);
             for (int ox = -halfWidth; ox <= halfWidth; ox++) {
                 for (int oz = -halfWidth; oz <= halfWidth; oz++) {
                     if (ox * ox + oz * oz > halfWidth * halfWidth + halfWidth) continue;
                     int x = cx + ox;
                     int z = cz + oz;
-                    Material surface = Math.floorMod(step + ox * 3 + oz * 5, 11) == 0
-                        ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE;
+                    boolean edge = ox * ox + oz * oz >= Math.max(1, halfWidth * halfWidth - 1);
+                    Material surface = edge ? Material.ANDESITE
+                            : Math.floorMod(step * 3 + ox * 5 + oz * 7, 17) < 3
+                            ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE;
                     out.add(e(x, cy - 1, z, surface));
                     out.add(e(x, cy - 2, z, Material.STONE_BRICKS));
                     out.add(e(x, cy - 3, z, Material.STONE));
                     for (int yy = 0; yy <= 3; yy++) out.add(e(x, cy + yy, z, Material.AIR));
+                    registry.registerRoadCell(id, x, cy, z, surface);
+                }
+            }
+            if (step % 12 == 6) {
+                for (int side : new int[]{-halfWidth - 2, halfWidth + 2}) {
+                    int x = (int) Math.round(cx + nx * side);
+                    int z = (int) Math.round(cz + nz * side);
+                    out.add(e(x, cy - 1, z, Material.MOSS_BLOCK));
+                    out.add(e(x, cy, z, side < 0 ? Material.AZALEA : Material.FLOWERING_AZALEA));
                 }
             }
         }
@@ -1245,25 +1364,56 @@ final class OverworldCampaignArchitecture148 {
 
     static void monumentalArenaEntrance(List<BlockEdit> out, World world, Registry registry,
                                         int cx, int y, int cz) {
-        // A thicker gatehouse with connected wings prevents floating bars and open corners.
-        for (int z = 0; z <= 5; z++) {
-            for (int x = -15; x <= 15; x++) for (int yy = 0; yy <= 17; yy++) {
-                boolean side = Math.abs(x) >= 11;
-                boolean arch = yy >= 12 && Math.abs(x) <= 10 - Math.max(0, yy - 12);
-                if (side || arch) out.add(e(cx + x, y + yy, cz + z,
-                        Math.floorMod(x + yy + z, 9) == 0 ? Material.MOSSY_STONE_BRICKS : Material.DEEPSLATE_BRICKS));
+        for (int x = -23; x <= 23; x++) for (int z = -4; z <= 7; z++) {
+            out.add(e(cx + x, y - 1, cz + z,
+                    Math.floorMod(x * 7 + z * 11, 17) < 3
+                            ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_DEEPSLATE));
+        }
+        for (int z = -2; z <= 6; z++) {
+            for (int x = -22; x <= 22; x++) {
+                int ax = Math.abs(x);
+                for (int yy = 0; yy <= 18; yy++) {
+                    boolean towerMass = ax >= 10;
+                    boolean archCrown = yy >= 10 && yy <= 15
+                            && ax <= Math.max(3, 10 - (yy - 10) * 2);
+                    boolean upperBridge = yy >= 15 && yy <= 17 && ax < 10;
+                    if (towerMass || archCrown || upperBridge) {
+                        Material material = Math.floorMod(x + yy * 3 + z * 5, 13) < 2
+                                ? Material.MOSSY_STONE_BRICKS : Material.DEEPSLATE_BRICKS;
+                        out.add(e(cx + x, y + yy, cz + z, material));
+                    } else if (ax <= BOSS_GATE_CLEAR_HALF_WIDTH && yy <= 9) {
+                        out.add(e(cx + x, y + yy, cz + z, Material.AIR));
+                    }
+                }
             }
         }
-        for (int x = -20; x <= 20; x++) {
-            for (int z = -2; z <= 3; z++) {
-                out.add(e(cx + x, y - 1, cz + z, Math.floorMod(x + z, 7) == 0 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_DEEPSLATE));
+        // Raised portcullis: visible and complete without blocking the playable corridor.
+        for (int x = -6; x <= 6; x += 2) for (int yy = 10; yy <= 14; yy++) {
+            out.add(e(cx + x, y + yy, cz + 2, Material.IRON_BARS));
+        }
+        for (int x = -22; x <= 22; x += 3) {
+            out.add(e(cx + x, y + 19, cz + 2, Material.DEEPSLATE_BRICK_WALL));
+        }
+        // Curved wings join the rectangular gatehouse to the radius-50 arena wall.
+        for (int side : new int[]{-1, 1}) {
+            for (int offset = 20; offset <= 48; offset++) {
+                int x = cx + side * offset;
+                int curveZ = cz + (int) Math.round(50.0D
+                        - Math.sqrt(Math.max(0.0D, 2500.0D - offset * offset)));
+                for (int thick = -1; thick <= 1; thick++) {
+                    for (int yy = 0; yy <= 9; yy++) {
+                        out.add(e(x, y + yy, curveZ + thick,
+                                Math.floorMod(offset + yy + thick, 11) == 0
+                                        ? Material.MOSSY_STONE_BRICKS : Material.DEEPSLATE_BRICKS));
+                    }
+                    out.add(e(x, y + 10, curveZ + thick, Material.DEEPSLATE_BRICK_WALL));
+                }
             }
         }
-        // Towers are replayed last so the gatehouse cannot overwrite their ladders or floors.
         auditedTower(out, world, registry, "boss-gate-west", cx - BOSS_GATE_TOWER_OFFSET,
-                y, cz, BOSS_GATE_TOWER_RADIUS, 24, Material.DARK_OAK_PLANKS);
+                y, cz, BOSS_GATE_TOWER_RADIUS, 24, Material.DARK_OAK_PLANKS, Facing.NORTH);
         auditedTower(out, world, registry, "boss-gate-east", cx + BOSS_GATE_TOWER_OFFSET,
-                y, cz, BOSS_GATE_TOWER_RADIUS, 24, Material.DARK_OAK_PLANKS);
+                y, cz, BOSS_GATE_TOWER_RADIUS, 24, Material.DARK_OAK_PLANKS, Facing.NORTH);
     }
 
     static BlockEdit e(int x, int y, int z, Material material) {

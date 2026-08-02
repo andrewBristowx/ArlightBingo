@@ -1,0 +1,15 @@
+PRUEBA ARLIGHTBINGO 1.48.9
+
+1. Apaga el servidor; no uses /reload.
+2. Conserva 1.48.8 y 1.48.7.
+3. Instala ArlightBingo-1.48.9.jar.
+4. Ejecuta:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.9-test1
+   /bingo template overworld status
+5. Cuando esté READY:
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+Revisar caminos, accesos de casas, aleros, interiores, plaza, terreno y puerta del boss.
+No regenerar Nether ni End.
