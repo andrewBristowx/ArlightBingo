@@ -21,7 +21,7 @@ final class OverworldCampaignArchitecture148 {
                       int floors, boolean roofAlongX, Material plaster, Facing front) {
         int hx = width / 2, hz = depth / 2, height = floors * 5;
         registry.registerHouse(new HouseSpec(id, cx, y, cz, hx, hz,
-                height, roofAlongX, front));
+                height, roofAlongX, plaster, front));
         OverworldCampaignTerrain148.buildingPad(out, world, cx, y - 1, cz,
                 hx + 1, hz + 1, 5, Material.GRASS_BLOCK);
         foundation(out, cx, y - 1, cz, hx + 1, hz + 1);
