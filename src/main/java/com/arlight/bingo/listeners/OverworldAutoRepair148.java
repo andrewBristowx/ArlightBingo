@@ -81,6 +81,8 @@ public final class OverworldAutoRepair148 {
 
     record BuildDecision(Inspection inspection, RepairPlan plan) { }
 
+    record RoadIssue(String routeId, int x, int y, int z) { }
+
     /** Persists the exact audited plan so in-game repair works after a restart. */
     static void saveContext(Path folder, World world, OverworldCampaignAudit148.Registry registry,
                             Site village, Site residential, Site commercial, Site military,
@@ -103,7 +105,7 @@ public final class OverworldAutoRepair148 {
         putLocation(properties, "invocationAltar", invocationAltar);
         putLocation(properties, "ritualGate", ritualGate);
         atomicProperties(folder.resolve(CONTEXT_FILE), properties,
-                "ArlightBingo 1.48.16 deterministic Overworld autorepair context");
+                "ArlightBingo 1.48.17 deterministic Overworld autorepair context");
 
         Path temporary = folder.resolve(REGISTRY_FILE + ".tmp");
         try (BufferedWriter writer = Files.newBufferedWriter(temporary, StandardCharsets.UTF_8,
@@ -374,6 +376,12 @@ public final class OverworldAutoRepair148 {
         boolean roads = categories.contains("road") || categories.contains("ritual");
         boolean terrain = categories.contains("terrain");
         boolean fortification = categories.contains("fortification") || categories.contains("boss_gate");
+        List<RoadIssue> roadIssues = parseRoadIssues(inspection.issues(), context.registry());
+        String strategy = roadIssues.isEmpty() ? "baseline" : switch (Math.floorMod(attempt, 3)) {
+            case 0 -> "targeted-clearance";
+            case 1 -> "supported-segment";
+            default -> "widened-corridor";
+        };
 
         if (houses) {
             edits.addAll(OverworldCampaignAudit148.repairRegisteredHouseShells(context.registry()));
@@ -387,11 +395,16 @@ public final class OverworldAutoRepair148 {
             edits.addAll(OverworldCampaignAudit148.repairRegisteredTowerLandings(world, context.registry()));
         }
         if (roads || fortification) {
-            edits.addAll(OverworldCampaignAudit148.repairRoadCorridors(world, context.registry()));
+            if (!roadIssues.isEmpty()) {
+                edits.addAll(repairDiagnosedRoads(world, context.registry(), roadIssues, attempt));
+                edits.addAll(stabilizeDiagnosedRoadEdges(world, context.registry(), roadIssues, attempt));
+            } else {
+                edits.addAll(OverworldCampaignAudit148.repairRoadCorridors(world, context.registry()));
+            }
             edits.addAll(repairRitualThreshold(world, context));
         }
         if (fortification) edits.addAll(repairBossGate(world, context));
-        if (terrain || attempt > 0) {
+        if (terrain) {
             int previousFailures = intProperty(memory, "failure.terrain", 0);
             edits.addAll(repairTerrainTransitions(world, context.registry(),
                     Math.max(2, 4 - Math.min(2, previousFailures + attempt))));
@@ -405,11 +418,12 @@ public final class OverworldAutoRepair148 {
             edits.addAll(OverworldCampaignAudit148.repairRegisteredTowerLandings(world, context.registry()));
             edits.addAll(OverworldCampaignAudit148.repairRegisteredChimneys(context.registry()));
             edits.addAll(repairTerrainTransitions(world, context.registry(), 3));
+            strategy = strategy + "+fallback";
         }
 
         List<BlockEdit> normalized = normalize(edits, center, radius, world);
-        String fingerprint = fingerprint(categories, normalized);
-        String description = String.join(", ", categories) + " · intento " + (attempt + 1);
+        String fingerprint = fingerprint(categories, normalized) + "-" + strategy;
+        String description = String.join(", ", categories) + " · " + strategy + " · intento " + (attempt + 1);
         return new RepairPlan(normalized, Set.copyOf(categories), fingerprint, description);
     }
 
@@ -522,6 +536,151 @@ public final class OverworldAutoRepair148 {
         return out;
     }
 
+    private static List<RoadIssue> parseRoadIssues(List<String> issues,
+                                                   OverworldCampaignAudit148.Registry registry) {
+        List<RoadIssue> out = new ArrayList<>();
+        Map<String, List<OverworldCampaignAudit148.RoadCell>> routes = registry.roadRoutesSnapshot();
+        for (String issue : issues) {
+            String lower = issue.toLowerCase(Locale.ROOT);
+            if (!lower.contains("camino cortado") && !lower.contains("corredor")) continue;
+            int colon = issue.indexOf(':');
+            int open = issue.indexOf('(', Math.max(0, colon));
+            String routeId = colon >= 0
+                    ? issue.substring(colon + 1, open > colon ? open : issue.length()).trim()
+                    : "";
+            int x = parseTaggedInt(issue, "x=");
+            int y = parseTaggedInt(issue, "y=");
+            int z = parseTaggedInt(issue, "z=");
+            if (!routeId.isBlank() && routes.containsKey(routeId) && x != Integer.MIN_VALUE
+                    && y != Integer.MIN_VALUE && z != Integer.MIN_VALUE) {
+                out.add(new RoadIssue(routeId, x, y, z));
+            }
+        }
+        return out;
+    }
+
+    private static int parseTaggedInt(String text, String tag) {
+        int start = text.indexOf(tag);
+        if (start < 0) return Integer.MIN_VALUE;
+        start += tag.length();
+        int end = start;
+        while (end < text.length()) {
+            char ch = text.charAt(end);
+            if ((ch >= '0' && ch <= '9') || ch == '-') {
+                end++;
+                continue;
+            }
+            break;
+        }
+        if (end <= start) return Integer.MIN_VALUE;
+        try { return Integer.parseInt(text.substring(start, end)); }
+        catch (NumberFormatException ignored) { return Integer.MIN_VALUE; }
+    }
+
+    private static List<BlockEdit> repairDiagnosedRoads(World world,
+                                                        OverworldCampaignAudit148.Registry registry,
+                                                        List<RoadIssue> issues,
+                                                        int attempt) {
+        List<BlockEdit> out = new ArrayList<>();
+        Map<String, List<OverworldCampaignAudit148.RoadCell>> routes = registry.roadRoutesSnapshot();
+        int reach = 8 + Math.max(0, attempt) * 4;
+        int widen = attempt >= 2 ? 1 : 0;
+        int headroom = attempt >= 2 ? 4 : 3;
+        for (RoadIssue issue : issues) {
+            List<OverworldCampaignAudit148.RoadCell> route = routes.get(issue.routeId());
+            if (route == null || route.isEmpty()) continue;
+            for (OverworldCampaignAudit148.RoadCell cell : route) {
+                if (Math.max(Math.abs(cell.x() - issue.x()), Math.abs(cell.z() - issue.z())) > reach) {
+                    continue;
+                }
+                for (int dx = -widen; dx <= widen; dx++) {
+                    for (int dz = -widen; dz <= widen; dz++) {
+                        if (Math.abs(dx) + Math.abs(dz) > Math.max(1, widen)) continue;
+                        int x = cell.x() + dx;
+                        int z = cell.z() + dz;
+                        if (registry.blocksStructureBody(x, cell.walkY(), z)) continue;
+                        Material floor = widenedRoadFloor(cell.floor(), dx, dz);
+                        OverworldCampaignTerrain148.supportedPathCell(out, world, x,
+                                cell.walkY(), z, floor);
+                        for (int y = cell.walkY(); y <= cell.walkY() + headroom; y++) {
+                            if (!registry.blocksStructureBody(x, y, z)) {
+                                out.add(new BlockEdit(x, y, z, Material.AIR));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static Material widenedRoadFloor(Material floor, int dx, int dz) {
+        if (dx == 0 && dz == 0) return floor;
+        if (floor == Material.DIRT_PATH || floor == Material.PACKED_MUD
+                || floor == Material.COARSE_DIRT || floor == Material.MUD_BRICKS) {
+            return Material.COARSE_DIRT;
+        }
+        if (floor == Material.STONE_BRICKS || floor == Material.MOSSY_STONE_BRICKS
+                || floor == Material.POLISHED_ANDESITE || floor == Material.ANDESITE) {
+            return Material.STONE_BRICKS;
+        }
+        if (floor == Material.DEEPSLATE_BRICKS || floor == Material.DEEPSLATE_TILES) {
+            return Material.DEEPSLATE_TILES;
+        }
+        if (floor == Material.SPRUCE_PLANKS) return Material.SPRUCE_PLANKS;
+        return floor;
+    }
+
+    private static List<BlockEdit> stabilizeDiagnosedRoadEdges(World world,
+                                                               OverworldCampaignAudit148.Registry registry,
+                                                               List<RoadIssue> issues,
+                                                               int attempt) {
+        List<BlockEdit> out = new ArrayList<>();
+        if (attempt <= 0) return out;
+        Map<String, List<OverworldCampaignAudit148.RoadCell>> routes = registry.roadRoutesSnapshot();
+        int reach = 6 + attempt * 4;
+        int shoulderRadius = attempt >= 2 ? 2 : 1;
+        for (RoadIssue issue : issues) {
+            List<OverworldCampaignAudit148.RoadCell> route = routes.get(issue.routeId());
+            if (route == null || route.isEmpty()) continue;
+            for (OverworldCampaignAudit148.RoadCell cell : route) {
+                if (Math.max(Math.abs(cell.x() - issue.x()), Math.abs(cell.z() - issue.z())) > reach) {
+                    continue;
+                }
+                for (int dx = -shoulderRadius; dx <= shoulderRadius; dx++) {
+                    for (int dz = -shoulderRadius; dz <= shoulderRadius; dz++) {
+                        if (Math.abs(dx) + Math.abs(dz) != shoulderRadius) continue;
+                        int x = cell.x() + dx;
+                        int z = cell.z() + dz;
+                        if (registry.blocksTerrainAudit(x, z) || registry.blocksStructureBody(x, cell.walkY(), z)) {
+                            continue;
+                        }
+                        stabilizeShoulderColumn(out, world, x, z, cell.walkY() - 1, cell.floor());
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void stabilizeShoulderColumn(List<BlockEdit> out, World world,
+                                                int x, int z, int targetTop,
+                                                Material roadFloor) {
+        int current = OverworldCampaignTerrain148.terrainY(world, x, z);
+        if (current >= targetTop - 1) {
+            replaceSurfaceIfBare(out, world, x, current, z);
+            return;
+        }
+        Material fill = roadFloor == Material.STONE_BRICKS || roadFloor == Material.MOSSY_STONE_BRICKS
+                || roadFloor == Material.POLISHED_ANDESITE || roadFloor == Material.ANDESITE
+                || roadFloor == Material.DEEPSLATE_BRICKS || roadFloor == Material.DEEPSLATE_TILES
+                ? Material.COBBLESTONE : Material.DIRT;
+        for (int y = current + 1; y < targetTop; y++) {
+            out.add(new BlockEdit(x, y, z, fill));
+        }
+        out.add(new BlockEdit(x, targetTop, z, fill == Material.DIRT ? Material.GRASS_BLOCK : fill));
+    }
+
     private static List<BlockEdit> normalize(List<BlockEdit> edits, Location center,
                                              int radius, World world) {
         Map<String, BlockEdit> unique = new LinkedHashMap<>();
@@ -541,7 +700,7 @@ public final class OverworldAutoRepair148 {
     private static Context loadContext(World world, Path folder) throws IOException {
         Properties properties = loadProperties(folder.resolve(CONTEXT_FILE));
         if (properties.isEmpty() || !Files.isRegularFile(folder.resolve(REGISTRY_FILE))) {
-            throw new IOException("La plantilla no tiene contexto de autorreparación 1.48.16. "
+            throw new IOException("La plantilla no tiene contexto de autorreparación 1.48.17. "
                     + "Regenera una revisión con esta versión.");
         }
         OverworldCampaignAudit148.Registry registry = new OverworldCampaignAudit148.Registry();
@@ -822,7 +981,7 @@ public final class OverworldAutoRepair148 {
     private static void writeScan(Path folder, Inspection inspection,
                                   RepairPlan plan) throws IOException {
         StringBuilder text = new StringBuilder();
-        text.append("ARLIGHTBINGO 1.48.16 AUTOREPAIR SCAN\n")
+        text.append("ARLIGHTBINGO 1.48.17 AUTOREPAIR SCAN\n")
                 .append("time=").append(Instant.now()).append('\n')
                 .append("clean=").append(inspection.clean()).append('\n')
                 .append("categories=").append(String.join(",", inspection.categories())).append('\n')

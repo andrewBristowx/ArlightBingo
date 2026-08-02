@@ -407,6 +407,37 @@ final class OverworldCampaignArchitecture148 {
         pillar(out, cx, y, cz + 4, 3, Material.POLISHED_DEEPSLATE_WALL, Material.SOUL_LANTERN);
     }
 
+    static void citadelCourtyardDetails(List<BlockEdit> out, int cx, int y, int cz) {
+        // Keep the central campaign lane open; occupy only the two side courts.
+        for (int side : new int[]{-1, 1}) {
+            int x = cx + side * 17;
+            int z = cz + 26;
+            for (int dx = -5; dx <= 5; dx++) for (int dz = -4; dz <= 4; dz++) {
+                if (Math.abs(dx) == 5 || Math.abs(dz) == 4) {
+                    Material border = Math.floorMod(dx * 7 + dz * 11, 8) == 0
+                            ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
+                    out.add(e(x + dx, y - 1, z + dz, border));
+                } else if (Math.floorMod(dx * 13 + dz * 5, 7) == 0) {
+                    out.add(e(x + dx, y - 1, z + dz, Material.POLISHED_ANDESITE));
+                }
+            }
+            pillar(out, x - 4, y, z - 3, 3, Material.POLISHED_DEEPSLATE_WALL,
+                    Material.LANTERN);
+            pillar(out, x + 4, y, z + 3, 3, Material.POLISHED_DEEPSLATE_WALL,
+                    Material.LANTERN);
+            out.add(e(x - 2, y, z, Material.BARREL));
+            out.add(e(x - 1, y, z, Material.CHEST));
+            out.add(e(x + 1, y, z, Material.SMITHING_TABLE));
+            out.add(e(x + 2, y, z, Material.ANVIL));
+            for (int bench = -3; bench <= 3; bench++) {
+                if (bench == 0) continue;
+                out.add(e(x + bench, y, z + (side < 0 ? 3 : -3), Material.SPRUCE_SLAB));
+            }
+            out.add(e(x, y, z + (side < 0 ? -2 : 2),
+                    side < 0 ? Material.GRINDSTONE : Material.TARGET));
+        }
+    }
+
     static void trainingYard(List<BlockEdit> out, int cx, int y, int cz) {
         for (int x = -12; x <= 12; x++) for (int z = -9; z <= 9; z++)
             out.add(e(cx + x, y - 1, cz + z, ((x + z) & 7) == 0 ? Material.GRAVEL : Material.COARSE_DIRT));
