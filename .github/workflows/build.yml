@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.48.11
+name: Compilar ArlightBingo 1.48.12
 
 on:
   workflow_dispatch:
@@ -30,32 +30,23 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Verificar fuente y restricciones 1.48.11
+      - name: Verificar fuente 1.48.12
         shell: bash
         run: |
           set -euo pipefail
-          grep -q '<version>1.48.11</version>' pom.xml
-          grep -q '^version: 1.48.11$' src/main/resources/plugin.yml
-          grep -q '^1.48.11$' BUILD_VERSION.txt
-          grep -q '^ArlightBingo 1.48.11 HOUSE-SHELL-BOSS-TERRAIN-RECOVERY$' SOURCE_VERSION.txt
-          grep -q 'campaign_1_48_anchor_only' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
-          grep -q '1.48.11-house-shell-boss-terrain-recovery-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
-          grep -q 'passed_1_48_11_house_shell_boss_terrain_recovery' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
-          grep -q 'closeEaves' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
-          grep -q 'house-path-' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
-          grep -q 'ceilingBeams' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
-          grep -q 'interiorColumns' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
-          grep -q 'greatHallDetails' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
-          grep -q 'complete_gatehouse_wall_wings' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
-          grep -q 'hueco bajo alero' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
-          grep -q 'camino de casa sin conectar' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
-          grep -q 'auditBossGatehouse' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
-          grep -q 'bossApproachWalkY' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
-          ! grep -q 'blendRoadShoulders(out' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
-          grep -q 'villageStreet(out, registry' src/main/java/com/arlight/bingo/listeners/OverworldCampaignStructures148.java
-          ! grep -q 'farmDistrict' src/main/java/com/arlight/bingo/listeners/OverworldCampaignStructures148.java
-          ! grep -Eq 'Material\.(FARMLAND|WHEAT|CARROTS|POTATOES|BEETROOTS|MELON_STEM|PUMPKIN_STEM)' src/main/java/com/arlight/bingo/listeners/OverworldCampaignStructures148.java
-          python3 scripts/validate_1_48_11.py
+          grep -q '<version>1.48.12</version>' pom.xml
+          grep -q '^version: 1.48.12$' src/main/resources/plugin.yml
+          grep -q '^1.48.12$' BUILD_VERSION.txt
+          grep -q '^ArlightBingo 1.48.12 TOWER-LANDING-CHIMNEY-RECOVERY$' SOURCE_VERSION.txt
+          grep -q '1.48.12-tower-landing-chimney-recovery-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q 'passed_1_48_12_tower_landing_chimney_recovery' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q 'repairRegisteredTowerLandings' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'repairRegisteredChimneys' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'int x = cx + side \* 5' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
+          grep -q 'if (target <= natural) continue;' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          test ! -d payloads/1.48.12
+          test ! -f trigger-1.48.12-finalize.txt
+          python3 scripts/validate_1_48_12.py
 
       - name: Descargar ArlightCore 1.20.0 canónico
         uses: actions/checkout@v4
@@ -77,37 +68,35 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp target/ArlightBingo-1.48.11.jar dist/
-          unzip -p dist/ArlightBingo-1.48.11.jar plugin.yml | grep -q '^version: 1.48.11$'
-          unzip -l dist/ArlightBingo-1.48.11.jar | grep -q 'OverworldCampaignBuilder148.class'
-          unzip -l dist/ArlightBingo-1.48.11.jar | grep -q 'OverworldCampaignTerrain148.class'
-          unzip -l dist/ArlightBingo-1.48.11.jar | grep -q 'OverworldCampaignArchitecture148.class'
-          unzip -l dist/ArlightBingo-1.48.11.jar | grep -q 'OverworldCampaignStructures148.class'
-          unzip -l dist/ArlightBingo-1.48.11.jar | grep -q 'OverworldCampaignLandscape148.class'
-          unzip -l dist/ArlightBingo-1.48.11.jar | grep -q 'OverworldCampaignAudit148.class'
+          cp target/ArlightBingo-1.48.12.jar dist/
+          unzip -p dist/ArlightBingo-1.48.12.jar plugin.yml | grep -q '^version: 1.48.12$'
+          unzip -l dist/ArlightBingo-1.48.12.jar | grep -q 'OverworldCampaignBuilder148.class'
+          unzip -l dist/ArlightBingo-1.48.12.jar | grep -q 'OverworldCampaignTerrain148.class'
+          unzip -l dist/ArlightBingo-1.48.12.jar | grep -q 'OverworldCampaignArchitecture148.class'
+          unzip -l dist/ArlightBingo-1.48.12.jar | grep -q 'OverworldCampaignAudit148.class'
 
       - name: Empaquetar entrega
         shell: bash
         run: |
           set -euo pipefail
-          DELIVERY='ArlightBingo-1.48.11-HOUSE-SHELL-BOSS-TERRAIN-RECOVERY'
+          DELIVERY='ArlightBingo-1.48.12-TOWER-LANDING-CHIMNEY-RECOVERY'
           mkdir -p package/${DELIVERY}-SOURCE
           rsync -a --exclude '.git/' --exclude 'arlight-core/' --exclude 'target/' --exclude 'dist/' --exclude 'package/' ./ package/${DELIVERY}-SOURCE/
           cd package
           zip -qr ${DELIVERY}-SOURCE.zip ${DELIVERY}-SOURCE
-          cp ../dist/ArlightBingo-1.48.11.jar .
-          sha256sum ArlightBingo-1.48.11.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.11-SHA256.txt
+          cp ../dist/ArlightBingo-1.48.12.jar .
+          sha256sum ArlightBingo-1.48.12.jar ${DELIVERY}-SOURCE.zip > ArlightBingo-1.48.12-SHA256.txt
           unzip -t ${DELIVERY}-SOURCE.zip
-          sha256sum -c ArlightBingo-1.48.11-SHA256.txt
+          sha256sum -c ArlightBingo-1.48.12-SHA256.txt
           rm -rf ${DELIVERY}-SOURCE
 
       - name: Subir entrega completa
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.48.11-DELIVERY
+          name: ArlightBingo-1.48.12-DELIVERY
           path: |
-            package/ArlightBingo-1.48.11.jar
-            package/ArlightBingo-1.48.11-HOUSE-SHELL-BOSS-TERRAIN-RECOVERY-SOURCE.zip
-            package/ArlightBingo-1.48.11-SHA256.txt
+            package/ArlightBingo-1.48.12.jar
+            package/ArlightBingo-1.48.12-TOWER-LANDING-CHIMNEY-RECOVERY-SOURCE.zip
+            package/ArlightBingo-1.48.12-SHA256.txt
           if-no-files-found: error
           retention-days: 90
