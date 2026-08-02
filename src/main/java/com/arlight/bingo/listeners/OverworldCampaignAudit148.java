@@ -5,15 +5,18 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.Bukkit;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
 
-/** Structural checks that prevent a visually broken 1.48.12 template from becoming READY. */
+/** Structural checks that prevent a visually broken 1.48.13 template from becoming READY. */
 final class OverworldCampaignAudit148 {
     enum Facing {
         NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
@@ -47,6 +50,8 @@ final class OverworldCampaignAudit148 {
     record RoadCell(String id, int x, int walkY, int z, Material floor) { }
 
     private record RoadColumn(int x, int z) { }
+
+    private record RoadNode(RoadCell planned, int actualWalkY) { }
 
     record Summary(int houses, int towers, int chimneys, int planters, int roadSamples,
                    int villageLights, int interiorLights, int furnishings, int crops,
@@ -257,19 +262,18 @@ final class OverworldCampaignAudit148 {
         for (FortificationSpec fortification : registry.fortifications) {
             auditFortificationFoundation(world, fortification, failures);
         }
-        Map<String, RoadCell> brokenRoads = new LinkedHashMap<>();
+        Map<String, List<RoadCell>> roadRoutes = new LinkedHashMap<>();
         for (RoadCell cell : registry.roadCells.values()) {
-            if (!isWalkable(world, cell.x, cell.walkY, cell.z)) {
-                brokenRoads.putIfAbsent(cell.id, cell);
-            }
+            roadRoutes.computeIfAbsent(cell.id, ignored -> new ArrayList<>()).add(cell);
         }
-        for (Map.Entry<String, RoadCell> broken : brokenRoads.entrySet()) {
-            RoadCell cell = broken.getValue();
-            Material floor = world.getBlockAt(cell.x, cell.walkY - 1, cell.z).getType();
-            Material passage = world.getBlockAt(cell.x, cell.walkY, cell.z).getType();
-            Material head = world.getBlockAt(cell.x, cell.walkY + 1, cell.z).getType();
-            failures.add("camino cortado: " + broken.getKey()
-                    + " (x=" + cell.x + ", y=" + cell.walkY + ", z=" + cell.z
+        for (Map.Entry<String, List<RoadCell>> route : roadRoutes.entrySet()) {
+            RoadCell broken = disconnectedRoadSample(world, route.getValue());
+            if (broken == null) continue;
+            Material floor = world.getBlockAt(broken.x, broken.walkY - 1, broken.z).getType();
+            Material passage = world.getBlockAt(broken.x, broken.walkY, broken.z).getType();
+            Material head = world.getBlockAt(broken.x, broken.walkY + 1, broken.z).getType();
+            failures.add("camino cortado en todo el corredor: " + route.getKey()
+                    + " (x=" + broken.x + ", y=" + broken.walkY + ", z=" + broken.z
                     + ", suelo=" + floor + ", paso=" + passage
                     + ", cabeza=" + head + ")");
         }
@@ -290,7 +294,7 @@ final class OverworldCampaignAudit148 {
 
         if (!failures.isEmpty()) {
             int limit = Math.min(12, failures.size());
-            throw new IllegalStateException("Auditoría estructural 1.48.12 rechazada: "
+            throw new IllegalStateException("Auditoría estructural 1.48.13 rechazada: "
                     + String.join("; ", failures.subList(0, limit)));
         }
         int interiorLights = countRegisteredInteriorLights(world, registry);
@@ -1038,12 +1042,131 @@ final class OverworldCampaignAudit148 {
         return lights;
     }
 
-    private static boolean isWalkable(World world, int x, int walkY, int z) {
-        Material floor = world.getBlockAt(x, walkY - 1, z).getType();
-        if (floor.isAir() || floor == Material.WATER || floor == Material.LAVA
-                || world.getBlockAt(x, walkY, z).getType().isSolid()
-                || world.getBlockAt(x, walkY + 1, z).getType().isSolid()) return false;
-        return true;
+    /**
+     * Audits a road as a corridor instead of requiring every decorative edge cell to be AIR.
+     * A valid route may use doors, bottom slabs, stairs and one-block height changes. A lamp,
+     * bench, wall post or house frame may occupy one lane as long as another lane remains
+     * continuously connected from one end of the registered route to the other.
+     */
+    private static RoadCell disconnectedRoadSample(World world, List<RoadCell> route) {
+        if (route.isEmpty()) return null;
+
+        int minimumX = Integer.MAX_VALUE;
+        int maximumX = Integer.MIN_VALUE;
+        int minimumZ = Integer.MAX_VALUE;
+        int maximumZ = Integer.MIN_VALUE;
+        Map<RoadColumn, RoadNode> nodes = new HashMap<>();
+        for (RoadCell cell : route) {
+            minimumX = Math.min(minimumX, cell.x);
+            maximumX = Math.max(maximumX, cell.x);
+            minimumZ = Math.min(minimumZ, cell.z);
+            maximumZ = Math.max(maximumZ, cell.z);
+            int actualWalkY = resolveRoadWalkY(world, cell.x, cell.walkY, cell.z);
+            if (actualWalkY != Integer.MIN_VALUE) {
+                nodes.put(new RoadColumn(cell.x, cell.z), new RoadNode(cell, actualWalkY));
+            }
+        }
+
+        boolean alongX = maximumX - minimumX >= maximumZ - minimumZ;
+        int routeMinimum = alongX ? minimumX : minimumZ;
+        int routeMaximum = alongX ? maximumX : maximumZ;
+        int span = routeMaximum - routeMinimum;
+        if (span <= 2) return nodes.isEmpty() ? route.get(0) : null;
+
+        int endpointTolerance = Math.max(1, Math.min(4, span / 8 + 1));
+        Set<RoadColumn> visited = new HashSet<>();
+        ArrayDeque<RoadColumn> pending = new ArrayDeque<>();
+        for (Map.Entry<RoadColumn, RoadNode> entry : nodes.entrySet()) {
+            if (!visited.add(entry.getKey())) continue;
+            pending.add(entry.getKey());
+            int componentMinimum = Integer.MAX_VALUE;
+            int componentMaximum = Integer.MIN_VALUE;
+            while (!pending.isEmpty()) {
+                RoadColumn currentColumn = pending.removeFirst();
+                RoadNode current = nodes.get(currentColumn);
+                int projection = alongX ? currentColumn.x : currentColumn.z;
+                componentMinimum = Math.min(componentMinimum, projection);
+                componentMaximum = Math.max(componentMaximum, projection);
+                for (int dx = -1; dx <= 1; dx++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dz == 0) continue;
+                        RoadColumn nextColumn = new RoadColumn(currentColumn.x + dx,
+                                currentColumn.z + dz);
+                        RoadNode next = nodes.get(nextColumn);
+                        if (next == null || visited.contains(nextColumn)) continue;
+                        if (Math.abs(current.actualWalkY - next.actualWalkY) > 1) continue;
+                        visited.add(nextColumn);
+                        pending.addLast(nextColumn);
+                    }
+                }
+            }
+            if (componentMinimum <= routeMinimum + endpointTolerance
+                    && componentMaximum >= routeMaximum - endpointTolerance) {
+                return null;
+            }
+        }
+
+        double middle = (routeMinimum + routeMaximum) / 2.0D;
+        RoadCell best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (RoadCell cell : route) {
+            if (resolveRoadWalkY(world, cell.x, cell.walkY, cell.z) != Integer.MIN_VALUE) continue;
+            int projection = alongX ? cell.x : cell.z;
+            double distance = Math.abs(projection - middle);
+            if (distance < bestDistance) {
+                best = cell;
+                bestDistance = distance;
+            }
+        }
+        if (best != null) return best;
+        for (RoadCell cell : route) {
+            int projection = alongX ? cell.x : cell.z;
+            double distance = Math.abs(projection - middle);
+            if (distance < bestDistance) {
+                best = cell;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    private static int resolveRoadWalkY(World world, int x, int plannedWalkY, int z) {
+        for (int offset : new int[]{0, 1, -1, 2}) {
+            int walkY = plannedWalkY + offset;
+            Material floor = world.getBlockAt(x, walkY - 1, z).getType();
+            Material feet = world.getBlockAt(x, walkY, z).getType();
+            Material head = world.getBlockAt(x, walkY + 1, z).getType();
+            if (isSafeRoadFloor(floor)
+                    && isPassableRoadSpace(feet)
+                    && isPassableRoadSpace(head)) return walkY;
+        }
+        return Integer.MIN_VALUE;
+    }
+
+    private static boolean isPassableRoadSpace(Material material) {
+        if (material == Material.WATER || material == Material.LAVA
+                || material == Material.POWDER_SNOW || material == Material.COBWEB
+                || material == Material.FIRE || material == Material.SOUL_FIRE) return false;
+        String name = material.name();
+        if (name.endsWith("_DOOR") || name.endsWith("_FENCE_GATE")) return true;
+        return !material.isSolid();
+    }
+
+    private static boolean isSafeRoadFloor(Material material) {
+        if (!material.isSolid() || material == Material.WATER || material == Material.LAVA
+                || material == Material.POWDER_SNOW || material == Material.CACTUS
+                || material == Material.MAGMA_BLOCK || material == Material.CAMPFIRE
+                || material == Material.SOUL_CAMPFIRE || material == Material.FIRE
+                || material == Material.SOUL_FIRE || material == Material.COBWEB
+                || material == Material.LANTERN || material == Material.SOUL_LANTERN
+                || material == Material.CHAIN || material == Material.IRON_BARS
+                || material == Material.GLASS_PANE) return false;
+        String name = material.name();
+        return !name.endsWith("_FENCE") && !name.endsWith("_FENCE_GATE")
+                && !name.endsWith("_WALL") && !name.endsWith("_DOOR")
+                && !name.endsWith("_TRAPDOOR") && !name.endsWith("_BUTTON")
+                && !name.endsWith("_PRESSURE_PLATE") && !name.endsWith("_SIGN")
+                && !name.endsWith("_HANGING_SIGN");
     }
 
     private static boolean blocksPassage(Material material) {
