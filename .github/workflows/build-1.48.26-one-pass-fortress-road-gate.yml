@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m pip install --quiet gdown
-          gdown 1g92rK8XjmNNFms2NqjbggBwqB5C2s8i4 -O source.zip
+          gdown 1ZpPWHM-Zen30cu-eAP_rm1Wq-Ly39ZXV -O source.zip
           echo '2ef2298346423994abaed7089c1667be13738154d62051f81595837614cd8ffa  source.zip' | sha256sum -c -
           unzip -q source.zip
           mv ArlightBingo-1.48.26-ONE-PASS-FORTRESS-ROAD-GATE-SOURCE source
