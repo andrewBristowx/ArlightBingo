@@ -1,0 +1,3 @@
+ArlightBingo 1.48.21 paths fix candidate.
+Source SHA-256: 8827caedd53707a80cd4cc34817b09b3c48555273fc011db735205ae5445c146
+Do not merge until server validation passes.
