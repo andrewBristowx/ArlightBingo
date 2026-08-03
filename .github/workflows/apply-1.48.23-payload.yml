@@ -1,0 +1,62 @@
+name: Aplicar ArlightBingo 1.48.23
+
+on:
+  push:
+    branches:
+      - candidate/bingo-1.48.23-fortress-integration-coliseum-closure
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-source:
+    if: github.event_name == 'push' || github.head_ref == 'candidate/bingo-1.48.23-fortress-integration-coliseum-closure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar rama candidata
+        uses: actions/checkout@v4
+        with:
+          ref: candidate/bingo-1.48.23-fortress-integration-coliseum-closure
+          fetch-depth: 0
+
+      - name: Comprobar paquete pendiente
+        id: pending
+        shell: bash
+        run: |
+          if compgen -G '.github/payloads/1.48.23/part-*' > /dev/null; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo 'La fuente 1.48.23 ya fue aplicada.'
+          fi
+
+      - name: Reconstruir y verificar paquete
+        if: steps.pending.outputs.exists == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/payloads/1.48.23/part-* | base64 --decode > /tmp/arlightbingo-1.48.23.tar.gz
+          echo 'cc0453d1d4ec01d7d9bf781269dc76cb24b6b22c4fe4c3384ccc82358eddcd86  /tmp/arlightbingo-1.48.23.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/arlightbingo-1.48.23.tar.gz -C .
+          rm -rf .github/payloads/1.48.23
+          rm -f .github/workflows/apply-1.48.23-payload.yml
+          python3 scripts/validate_1_48_23.py
+
+      - name: Publicar fuente real
+        if: steps.pending.outputs.exists == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'No hay cambios pendientes.'
+            exit 0
+          fi
+          git commit -m 'Aplicar ArlightBingo 1.48.23 integración de fortaleza y coliseo'
+          git push origin HEAD:candidate/bingo-1.48.23-fortress-integration-coliseum-closure
