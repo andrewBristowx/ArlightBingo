@@ -1,0 +1,84 @@
+name: Compilar ArlightBingo 1.48.26 una sola pasada
+
+on:
+  push:
+    branches:
+      - candidate/bingo-1.48.26-one-pass-fortress-road-gate
+  pull_request:
+    branches:
+      - candidate/bingo-1.48.25-final-gate-road-terrain-integration
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Descargar fuente exacta 1.48.26
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet gdown
+          gdown 1ZpPWHM-Zen30cu-eAP_rm1Wq-Ly39ZXV -O source.zip
+          echo '2ef2298346423994abaed7089c1667be13738154d62051f81595837614cd8ffa  source.zip' | sha256sum -c -
+          unzip -q source.zip
+          mv ArlightBingo-1.48.26-ONE-PASS-FORTRESS-ROAD-GATE-SOURCE source
+
+      - name: Validar fuente
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd source
+          python3 scripts/validate_1_48_26.py
+          grep -q '<version>1.48.26</version>' pom.xml
+          grep -q '^version: 1.48.26$' src/main/resources/plugin.yml
+          grep -q 'void clearRoute(String id)' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'anchorCitadelWallBase' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          grep -q 'blendCitadelWallEdge' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          grep -q 'Five-block-deep masonry jambs' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
+
+      - name: Descargar ArlightCore
+        uses: actions/checkout@v4
+        with:
+          repository: andrewBristowx/ArlightCore
+          ref: 597c130a5d5450ac92e02430def406ef22512bc9
+          path: arlight-core
+
+      - name: Instalar ArlightCore
+        run: mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
+
+      - name: Compilar Bingo
+        run: mvn -B -U -f source/pom.xml -DskipTests clean package
+
+      - name: Verificar y empaquetar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir package
+          cp source/target/ArlightBingo-1.48.26.jar package/
+          unzip -p package/ArlightBingo-1.48.26.jar plugin.yml | grep -q '^version: 1.48.26$'
+          jar tf package/ArlightBingo-1.48.26.jar > jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldCampaignTerrain148.class' jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldCampaignArchitecture148.class' jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldCampaignAudit148.class' jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldAutoRepair148.class' jar-contents.txt
+          cp source.zip package/ArlightBingo-1.48.26-ONE-PASS-FORTRESS-ROAD-GATE-SOURCE.zip
+          cd package
+          sha256sum ArlightBingo-1.48.26.jar ArlightBingo-1.48.26-ONE-PASS-FORTRESS-ROAD-GATE-SOURCE.zip > ArlightBingo-1.48.26-SHA256.txt
+          sha256sum -c ArlightBingo-1.48.26-SHA256.txt
+
+      - name: Subir entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.26-ONE-PASS-FORTRESS-ROAD-GATE-DELIVERY
+          path: package/*
+          retention-days: 90
