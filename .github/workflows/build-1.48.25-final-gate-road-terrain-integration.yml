@@ -1,0 +1,86 @@
+name: Compilar ArlightBingo 1.48.25 integración final
+
+on:
+  push:
+    branches:
+      - candidate/bingo-1.48.25-final-gate-road-terrain-integration
+  pull_request:
+    branches:
+      - candidate/bingo-1.48.24-gate-route-reconciliation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Descargar fuente exacta 1.48.25
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet gdown
+          gdown 1ZpPWHM-Zen30cu-eAP_rm1Wq-Ly39ZXV -O source.zip
+          echo '5497b21ec0d1006c935e44f28b87b11c75ca65a56ac470850a0b02fc1aa370c9  source.zip' | sha256sum -c -
+          unzip -q source.zip
+          mv ArlightBingo-1.48.25-FINAL-GATE-ROAD-TERRAIN-INTEGRATION-SOURCE source
+
+      - name: Validar fuente
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd source
+          python3 scripts/validate_1_48_25.py
+          grep -q '<version>1.48.25</version>' pom.xml
+          grep -q '^version: 1.48.25$' src/main/resources/plugin.yml
+          grep -q '1.48.25-final-gate-road-terrain-integration-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q 'BOSS_RITUAL_GATE_HALF_WIDTH = BOSS_GATE_CLEAR_HALF_WIDTH' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
+          grep -q 'reconcileRouteMembershipsToPhysicalPlan' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'repairRegisteredTowerFoundations' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'shapeRoadEmbankment' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          grep -q 'blendCitadelOuterSlope' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+
+      - name: Descargar ArlightCore
+        uses: actions/checkout@v4
+        with:
+          repository: andrewBristowx/ArlightCore
+          ref: 597c130a5d5450ac92e02430def406ef22512bc9
+          path: arlight-core
+
+      - name: Instalar ArlightCore
+        run: mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
+
+      - name: Compilar Bingo
+        run: mvn -B -U -f source/pom.xml -DskipTests clean package
+
+      - name: Verificar y empaquetar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir package
+          cp source/target/ArlightBingo-1.48.25.jar package/
+          unzip -p package/ArlightBingo-1.48.25.jar plugin.yml | grep -q '^version: 1.48.25$'
+          jar tf package/ArlightBingo-1.48.25.jar > jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldCampaignTerrain148.class' jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldCampaignArchitecture148.class' jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldCampaignAudit148.class' jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldAutoRepair148.class' jar-contents.txt
+          cp source.zip package/ArlightBingo-1.48.25-FINAL-GATE-ROAD-TERRAIN-INTEGRATION-SOURCE.zip
+          cd package
+          sha256sum ArlightBingo-1.48.25.jar ArlightBingo-1.48.25-FINAL-GATE-ROAD-TERRAIN-INTEGRATION-SOURCE.zip > ArlightBingo-1.48.25-SHA256.txt
+          sha256sum -c ArlightBingo-1.48.25-SHA256.txt
+
+      - name: Subir entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.25-FINAL-GATE-ROAD-TERRAIN-INTEGRATION-DELIVERY
+          path: package/*
+          retention-days: 90
