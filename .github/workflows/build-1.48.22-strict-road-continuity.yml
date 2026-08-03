@@ -1,0 +1,84 @@
+name: Compilar ArlightBingo 1.48.22 strict road continuity
+
+on:
+  push:
+    branches:
+      - candidate/bingo-1.48.22-strict-road-continuity
+  pull_request:
+    branches:
+      - candidate/bingo-1.48.21-paths-fix
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Descargar fuente 1.48.22
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet gdown
+          gdown 1ZpPWHM-Zen30cu-eAP_rm1Wq-Ly39ZXV -O source.zip
+          echo '56a1b6e45a2b91b0bf7885d3add02268488df6218fc77bd65e271c217fbde3d4  source.zip' | sha256sum -c -
+          unzip -q source.zip
+          mv ArlightBingo-1.48.22-STRICT-ROAD-CONTINUITY-SOURCE source
+
+      - name: Verificar fuente
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd source
+          python3 scripts/validate_1_48_22.py
+          grep -q '<version>1.48.22</version>' pom.xml
+          grep -q '^version: 1.48.22$' src/main/resources/plugin.yml
+          grep -q '^1.48.22$' BUILD_VERSION.txt
+          grep -q '^1.48.22$' SOURCE_VERSION.txt
+          grep -q '1.48.22-strict-road-continuity-1' src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java
+          grep -q 'restoreBossNorthMonumentalStairs' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          grep -q 'restoreAllRoadCorridorsStrict' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'Rebuild the complete declared route on the first pass' src/main/java/com/arlight/bingo/listeners/OverworldAutoRepair148.java
+
+      - name: Descargar ArlightCore
+        uses: actions/checkout@v4
+        with:
+          repository: andrewBristowx/ArlightCore
+          ref: 597c130a5d5450ac92e02430def406ef22512bc9
+          path: arlight-core
+
+      - name: Instalar ArlightCore
+        run: mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
+
+      - name: Compilar Bingo
+        run: mvn -B -U -f source/pom.xml -DskipTests clean package
+
+      - name: Verificar y empaquetar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir package
+          cp source/target/ArlightBingo-1.48.22.jar package/
+          unzip -p package/ArlightBingo-1.48.22.jar plugin.yml | grep -q '^version: 1.48.22$'
+          unzip -l package/ArlightBingo-1.48.22.jar | grep -q 'OverworldAutoRepair148.class'
+          unzip -l package/ArlightBingo-1.48.22.jar | grep -q 'OverworldCampaignAudit148.class'
+          unzip -l package/ArlightBingo-1.48.22.jar | grep -q 'OverworldCampaignTerrain148.class'
+          cp source.zip package/ArlightBingo-1.48.22-STRICT-ROAD-CONTINUITY-SOURCE.zip
+          cd package
+          sha256sum ArlightBingo-1.48.22.jar ArlightBingo-1.48.22-STRICT-ROAD-CONTINUITY-SOURCE.zip > ArlightBingo-1.48.22-SHA256.txt
+          sha256sum -c ArlightBingo-1.48.22-SHA256.txt
+
+      - name: Subir entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.22-STRICT-ROAD-CONTINUITY-DELIVERY
+          path: package/*
+          retention-days: 90
