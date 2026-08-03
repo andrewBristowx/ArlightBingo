@@ -1,0 +1,84 @@
+name: Compilar ArlightBingo 1.48.20 paths leaves fortress integrity
+
+on:
+  push:
+    branches:
+      - candidate/bingo-1.48.20-paths-leaves-fortress-integrity
+  pull_request:
+    branches:
+      - candidate/bingo-1.48.19-fortress-zoned-finalization
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Descargar fuente 1.48.20
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet gdown
+          gdown 1ZpPWHM-Zen30cu-eAP_rm1Wq-Ly39ZXV -O source.zip
+          echo '864e0f21d57a8236bacea1dd6ce231689c2bd8a0555750d09c60d65d349cb83e  source.zip' | sha256sum -c -
+          unzip -q source.zip
+          mv ArlightBingo-1.48.20-PATHS-LEAVES-FORTRESS-INTEGRITY-SOURCE source
+
+      - name: Verificar fuente
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd source
+          python3 scripts/validate_1_48_20.py
+          grep -q '<version>1.48.20</version>' pom.xml
+          grep -q '^version: 1.48.20$' src/main/resources/plugin.yml
+          grep -q 'persistent=true' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
+          grep -q 'restoreBossGatehouse' src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java
+          grep -q 'repairRegisteredTowerShells' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+          grep -q 'finalizeCitadelGround' src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java
+          grep -q 'id.startsWith("local-street-")' src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java
+
+      - name: Descargar ArlightCore
+        uses: actions/checkout@v4
+        with:
+          repository: andrewBristowx/ArlightCore
+          ref: 597c130a5d5450ac92e02430def406ef22512bc9
+          path: arlight-core
+
+      - name: Instalar ArlightCore
+        run: mvn -B -U -f arlight-core/pom.xml -DskipTests clean install
+
+      - name: Compilar Bingo
+        run: mvn -B -U -f source/pom.xml -DskipTests clean package
+
+      - name: Verificar y empaquetar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir package
+          cp source/target/ArlightBingo-1.48.20.jar package/
+          unzip -p package/ArlightBingo-1.48.20.jar plugin.yml | grep -q '^version: 1.48.20$'
+          unzip -l package/ArlightBingo-1.48.20.jar | grep -q 'OverworldCampaignArchitecture148.class'
+          unzip -l package/ArlightBingo-1.48.20.jar | grep -q 'OverworldCampaignTerrain148.class'
+          unzip -l package/ArlightBingo-1.48.20.jar | grep -q 'OverworldCampaignAudit148.class'
+          unzip -l package/ArlightBingo-1.48.20.jar | grep -q 'OverworldAutoRepair148.class'
+          cp source.zip package/ArlightBingo-1.48.20-PATHS-LEAVES-FORTRESS-INTEGRITY-SOURCE.zip
+          cd package
+          sha256sum ArlightBingo-1.48.20.jar ArlightBingo-1.48.20-PATHS-LEAVES-FORTRESS-INTEGRITY-SOURCE.zip > ArlightBingo-1.48.20-SHA256.txt
+          sha256sum -c ArlightBingo-1.48.20-SHA256.txt
+
+      - name: Subir entrega
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.20-PATHS-LEAVES-FORTRESS-INTEGRITY-DELIVERY
+          path: package/*
+          retention-days: 90
