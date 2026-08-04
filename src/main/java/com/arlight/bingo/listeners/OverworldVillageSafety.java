@@ -9,7 +9,10 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.server.ServerCommandEvent;
+import org.bukkit.event.server.TabCompleteEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.util.BoundingBox;
 
@@ -34,12 +37,14 @@ public final class OverworldVillageSafety implements Listener {
 
     private final BingoPlugin plugin;
     private final OverworldCampaignLandscape148 campaignLayout;
+    private final OverworldIslandLoreDecorator islandLoreDecorator;
     private final Map<UUID, SafeZone> zones = new HashMap<>();
     private final Map<UUID, Long> retryAfter = new HashMap<>();
 
     public OverworldVillageSafety(BingoPlugin plugin) {
         this.plugin = plugin;
         this.campaignLayout = new OverworldCampaignLandscape148(plugin);
+        this.islandLoreDecorator = new OverworldIslandLoreDecorator(plugin);
         long interval = Math.max(20L, plugin.getConfig().getLong(
                 "template-worlds.overworld.safe-village.purge-interval-ticks", 40L));
         Bukkit.getScheduler().runTaskTimer(plugin, this::maintenanceTick, interval, interval);
@@ -59,12 +64,34 @@ public final class OverworldVillageSafety implements Listener {
         campaignLayout.handleInteraction(event);
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
+        if (!islandLoreDecorator.matches(event.getMessage())) return;
+        event.setCancelled(true);
+        islandLoreDecorator.execute(event.getPlayer(), event.getMessage());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onServerCommand(ServerCommandEvent event) {
+        if (!islandLoreDecorator.matches(event.getCommand())) return;
+        event.setCancelled(true);
+        islandLoreDecorator.execute(event.getSender(), event.getCommand());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onTabComplete(TabCompleteEvent event) {
+        if (!islandLoreDecorator.matches(event.getBuffer())) return;
+        var completions = islandLoreDecorator.completions(event.getBuffer());
+        if (!completions.isEmpty()) event.setCompletions(completions);
+    }
+
     @EventHandler
     public void onWorldUnload(WorldUnloadEvent event) {
         UUID id = event.getWorld().getUID();
         zones.remove(id);
         retryAfter.remove(id);
         campaignLayout.onWorldUnload(event.getWorld());
+        islandLoreDecorator.onWorldUnload(event.getWorld());
     }
 
     private void maintenanceTick() {
