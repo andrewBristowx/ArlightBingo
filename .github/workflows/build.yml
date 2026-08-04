@@ -9,7 +9,7 @@ on:
       - '.github/workflows/build.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -19,6 +19,20 @@ jobs:
     steps:
       - name: Descargar repositorio
         uses: actions/checkout@v4
+
+      - name: Registrar ejecución
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/run-info
+          printf '%s\n' "$GITHUB_RUN_ID" > .github/run-info/LAST_RUN_ID_14831.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/run-info/LAST_RUN_ID_14831.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Registrar build 1.48.31 ${GITHUB_RUN_ID}"
+            git push origin HEAD:build/1.48.31-island-decorator
+          fi
 
       - name: Configurar Java 21
         uses: actions/setup-java@v4
