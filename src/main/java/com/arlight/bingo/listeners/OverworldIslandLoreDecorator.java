@@ -1429,7 +1429,7 @@ final class OverworldIslandLoreDecorator {
         meta.setAuthor(author);
         meta.setPages(pages);
         book.setItemMeta(meta);
-        lectern.setBook(book);
+        lectern.getInventory().setItem(0, book);
         lectern.update(true, false);
     }
 
