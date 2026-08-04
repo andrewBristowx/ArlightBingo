@@ -56,6 +56,10 @@ jobs:
           base64 -d /tmp/14832.patch.b64 > /tmp/14832.patch.tar.gz
           echo '424a5bc559689ea7617ab5af6f7ee998e79db84f23a89ae4d0b85bc75f82981d  /tmp/14832.patch.tar.gz' | sha256sum -c -
           tar -xzf /tmp/14832.patch.tar.gz -C .
+          sed -i 's/lectern\.setBook(book);/lectern.getInventory().setItem(0, book);/' \
+            src/main/java/com/arlight/bingo/listeners/OverworldIslandLoreDecorator.java
+          grep -q 'lectern.getInventory().setItem(0, book);' \
+            src/main/java/com/arlight/bingo/listeners/OverworldIslandLoreDecorator.java
           grep -q '<version>1.48.32</version>' pom.xml
           grep -q 'version: 1.48.32' src/main/resources/plugin.yml
           test -f src/main/java/com/arlight/bingo/listeners/OverworldIslandLoreDecorator.java
@@ -75,7 +79,7 @@ jobs:
             src/main/java/com/arlight/bingo/listeners/OverworldIslandLoreDecorator.java \
             src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
           if ! git diff --cached --quiet; then
-            git commit -m 'Implementar mina de lore y decoración de isla 1.48.32'
+            git commit -m 'Corregir diarios de la mina y compilar ArlightBingo 1.48.32'
             git push origin HEAD:build/1.48.32-lore-mine-decoration
           fi
 
