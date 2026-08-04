@@ -1,0 +1,15 @@
+ArlightBingo 1.48.30 MANUAL-COMMIT-FRONTIER-DRESSING
+
+Cambios principales
+- Añadido /bingo template overworld commit [force] para guardar manualmente la revisión de trabajo exactamente como quedó editada en el mundo, escribir el marcador COMPLETE y dejarla READY para audit/promote.
+- El commit manual ahora fuerza save-all flush, conserva la revisión activa en trabajo y registra que la aprobación fue manual o manual-force.
+- Mejorada la ambientación exterior de la isla sin rehacer las construcciones ya existentes: nuevos puertos/refugios costeros, más arboledas y vegetación alrededor del refugio inicial.
+- Reforzada la sensación de infección por corrosión de esmeralda musgosa con manchas exteriores, tótems de corrupción, árboles marchitos y cristales fuera de la ciudadela y distritos.
+- Actualizado el marcador estructural a 1.48.30-manual-commit-frontier-dressing-1 y añadida la propiedad frontierDecoration para la auditoría.
+
+Uso nuevo
+- /bingo template overworld commit
+- /bingo template overworld commit force
+
+Notas
+- El commit guarda la revisión candidata actual; después aún debes usar audit y promote cuando quieras volverla estable.
