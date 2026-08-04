@@ -76,18 +76,35 @@ jobs:
           echo "root=$ROOT" >> "$GITHUB_OUTPUT"
           echo "Proyecto: $ROOT"
 
+      - name: Importar fuente completa a la rama
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="${{ steps.source.outputs.root }}"
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            "$ROOT/" ./
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Importar fuente ArlightBingo 1.48.31'
+            git push origin HEAD:build/1.48.31-island-decorator
+          fi
+
       - name: Compilar con Maven
         shell: bash
         run: |
           set -euo pipefail
-          mvn -B -U -DskipTests -f "${{ steps.source.outputs.root }}/pom.xml" clean package
+          mvn -B -U -DskipTests clean package
 
       - name: Reunir JAR
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          find "${{ steps.source.outputs.root }}/target" -maxdepth 1 -type f -name '*.jar' \
+          find target -maxdepth 1 -type f -name '*.jar' \
             ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' \
             -exec cp {} dist/ \;
           test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
