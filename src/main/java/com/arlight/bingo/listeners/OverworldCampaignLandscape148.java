@@ -606,7 +606,8 @@ public final class OverworldCampaignLandscape148 {
         if (!activeGateAnimations.add(world.getUID())) return;
         int layers = Math.max(1, maxY - minY + 1);
         for (int layer = 0; layer < layers; layer++) {
-            final int y = minY + layer;
+            final int layerIndex = layer;
+            final int y = minY + layerIndex;
             plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
                 for (int x = minX; x <= maxX; x++) {
                     if (!world.getBlockAt(x, y, z).getType().isAir()) {
@@ -619,8 +620,8 @@ public final class OverworldCampaignLandscape148 {
                         Math.max(12, (maxX - minX + 1) * 2),
                         Math.max(1.0D, (maxX - minX) / 2.0D), 0.15D, 0.2D, 0.02D);
                 world.playSound(line, Sound.BLOCK_CHAIN_BREAK, 0.75F,
-                        0.75F + layer * 0.06F);
-            }, layer * 5L);
+                        0.75F + layerIndex * 0.06F);
+            }, layerIndex * 5L);
         }
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             activeGateAnimations.remove(world.getUID());
