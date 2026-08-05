@@ -22,9 +22,18 @@ public final class CampaignItemBridge {
     public static final String PONY_TREASURE_CHEST = "arlightbosses:pony_treasure_chest";
     public static final String DIAMOND_TREASURE_CHEST = "arlightbosses:diamond_treasure_chest";
     public static final String NETHERITE_TREASURE_CHEST = "arlightbosses:netherite_treasure_chest";
+    public static final String MOSSBOUND_HOME_MEDAL = "arlightbosses:mossbound_home_medal";
+    public static final String GILDED_TRADE_MEDAL = "arlightbosses:gilded_trade_medal";
+    public static final String EMERALD_BASTION_MEDAL = "arlightbosses:emerald_bastion_medal";
+    public static final String HOME_MEDAL_PEDESTAL = "arlightbosses:home_medal_pedestal";
+    public static final String TRADE_MEDAL_PEDESTAL = "arlightbosses:trade_medal_pedestal";
+    public static final String BASTION_MEDAL_PEDESTAL = "arlightbosses:bastion_medal_pedestal";
 
     private static final String IGNEOUS_TAG = "arlightbingo_has_igneous_key";
     private static final String DRAGON_TAG = "arlightbingo_has_dragon_key";
+    private static final String HOME_MEDAL_TAG = "arlightbingo_has_home_medal";
+    private static final String TRADE_MEDAL_TAG = "arlightbingo_has_trade_medal";
+    private static final String BASTION_MEDAL_TAG = "arlightbingo_has_bastion_medal";
 
     private CampaignItemBridge() { }
 
@@ -179,6 +188,11 @@ public final class CampaignItemBridge {
     }
 
 
+    /** Actualiza propiedades del bloque modded existente conservando su BlockEntity. */
+    public static boolean updateExistingModBlockProperties(Location location, Map<String, String> properties) {
+        return ArclightDirectBridge.updateExistingBlockProperties(location, properties);
+    }
+
     /**
      * Reproduce la animación nativa de un cofre de ArlightBosses sin ejecutar
      * comandos ni sustituir el bloque. El primer camino llama a la BlockEntity de
@@ -209,6 +223,9 @@ public final class CampaignItemBridge {
     private static String ownershipTag(String id) {
         if (IGNEOUS_KEY.equalsIgnoreCase(id)) return IGNEOUS_TAG;
         if (DRAGON_KEY.equalsIgnoreCase(id)) return DRAGON_TAG;
+        if (MOSSBOUND_HOME_MEDAL.equalsIgnoreCase(id)) return HOME_MEDAL_TAG;
+        if (GILDED_TRADE_MEDAL.equalsIgnoreCase(id)) return TRADE_MEDAL_TAG;
+        if (EMERALD_BASTION_MEDAL.equalsIgnoreCase(id)) return BASTION_MEDAL_TAG;
         return null;
     }
 }

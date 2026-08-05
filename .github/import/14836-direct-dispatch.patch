@@ -1,0 +1,262 @@
+diff -ruN a/BUILD_VERSION.txt b/BUILD_VERSION.txt
+--- a/BUILD_VERSION.txt	2026-08-05 01:49:07.000000000 +0000
++++ b/BUILD_VERSION.txt	2026-08-05 02:13:22.175809992 +0000
+@@ -1 +1 @@
+-ArlightBingo 1.48.35 CONNECTED-MINE-PERSISTENT-ECOLOGY-CORRUPTION
++ArlightBingo 1.48.36 DIRECT-TEMPLATE-UTILITY-DISPATCH
+diff -ruN a/CAMBIOS_1.48.36.txt b/CAMBIOS_1.48.36.txt
+--- a/CAMBIOS_1.48.36.txt	1970-01-01 00:00:00.000000000 +0000
++++ b/CAMBIOS_1.48.36.txt	2026-08-05 02:13:22.175889329 +0000
+@@ -0,0 +1,11 @@
++ArlightBingo 1.48.36 DIRECT-TEMPLATE-UTILITY-DISPATCH
++
++Corrección crítica
++- Los comandos recover, snapshot, village, commit y decorate ya no dependen únicamente de PlayerCommandPreprocessEvent o ServerCommandEvent.
++- BingoCommand los deriva directamente al controlador seguro del Overworld.
++- Corrige el mensaje «Acción de plantilla desconocida» al ejecutar /bingo template overworld recover apply all.
++- El snapshot interno de la recuperación también pasa por la ruta directa y puede iniciar correctamente.
++- El commit vuelve a pasar siempre por el controlador seguro con snapshot automático, evitando que el administrador llame accidentalmente al commit antiguo.
++- El autocompletado incorpora recover, snapshot, village, commit y decorate.
++
++No cambia la geometría de la mina, vegetación, campamentos, corrupción ni puerto añadida en 1.48.35.
+diff -ruN a/PROBAR_1.48.36.txt b/PROBAR_1.48.36.txt
+--- a/PROBAR_1.48.36.txt	1970-01-01 00:00:00.000000000 +0000
++++ b/PROBAR_1.48.36.txt	2026-08-05 02:13:22.175923771 +0000
+@@ -0,0 +1,7 @@
++1. Detener el servidor y reemplazar el JAR. No usar /reload.
++2. Confirmar en el inicio: ArlightBingo 1.48.36.
++3. Ejecutar: /bingo template overworld recover preview all
++4. Crear snapshot manual opcional: /bingo template overworld snapshot create pre-recover-14836
++5. Ejecutar: /bingo template overworld recover apply all
++6. Ver progreso: /bingo template overworld recover status
++7. Revisar el mundo antes del commit seguro.
+diff -ruN a/pom.xml b/pom.xml
+--- a/pom.xml	2026-08-05 01:49:07.000000000 +0000
++++ b/pom.xml	2026-08-05 02:13:22.175730454 +0000
+@@ -6,7 +6,7 @@
+ 
+     <groupId>com.arlight</groupId>
+     <artifactId>ArlightBingo</artifactId>
+-    <version>1.48.35</version>
++    <version>1.48.36</version>
+     <packaging>jar</packaging>
+ 
+     <properties>
+diff -ruN a/src/main/java/com/arlight/bingo/BingoPlugin.java b/src/main/java/com/arlight/bingo/BingoPlugin.java
+--- a/src/main/java/com/arlight/bingo/BingoPlugin.java	2026-08-05 01:59:33.000000000 +0000
++++ b/src/main/java/com/arlight/bingo/BingoPlugin.java	2026-08-05 02:11:46.665896266 +0000
+@@ -24,8 +24,11 @@
+ import com.arlight.bingo.template.OverworldTemplateManager;
+ import com.arlight.bingo.template.NetherTemplateManager;
+ import com.arlight.bingo.template.EndTemplateManager;
++import org.bukkit.command.CommandSender;
+ import org.bukkit.plugin.java.JavaPlugin;
+ 
++import java.util.List;
++
+ public class BingoPlugin extends JavaPlugin {
+ 
+     private ConfigManager configManager;
+@@ -42,9 +45,21 @@
+     private NetherTemplateManager netherTemplateManager;
+     private EndTemplateManager endTemplateManager;
+     private SomitaGuideNetwork somitaGuideNetwork;
++    private OverworldVillageSafety overworldVillageSafety;
+ 
+     public WorldPoolManager getWorldPoolManager() { return worldPoolManager; }
+ 
++    public boolean dispatchOverworldTemplateUtility(CommandSender sender, String rawCommand) {
++        return overworldVillageSafety != null
++                && overworldVillageSafety.dispatchTemplateUtility(sender, rawCommand);
++    }
++
++    public List<String> completeOverworldTemplateUtility(String rawCommand) {
++        return overworldVillageSafety == null
++                ? List.of()
++                : overworldVillageSafety.templateUtilityCompletions(rawCommand);
++    }
++
+     @Override
+     public void onEnable() {
+         saveDefaultConfig();
+@@ -76,7 +91,8 @@
+         getServer().getPluginManager().registerEvents(overworldTemplateManager, this);
+         getServer().getPluginManager().registerEvents(netherTemplateManager, this);
+         getServer().getPluginManager().registerEvents(endTemplateManager, this);
+-        getServer().getPluginManager().registerEvents(new OverworldVillageSafety(this), this);
++        this.overworldVillageSafety = new OverworldVillageSafety(this);
++        getServer().getPluginManager().registerEvents(overworldVillageSafety, this);
+         overworldTemplateManager.resumeIfNeeded();
+         netherTemplateManager.resumeIfNeeded();
+         endTemplateManager.resumeIfNeeded();
+diff -ruN a/src/main/java/com/arlight/bingo/commands/BingoCommand.java b/src/main/java/com/arlight/bingo/commands/BingoCommand.java
+--- a/src/main/java/com/arlight/bingo/commands/BingoCommand.java	2026-08-05 01:59:33.000000000 +0000
++++ b/src/main/java/com/arlight/bingo/commands/BingoCommand.java	2026-08-05 02:12:24.193895949 +0000
+@@ -55,6 +55,14 @@
+ 
+         String sub = args[0].toLowerCase();
+ 
++        if (sub.equals("template") && args.length >= 3
++                && args[1].equalsIgnoreCase("overworld")
++                && plugin instanceof BingoPlugin bingoPlugin) {
++            String rawUtilityCommand = "bingo " + String.join(" ", args);
++            List<String> utilityCompletions = bingoPlugin.completeOverworldTemplateUtility(rawUtilityCommand);
++            if (!utilityCompletions.isEmpty()) return utilityCompletions;
++        }
++
+         if (args.length == 2) {
+             switch (sub) {
+                 case "world":
+@@ -115,8 +123,9 @@
+                     }
+                     if (args[1].equalsIgnoreCase("overworld")) {
+                         return filter(Arrays.asList("generate", "resume", "status", "audit",
+-                                "revisions", "promote", "rollback", "force-stage",
+-                                "cancel", "reset", "tp", "lootr", "testboss"), args[2]);
++                                "revisions", "commit", "snapshot", "village", "recover", "decorate",
++                                "promote", "rollback", "force-stage", "cancel", "reset", "tp",
++                                "lootr", "testboss"), args[2]);
+                     }
+                     if (Arrays.asList("nether", "end").contains(args[1].toLowerCase())) {
+                         return filter(Arrays.asList("generate", "resume", "status", "audit",
+@@ -598,7 +607,7 @@
+                 }
+                 if (args.length < 3) {
+                     sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo template <overworld|nether|end|all> "
+-                            + "<generate|resume|status|audit|revisions|commit|promote|rollback|force-stage|cancel|reset|tp> [revisión]");
++                            + "<generate|resume|status|audit|revisions|commit|snapshot|village|recover|decorate|promote|rollback|force-stage|cancel|reset|tp> [opción]");
+                     return true;
+                 }
+ 
+@@ -627,6 +636,10 @@
+                 }
+ 
+                 if (dimension.equals("overworld")) {
++                    String rawUtilityCommand = "bingo " + String.join(" ", args);
++                    if (bingoPlugin.dispatchOverworldTemplateUtility(sender, rawUtilityCommand)) {
++                        return true;
++                    }
+                     var templates = bingoPlugin.getOverworldTemplateManager();
+                     switch (action) {
+                         case "generate" -> {
+diff -ruN a/src/main/java/com/arlight/bingo/listeners/OverworldCampaignRecoveryCommands.java b/src/main/java/com/arlight/bingo/listeners/OverworldCampaignRecoveryCommands.java
+--- a/src/main/java/com/arlight/bingo/listeners/OverworldCampaignRecoveryCommands.java	2026-08-05 01:59:33.000000000 +0000
++++ b/src/main/java/com/arlight/bingo/listeners/OverworldCampaignRecoveryCommands.java	2026-08-05 02:13:22.175591067 +0000
+@@ -134,7 +134,7 @@
+             return;
+         }
+         RecoveryPlan plan = plan(world, category);
+-        sender.sendMessage(ChatColor.AQUA + "=== Recuperación estructural Overworld 1.48.34 ===");
++        sender.sendMessage(ChatColor.AQUA + "=== Recuperación estructural Overworld 1.48.36 ===");
+         sender.sendMessage(ChatColor.GRAY + "- categoría=" + ChatColor.WHITE + category);
+         sender.sendMessage(ChatColor.GRAY + "- operaciones=" + ChatColor.WHITE + plan.edits().size());
+         sender.sendMessage(ChatColor.GRAY + "- reconstruye=" + ChatColor.WHITE
+@@ -387,7 +387,7 @@
+     private void writeRecoveryMarkers(World world, String category, String snapshot,
+                                       List<String> categories) {
+         Path folder = world.getWorldFolder().toPath();
+-        String text = "version=1.48.34\n"
++        String text = "version=1.48.36\n"
+                 + "recoveredAt=" + System.currentTimeMillis() + "\n"
+                 + "category=" + category + "\n"
+                 + "components=" + String.join(",", categories) + "\n"
+diff -ruN a/src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java b/src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
+--- a/src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java	2026-08-05 01:59:33.000000000 +0000
++++ b/src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java	2026-08-05 02:12:05.127297404 +0000
+@@ -3,6 +3,7 @@
+ import com.arlight.bingo.BingoPlugin;
+ import org.bukkit.Bukkit;
+ import org.bukkit.World;
++import org.bukkit.command.CommandSender;
+ import org.bukkit.entity.Entity;
+ import org.bukkit.entity.Monster;
+ import org.bukkit.event.EventHandler;
+@@ -22,6 +23,7 @@
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.util.HashMap;
++import java.util.List;
+ import java.util.Map;
+ import java.util.Properties;
+ import java.util.UUID;
+@@ -54,6 +56,31 @@
+         Bukkit.getScheduler().runTaskTimer(plugin, this::maintenanceTick, interval, interval);
+     }
+ 
++    public boolean dispatchTemplateUtility(CommandSender sender, String rawCommand) {
++        if (campaignRecoveryCommands.matches(rawCommand)) {
++            campaignRecoveryCommands.execute(sender, rawCommand);
++            return true;
++        }
++        if (recoveryCommands.matches(rawCommand)) {
++            recoveryCommands.execute(sender, rawCommand);
++            return true;
++        }
++        if (islandLoreDecorator.matches(rawCommand)) {
++            islandLoreDecorator.execute(sender, rawCommand);
++            return true;
++        }
++        return false;
++    }
++
++    public List<String> templateUtilityCompletions(String rawCommand) {
++        List<String> campaign = campaignRecoveryCommands.completions(rawCommand);
++        if (!campaign.isEmpty()) return campaign;
++        List<String> recovery = recoveryCommands.completions(rawCommand);
++        if (!recovery.isEmpty()) return recovery;
++        List<String> decoration = islandLoreDecorator.completions(rawCommand);
++        return decoration == null ? List.of() : decoration;
++    }
++
+     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+     public void onCreatureSpawn(CreatureSpawnEvent event) {
+         if (!(event.getEntity() instanceof Monster)) return;
+@@ -70,36 +97,14 @@
+ 
+     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+     public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
+-        if (campaignRecoveryCommands.matches(event.getMessage())) {
+-            event.setCancelled(true);
+-            campaignRecoveryCommands.execute(event.getPlayer(), event.getMessage());
+-            return;
+-        }
+-        if (recoveryCommands.matches(event.getMessage())) {
+-            event.setCancelled(true);
+-            recoveryCommands.execute(event.getPlayer(), event.getMessage());
+-            return;
+-        }
+-        if (!islandLoreDecorator.matches(event.getMessage())) return;
++        if (!dispatchTemplateUtility(event.getPlayer(), event.getMessage())) return;
+         event.setCancelled(true);
+-        islandLoreDecorator.execute(event.getPlayer(), event.getMessage());
+     }
+ 
+     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+     public void onServerCommand(ServerCommandEvent event) {
+-        if (campaignRecoveryCommands.matches(event.getCommand())) {
+-            event.setCancelled(true);
+-            campaignRecoveryCommands.execute(event.getSender(), event.getCommand());
+-            return;
+-        }
+-        if (recoveryCommands.matches(event.getCommand())) {
+-            event.setCancelled(true);
+-            recoveryCommands.execute(event.getSender(), event.getCommand());
+-            return;
+-        }
+-        if (!islandLoreDecorator.matches(event.getCommand())) return;
++        if (!dispatchTemplateUtility(event.getSender(), event.getCommand())) return;
+         event.setCancelled(true);
+-        islandLoreDecorator.execute(event.getSender(), event.getCommand());
+     }
+ 
+     @EventHandler(priority = EventPriority.HIGHEST)
+diff -ruN a/src/main/resources/plugin.yml b/src/main/resources/plugin.yml
+--- a/src/main/resources/plugin.yml	2026-08-05 01:49:07.000000000 +0000
++++ b/src/main/resources/plugin.yml	2026-08-05 02:13:22.175780108 +0000
+@@ -1,5 +1,5 @@
+ name: ArlightBingo
+-version: 1.48.35
++version: 1.48.36
+ main: com.arlight.bingo.BingoPlugin
+ api-version: '1.21'
+ softdepend: [ArlightCore, ArlightEventGuard, Chunky, Lootr, Multiverse-Core, Multiverse-NetherPortals, Multiverse-Inventories]

@@ -1,0 +1,33 @@
+PRUEBA DE SERVIDOR - ARLIGHTBINGO 1.48.4
+
+1. Apagar completamente el servidor. No usar /reload.
+2. Retirar 1.48.3 de plugins e instalar únicamente ArlightBingo-1.48.4.jar.
+3. Conservar fuera de plugins 1.48.3 y 1.48.2 como las dos revisiones de rollback.
+4. Encender y regenerar solo Overworld:
+
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.4-test1
+   /bingo template overworld status
+
+5. Esperar READY. Si aparece FAILED, copiar el mensaje completo una sola vez; no
+   reiniciar para repetir la construcción.
+6. Cuando aparezca READY, ejecutar:
+
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+7. Revisar visualmente:
+
+   - El cuartel militar conserva doce luces y su pedestal queda fuera del edificio.
+   - Ningún camino principal o sendero diagonal contiene agujeros de un bloque.
+   - Los porches están al ras y ninguna puerta queda detrás de una zanja o bloque.
+   - Cada torre tiene puerta orientada, suelo y descansillo despejado de 5x5.
+   - Los accesos de bastión, ciudadela, arena y portal tienen laterales de piedra,
+     sin tierra expuesta dentro del arco ni murallas suspendidas.
+   - La explanada militar tiene materiales variados y ramales hacia sus torres.
+   - Los bancos muestran respaldos verticales.
+   - Los cristales se unen al marco y entre sí; no aparecen como varillas aisladas.
+   - Las fachadas grandes tienen ventanas repartidas y no paños oscuros vacíos.
+   - La consola no informa `interior oscuro` ni `corte abrupto del terreno`.
+
+8. No regenerar Nether ni End durante esta prueba.

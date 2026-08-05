@@ -1,0 +1,14 @@
+ARLIGHTBINGO 1.48.21 - PATHS FIX
+
+Base: ArlightBingo 1.48.20 PATHS-LEAVES-FORTRESS-INTEGRITY.
+No modifica Nether, End ni la distribución de las aldeas.
+
+Cambios incluidos por el usuario:
+1. blendedSurface agrupa la selección de terreno natural en celdas 4x4 para evitar
+   bloques sueltos de tierra o grava con patrón "sal y pimienta" en laderas diseñadas.
+2. polishBossPortalRimJunction añade un puente de 14 pasos entre el final real de
+   boss-north-approach y boss-portal-north-rim.
+3. El puente interpola X, Z e Y, usa supportedPathCell y registra las celdas con el id
+   boss-portal-north-rim para que auditoría y autorreparación puedan reconocerlo.
+
+Esta versión solo cambia el número de versión y conserva el código del parche recibido.

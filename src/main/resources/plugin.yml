@@ -1,8 +1,8 @@
 name: ArlightBingo
-version: 1.39.1
+version: 1.48.42
 main: com.arlight.bingo.BingoPlugin
 api-version: '1.21'
-softdepend: [ArlightCore, Chunky, Lootr, Multiverse-Core, Multiverse-NetherPortals, Multiverse-Inventories]
+softdepend: [ArlightCore, ArlightEventGuard, Chunky, Lootr, Multiverse-Core, Multiverse-NetherPortals, Multiverse-Inventories]
 author: Arlight
 description: Minijuego de Bingo (items, bloques, mobs, logros y eventos modded) para el servidor Arlight
 

@@ -1,0 +1,27 @@
+ARLIGHTBINGO 1.48.4 - TERRENO, CAMINOS Y ESTADOS DE BLOQUE
+
+- El pedestal de recompensa militar sale del volumen del cuartel. Ya no elimina
+  una de sus doce luces ni puede provocar `interior oscuro en military-barracks`.
+- Los caminos usan una brocha circular continua en cada muestra. Las curvas y
+  diagonales dejan de producir agujeros de un bloque entre secciones redondeadas.
+- Los porches de viviendas usan bloques completos y quedan al ras del sendero;
+  ya no forman zanjas de media losa delante de las puertas.
+- Todas las torres reciben un descansillo sostenido de cinco bloques y orientan
+  la puerta hacia el interior de su recinto cuando corresponde.
+- Las puertas oeste del bastión, norte/este/oeste/sur de la ciudadela, norte de
+  la arena y norte del portal reciben accesos sostenidos y laterales revestidos.
+- Los soportes se detienen al encontrar terreno sólido. Ya no reemplazan doce
+  capas sanas por adoquín ni engañan a la auditoría como si fueran barrancos.
+- El borde orgánico conserva al menos dieciocho bloques de transición y la
+  auditoría ignora solamente columnas ocupadas por edificios, caminos y muros.
+- La explanada militar mezcla tierra gruesa, grava, andesita y toba, y suma
+  ramales pavimentados hacia las torres del norte para evitar un vacío uniforme.
+- Las fachadas generan ventanas de dos bloques centradas en cada paño. Los
+  paneles de cristal incluyen conexiones explícitas incluso al construir sin física.
+- Los respaldos de bancos usan trampillas abiertas verticales, no tablas flotantes.
+- La auditoría comprueba conexión de paneles, descansillos de torre, iluminación,
+  terreno libre de falsos positivos y todos los requisitos anteriores.
+- Un rechazo continúa siendo terminal en `FAILED` y nunca reinicia la obra en bucle.
+
+Esta candidata requiere reset y regeneración únicamente de Overworld. Nether y
+End no cambian.

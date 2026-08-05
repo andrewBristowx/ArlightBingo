@@ -1,0 +1,13 @@
+ARLIGHTBINGO 1.48.28 - FORTRESS FINISH, LIGHT & PORTAL CLEAR
+
+Alcance: solo plantilla Overworld. No modifica aldeas, Nether ni End.
+
+- Los caminos hacia la ciudadela siguen el terreno sin bajar y volver a subir.
+- Las transiciones de puerta se estrechan de 9 a 5 bloques y ya no parecen plataformas-muro.
+- La bajada norte del boss queda abierta hasta la superficie y revestida con muros de contención.
+- Los laterales de la puerta del boss reciben un delantal compacto apoyado, sin bolsas de césped.
+- Los accesos de la ciudadela y el pasaje del boss reciben iluminación invisible nivel 14.
+- El área central de 13x9 del santuario queda completamente libre para el portal del Nether.
+- Se eliminan los atriles del santuario; el mobiliario se conserva únicamente junto a los muros.
+- La auditoría rechaza accesos oscuros, huecos del portal ocupados y atriles dentro de la reserva.
+- La autorreparación conoce las categorías portal e iluminación y reaplica la terminación final.
