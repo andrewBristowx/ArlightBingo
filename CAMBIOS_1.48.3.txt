@@ -1,0 +1,25 @@
+ARLIGHTBINGO 1.48.3 - CORRECCIÓN VISUAL, COLISIONES Y CIMIENTOS
+
+- Las fachadas permanecen cerradas: el camino privado solo abre los dos bloques
+  ocupados por la puerta y conserva paredes laterales y dintel.
+- Los pisos superiores ya no eliminan esquinas enteras; únicamente reservan el
+  bloque vertical exacto de la escalera.
+- Faroles y postes consultan los volúmenes de casas, torres y sus corredores de
+  entrada antes de colocarse.
+- Casas y torres reciben una plataforma local anclada al terreno con transición
+  corta, en vez de una placa rectangular suspendida de cinco bloques.
+- Las murallas militares y de ciudadela usan soportes cuadrados; la arena conserva
+  soportes circulares que coinciden con sus cuatro anillos reales.
+- La puerta norte de la ciudadela tiene un acceso nivelado, sostenido y registrado
+  como camino para su repetición final.
+- El terreno del pueblo deja de aplicar ruido vertical independiente por columna,
+  eliminando los huecos de tablero visibles en 1.48.2.
+- La corrupción global por carga de chunk queda bloqueada cuando la campaña 1.48
+  está activa. Ya no puede introducir agujas de esmeralda, froglight ni ruinas
+  después de construir o durante la auditoría.
+- La auditoría comprueba pisos intermedios, doce bloques de apoyo bajo casas,
+  torres y murallas, además de conservar las comprobaciones de puertas, fachadas,
+  caminos, iluminación, chimeneas y estado FAILED terminal.
+
+Esta versión requiere regenerar únicamente la plantilla Overworld desde cero.
+No cambia Nether ni End.

@@ -1,0 +1,46 @@
+ArlightBingo 1.46.0 - ISLAND RECONSTRUCTION & BOSS GATE
+=========================================================
+
+TERRENO E ISLA
+- Sustituye la limpieza circular 1.45 por reconstrucción basada en el límite natural.
+- Cada huella heredada toma muestras alrededor de su borde y reconstruye pendiente,
+  costa, fondo oceánico y superficie sin confiar en los bloques dañados del interior.
+- Amplía las huellas de restauración para retirar torres, muros, casas, columnas y
+  plataformas que quedaron cortados fuera de los centros originales.
+- Elimina entidades heredadas dentro de las zonas retiradas, excepto jugadores.
+- Rellena cavidades con piedra, tierra o grava y reconstruye el agua solo donde la
+  costa natural indica océano.
+- Divide la restauración en franjas pequeñas y limita bloques y milisegundos por tick.
+
+PUEBLO INICIAL
+- Retira por completo el pueblo circular anterior y lo reconstruye en tres terrazas.
+- Añade calle principal, calles laterales, plaza con campana y fuente, salida marcada,
+  muros de contención, faroles, bancos, árboles y jardines.
+- Añade nueve edificios diferenciados: posada, herrería, cartógrafo, panadería,
+  viviendas, salón comunal y zonas de servicio.
+- Añade porches, chimeneas, talleres, almacenamiento, mobiliario e interiores útiles.
+- Actualiza el spawn seguro para aparecer en la entrada sur del pueblo reconstruido.
+
+CAMPAÑA Y ASENTAMIENTOS
+- Conserva la macrodistribución separada de 1.45 y mejora los tres asentamientos.
+- Añade más identidad residencial, comercial y militar y reduce espacios vacíos.
+- Mantiene los cuatro spawners y el cofre de misión esperados por la progresión.
+- Mantiene seis rutas con soportes, puentes, iluminación y desnivel máximo gradual.
+
+ARENA DEL JEFE
+- Elimina las cuatro torres de esquina de la arena.
+- Coloca dos torres monumentales en la única entrada norte.
+- La puerta permanece físicamente cerrada hasta reunir las tres piezas de campaña.
+- El altar exterior consume Emblema del Hogar, Emblema del Comercio y Núcleo Esmeralda.
+- Al completar los pedestales se abre la puerta, pero el jefe sigue dormido.
+- El altar central interior realiza una segunda interacción y recién entonces invoca
+  al Guardián de la Superficie.
+- Se usan marcadores separados para puerta abierta y jefe invocado, permitiendo
+  recuperación segura después de un reinicio.
+
+SEGURIDAD
+- 1.45.0 permanece intacta en su rama y PR anteriores.
+- La plantilla READY se oculta durante toda la reconstrucción 1.46.0.
+- Una plantilla parcial no puede clonarse ni promoverse.
+- No promover 1.46.0 hasta revisar visualmente la isla, el pueblo, las rutas y jugar
+  la progresión completa hasta derrotar al Guardián.

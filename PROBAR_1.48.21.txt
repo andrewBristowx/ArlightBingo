@@ -1,0 +1,16 @@
+PRUEBA ARLIGHTBINGO 1.48.21
+
+1. Apagar el servidor y conservar ArlightBingo 1.48.20 como respaldo.
+2. Instalar ArlightBingo-1.48.21.jar. No usar /reload.
+3. Generar una plantilla Overworld nueva:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.21-test1
+   /bingo template overworld status
+4. Al llegar a READY:
+   /bingo template overworld audit
+   /bingo template overworld tp
+5. Revisar:
+   - laderas y escaleras de citadel/military, sin tierra suelta salpicada;
+   - unión norte del boss entre boss.z()-74 y boss.z()-62;
+   - continuidad del camino hacia el portal.
+6. No reemplazar definitivamente 1.48.20 hasta aprobar la generación visual.

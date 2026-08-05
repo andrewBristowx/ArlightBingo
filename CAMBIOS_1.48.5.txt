@@ -1,0 +1,18 @@
+ARLIGHTBINGO 1.48.5 - FINALIZACIÓN DE PUERTAS Y ACCESOS
+
+Correcciones frente a 1.48.4:
+
+- La auditoría de torres valida la puerta real una sola vez y revisa el
+  descansillo desde el primer bloque exterior.
+- Una última fase restaura todas las puertas y accesos privados registrados
+  después de caminos, murallas y decoración.
+- El camino transversal de la arena se construye antes de las torres de la
+  puerta monumental, por lo que ya no elimina boss-gate-west/east.
+- El ramal de military-supply se aplica después de nivelar el edificio y
+  conserva su unión con la calle pública.
+- La auditoría sigue bloqueando puertas ausentes, pisos sin soporte y
+  corredores realmente obstruidos.
+- El estado FAILED continúa siendo terminal y no reinicia la construcción.
+
+Requiere reset y regeneración únicamente de Overworld.
+No regenera ni modifica Nether o End.

@@ -1,0 +1,59 @@
+PRUEBAS ARLIGHTBINGO 1.46.0
+============================
+
+INSTALACIÓN
+1. Conserva el JAR y la revisión 1.45.0 como respaldo.
+2. Apaga completamente el servidor. No uses /reload.
+3. Reemplaza únicamente el JAR de ArlightBingo y vuelve a iniciar.
+4. Comprueba:
+   /version ArlightBingo
+   Debe responder 1.46.0.
+
+GENERACIÓN LIMPIA
+5. Descarta solo la revisión de trabajo anterior:
+   /bingo template overworld reset
+6. Genera una revisión nueva:
+   /bingo template overworld generate island-1.46-test1
+7. Consulta:
+   /bingo template overworld status
+8. Espera el mensaje:
+   Overworld 1.46.0 completado
+9. Comprueba en la carpeta del mundo:
+   arlight-overworld-campaign-1.46.done
+   arlight-overworld-campaign-1.46.properties
+   arlight-overworld-campaign-1.46-report.txt
+
+REVISIÓN VISUAL
+10. Recorre la antigua costa oriental de las capturas 1.45:
+    - no deben quedar casas, torres, columnas ni murallas cortadas;
+    - no deben existir lagos rectangulares o agujeros artificiales;
+    - costa y laderas deben continuar de forma gradual;
+    - no debe haber bloques flotando sobre el océano.
+11. Revisa el pueblo inicial:
+    - tres terrazas conectadas;
+    - spawn en la entrada sur;
+    - calle principal y calles laterales;
+    - nueve edificios distintos con acceso e interior;
+    - plaza, campana, fuente, faroles, árboles, jardines y muros de contención.
+12. Revisa los tres asentamientos y sus caminos.
+13. Revisa la arena:
+    - solo dos torres principales en la entrada;
+    - puerta cerrada y sin acceso lateral normal;
+    - altar exterior delante de la puerta;
+    - altar de invocación en el centro.
+
+PRUEBA JUGABLE
+14. Inicia una partida y libera residencial, comercial y militar.
+15. Lleva las tres piezas al altar exterior y haz clic derecho.
+16. Comprueba que las piezas se consuman y la puerta se abra.
+17. Comprueba que el jefe todavía no ataque ni sea visible.
+18. Entra y haz clic derecho en el altar central.
+19. Comprueba que el Guardián aparezca con IA, brillo y vulnerabilidad.
+20. Derrota al jefe y verifica la progresión hacia el Nether.
+21. Reinicia una vez con la puerta abierta y antes de invocar; ambos estados deben persistir.
+
+AUDITORÍA
+22. Ejecuta:
+    /bingo template overworld audit
+    /bingo template overworld tp
+23. No ejecutes promote hasta aprobar todas las pruebas.
