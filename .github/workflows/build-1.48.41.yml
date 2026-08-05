@@ -29,13 +29,13 @@ jobs:
           ref: build/1.48.41-deterministic-recovery-organic-mine
 
       - name: Configurar Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
 
-      - name: Aplicar corrección 1.48.41
+      - name: Aplicar y validar corrección 1.48.41
         shell: bash
         run: |
           set -euo pipefail
@@ -43,7 +43,15 @@ jobs:
           if ! grep -q '<version>1.48.41</version>' pom.xml; then
             git apply /tmp/14841.patch
           fi
-          python scripts/validate_1_48_41.py
+          grep -q '<version>1.48.41</version>' pom.xml
+          grep -q 'version: 1.48.41' src/main/resources/plugin.yml
+          grep -q 'surfaceYAt' src/main/java/com/arlight/bingo/template/OverworldIslandGenerator.java
+          grep -q 'all-damage' src/main/java/com/arlight/bingo/listeners/OverworldTerrainBlendCommands.java
+          grep -q 'MinePathPoint' src/main/java/com/arlight/bingo/listeners/OverworldIslandLoreDecorator.java
+          if grep -q 'planAccessibleServiceLoop(plan, mine);' src/main/java/com/arlight/bingo/listeners/OverworldIslandLoreDecorator.java; then
+            echo 'La cuadrícula de corredores antigua sigue activa.' >&2
+            exit 1
+          fi
           git diff --check
 
       - name: Guardar fuente 1.48.41 en la rama
@@ -54,11 +62,10 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add pom.xml src/main/resources/plugin.yml BUILD_VERSION.txt SOURCE_VERSION.txt \
-            CAMBIOS_1.48.41.txt PROBAR_1.48.41.txt scripts/validate_1_48_41.py \
             src/main/java/com/arlight/bingo/listeners/OverworldCampaignRecoveryCommands.java \
             src/main/java/com/arlight/bingo/listeners/OverworldIslandLoreDecorator.java \
             src/main/java/com/arlight/bingo/listeners/OverworldTerrainBlendCommands.java \
-            src/main/java/com/arlight/bingo/world/OverworldIslandGenerator.java
+            src/main/java/com/arlight/bingo/template/OverworldIslandGenerator.java
           if ! git diff --cached --quiet; then
             git commit -m 'ArlightBingo 1.48.41: recuperación determinista y mina orgánica'
             git push origin HEAD:build/1.48.41-deterministic-recovery-organic-mine
@@ -86,7 +93,7 @@ jobs:
           unzip -p "$JAR" plugin.yml | grep -q 'version: 1.48.41'
           jar tf "$JAR" | grep -q 'com/arlight/bingo/listeners/OverworldTerrainBlendCommands.class'
           jar tf "$JAR" | grep -q 'com/arlight/bingo/listeners/OverworldIslandLoreDecorator.class'
-          jar tf "$JAR" | grep -q 'com/arlight/bingo/world/OverworldIslandGenerator.class'
+          jar tf "$JAR" | grep -q 'com/arlight/bingo/template/OverworldIslandGenerator.class'
 
       - name: Reunir entregables
         shell: bash
