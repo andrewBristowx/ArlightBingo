@@ -1,0 +1,16 @@
+ARLIGHTBINGO 1.48.8 - INTERIORES Y LUGARES DECORADOS
+
+Mejoras sobre 1.48.7
+- Cada edificio recibe mobiliario según su función: viviendas, posadas, panadería, herrería, cartógrafo, tiendas, almacenes, cuartel, armería y gran salón.
+- Las plantas superiores incluyen dormitorios o almacenes reales, sin bloquear escaleras.
+- Las torres reciben utilería por nivel y dejan de sentirse como columnas vacías.
+- El mercado muestra mercancías variadas en los puestos.
+- El patio de entrenamiento incorpora blancos, equipo, suministros y zona de herrería.
+- El santuario del portal incorpora bancos, atriles, ofrendas, cofres y cuatro braseros.
+- La arena incorpora braseros ceremoniales y puntos de suministros sin cerrar el corredor norte.
+- La auditoría exige un mínimo de mobiliario por planta y valida la utilería del portal y la arena.
+
+Alcance
+- Solo cambia el diseño generado del Overworld.
+- Requiere reset y generación limpia únicamente de la plantilla Overworld.
+- Nether y End no se regeneran.

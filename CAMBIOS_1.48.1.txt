@@ -1,0 +1,17 @@
+ArlightBingo 1.48.1 - ROUTE-AUDIT-LOOP-FIX
+
+- Corrige el bucle que reiniciaba la reconstrucción después de una auditoría rechazada.
+- Un fallo elimina el marcador in-progress, escribe un estado FAILED persistente y no vuelve a
+  intentarse hasta que el administrador solicite una generación nueva.
+- Mueve el farol que bloqueaba village-home-southwest.
+- Conecta village-hall con la calle pública mediante un tramo transitable real.
+- Alinea residential-lodge con la altura de su calle.
+- Hace converger cada carretera exactamente a la altura de sus puntos compartidos; los tramos
+  exteriores de la arena ya no registran el mismo cruce en dos niveles distintos.
+- Registra y audita todas las celdas transitables de las ocho rutas, no solo muestras aisladas.
+- Después de construir murallas y decoración, vuelve a abrir únicamente los corredores públicos
+  registrados para impedir que un muro, altar o adorno corte un camino válido.
+- Añade vanos enmarcados en la muralla militar y en los accesos norte, este y oeste de la
+  ciudadela, alineados con las rutas públicas.
+- Conserva íntegros el terreno, las casas cerradas, la arena, la campaña, Lootr y los tres mundos
+  de la candidata 1.48.0.

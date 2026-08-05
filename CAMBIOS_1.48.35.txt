@@ -1,0 +1,23 @@
+ArlightBingo 1.48.35 CONNECTED-MINE-PERSISTENT-ECOLOGY-CORRUPTION
+
+Cambios principales
+- La mina Umbraverde ahora queda conectada de extremo a extremo sin necesitar picar bloques.
+- Se reabren y aseguran las conexiones del taller, descanso, salón de extracción, bombeo, laboratorio de cuarentena, galería derrumbada, depósito y ramales laterales.
+- Se añade una aproximación final transitable hasta la geoda; si la geoda ya existía, se conserva su centro y altar como zona final.
+- Mina ampliada con taller, estación de bombeo, laboratorio de cuarentena, depósito de mineral y una quinta galería lateral.
+- Pisos de mina reforzados con capas inferiores, pilares y pasarelas para evitar salas o corredores suspendidos sobre cuevas.
+- Campamentos reconstruidos sobre terrazas adaptativas, muros de contención y soportes, evitando tiendas y objetos flotantes.
+- Cinco masas forestales mayores, más sotobosque, rocas, troncos caídos y puntos de descanso.
+- Las hojas nuevas y las hojas detectadas en las zonas decoradas se marcan como persistentes.
+- Corrupción de esmeralda musgosa mucho más extensa: tres venas principales, parches grandes, raíces, cristales y árboles enfermos.
+- El puerto editado manualmente continúa completamente excluido.
+- Nuevo alias /bingo template overworld decorate upgrade para aplicar únicamente las mejoras 1.48.35 pendientes.
+- El marcador registra la revisión aplicada por categoría para permitir actualizaciones parciales seguras.
+
+Uso recomendado
+1. /bingo template overworld snapshot create pre-14835
+2. /bingo template overworld decorate preview upgrade
+3. /bingo template overworld decorate upgrade
+4. /bingo template overworld decorate status
+5. Revisar visualmente la isla y la mina.
+6. /bingo template overworld commit

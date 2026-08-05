@@ -1,0 +1,11 @@
+ArlightBingo 1.48.36 DIRECT-TEMPLATE-UTILITY-DISPATCH
+
+Corrección crítica
+- Los comandos recover, snapshot, village, commit y decorate ya no dependen únicamente de PlayerCommandPreprocessEvent o ServerCommandEvent.
+- BingoCommand los deriva directamente al controlador seguro del Overworld.
+- Corrige el mensaje «Acción de plantilla desconocida» al ejecutar /bingo template overworld recover apply all.
+- El snapshot interno de la recuperación también pasa por la ruta directa y puede iniciar correctamente.
+- El commit vuelve a pasar siempre por el controlador seguro con snapshot automático, evitando que el administrador llame accidentalmente al commit antiguo.
+- El autocompletado incorpora recover, snapshot, village, commit y decorate.
+
+No cambia la geometría de la mina, vegetación, campamentos, corrupción ni puerto añadida en 1.48.35.
