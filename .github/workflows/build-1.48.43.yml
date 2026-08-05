@@ -43,6 +43,28 @@ jobs:
           if ! test -f src/main/java/com/arlight/bingo/listeners/OverworldRitualTestCommands.java; then
             git apply /tmp/14843.patch
           fi
+
+          # Una ejecución anterior guardó en la rama la variante que capturaba
+          # directamente la variable mutable del bucle. Corrígela también cuando
+          # la fuente 1.48.43 ya existe y, por tanto, el parche completo se omite.
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java')
+          text = path.read_text(encoding='utf-8')
+          old = '''        for (int layer = 0; layer < layers; layer++) {
+              final int y = minY + layer;
+              plugin.getServer().getScheduler().runTaskLater(plugin, () -> {'''
+          new = '''        for (int layer = 0; layer < layers; layer++) {
+              final int layerIndex = layer;
+              final int y = minY + layerIndex;
+              plugin.getServer().getScheduler().runTaskLater(plugin, () -> {'''
+          text = text.replace(old, new)
+          text = text.replace('0.75F + layer * 0.06F);', '0.75F + layerIndex * 0.06F);')
+          text = text.replace('}, layer * 5L);', '}, layerIndex * 5L);')
+          path.write_text(text, encoding='utf-8')
+          PY
+
           grep -q '<version>1.48.43</version>' pom.xml
           grep -q 'version: 1.48.43' src/main/resources/plugin.yml
           grep -q 'class OverworldRitualTestCommands' src/main/java/com/arlight/bingo/listeners/OverworldRitualTestCommands.java
@@ -52,6 +74,9 @@ jobs:
           grep -q 'TEST_GATE_MAX_Y = 96' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           grep -q 'TEST_GATE_Z = 192' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           grep -q 'debugRitualTestReset' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
+          grep -q 'final int layerIndex = layer' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
+          grep -q '0.75F + layerIndex \* 0.06F' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
+          ! grep -q '0.75F + layer \* 0.06F' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           grep -q 'void reset(World world)' src/main/java/com/arlight/bingo/listeners/OverworldMedalRitual.java
           git diff --check
 
@@ -69,7 +94,7 @@ jobs:
             src/main/java/com/arlight/bingo/listeners/OverworldMedalRitual.java \
             src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
           if ! git diff --cached --quiet; then
-            git commit -m 'ArlightBingo 1.48.43: prueba segura del ritual y reja'
+            git commit -m 'ArlightBingo 1.48.43: corregir animación segura de la reja'
             git push origin HEAD:feature/1.48.43-template-ritual-gate-test
           fi
 
