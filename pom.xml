@@ -6,7 +6,7 @@
 
     <groupId>com.arlight</groupId>
     <artifactId>ArlightBingo</artifactId>
-    <version>1.48.38</version>
+    <version>1.48.39</version>
     <packaging>jar</packaging>
 
     <properties>

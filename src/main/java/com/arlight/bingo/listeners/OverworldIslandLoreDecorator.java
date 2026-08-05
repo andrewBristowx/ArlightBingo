@@ -54,7 +54,7 @@ final class OverworldIslandLoreDecorator {
     private static final String TEMPLATE_MARKER = "arlight-overworld-template.properties";
     private static final String LEGACY_DECORATION_MARKER = "arlight-overworld-decoration.properties";
     private static final String LORE_MARKER = "arlight-overworld-lore-decoration.properties";
-    private static final String REVISION = "1.48.38-fixed-mine-legacy-scan-progressive-moss-biome-1";
+    private static final String REVISION = "1.48.39-mine-cleanup-independent-final-accessibility-spine-1";
     private static final int DEFAULT_BATCH = 1400;
     private static final int PORT_PROTECTION_RADIUS = 220;
 
@@ -100,7 +100,7 @@ final class OverworldIslandLoreDecorator {
             return;
         }
         if (action.equals("status")) {
-            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.38: "
+            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.39: "
                     + ChatColor.WHITE + status(sender));
             return;
         }
@@ -167,7 +167,7 @@ final class OverworldIslandLoreDecorator {
         List<MineSite> legacyMines = detectLegacyMineSitesRobust(world, anchors, storedMine);
         MineSite mine = fixedMainMineSite(world, anchors);
 
-        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.38 ===");
+        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.39 ===");
         sender.sendMessage(ChatColor.GRAY + "- categoría=" + ChatColor.WHITE + category);
         sender.sendMessage(ChatColor.GRAY + "- puerto=" + ChatColor.GREEN
                 + "PROTEGIDO: el comando no planifica ni cambia ningún bloque del puerto");
@@ -252,26 +252,46 @@ final class OverworldIslandLoreDecorator {
             return;
         }
 
-        Plan plan = new Plan();
+        Plan restorationPlan = new Plan();
         if (migrateMine) {
             for (MineSite legacy : legacyMines) {
-                planMineRestoration(world, plan, anchors, legacy);
+                planMineRestoration(world, restorationPlan, anchors, legacy);
             }
             existing.setProperty("mineLegacySitesRestoredLastRun", String.valueOf(legacyMines.size()));
             existing.setProperty("mineLegacyDetector", "dense-signature-scan+stored-marker+fixed-fallbacks");
         }
-        if (categories.contains("forests")) planForests(world, plan, anchors);
-        if (categories.contains("camps")) planCamps(world, plan, anchors, mine);
+
+        Plan decorationPlan = new Plan();
+        if (categories.contains("forests")) planForests(world, decorationPlan, anchors);
+        if (categories.contains("camps")) planCamps(world, decorationPlan, anchors, mine);
         boolean preserveExistingGeode = categories.contains("mine") && !migrateMine && storedMine != null;
+        boolean mineValidated = true;
         if (categories.contains("mine")) {
-            planLargeLoreMine(world, plan, anchors, mine, preserveExistingGeode);
-            if (!validateAccessibleMinePlan(plan, mine)) {
-                sender.sendMessage(ChatColor.RED + "La nueva mina no superó la auditoría interna de accesibilidad. "
-                        + "No se aplicó ningún bloque.");
+            planLargeLoreMine(world, decorationPlan, anchors, mine, preserveExistingGeode);
+            mineValidated = validateAccessibleMinePlan(decorationPlan, mine);
+        }
+        if (categories.contains("corruption")) planCorruption(world, decorationPlan, anchors, mine);
+
+        Plan plan = new Plan();
+        Set<String> appliedCategories = new LinkedHashSet<>(categories);
+        MineSite appliedMine = mine;
+        if (!mineValidated) {
+            if (restorationPlan.blocks.isEmpty()) {
+                sender.sendMessage(ChatColor.RED + "La mina nueva no superó la auditoría de accesibilidad y "
+                        + "no había restos antiguos que restaurar. No se aplicó ningún bloque.");
                 return;
             }
+            mergePlan(plan, restorationPlan);
+            appliedCategories.clear();
+            appliedCategories.add("mine-cleanup");
+            appliedMine = null;
+            sender.sendMessage(ChatColor.YELLOW + "La mina nueva no superó la auditoría. "
+                    + "Se aplicará únicamente la restauración independiente de las minas antiguas; "
+                    + "vuelve a ejecutar el comando después de terminar.");
+        } else {
+            mergePlan(plan, restorationPlan);
+            mergePlan(plan, decorationPlan);
         }
-        if (categories.contains("corruption")) planCorruption(world, plan, anchors, mine);
 
         if (plan.blocks.isEmpty()) {
             sender.sendMessage(ChatColor.RED + "No se encontraron ubicaciones naturales seguras para esta decoración.");
@@ -282,13 +302,14 @@ final class OverworldIslandLoreDecorator {
         int batch = Math.max(300, plugin.getConfig().getInt(
                 "template-worlds.overworld.lore-decoration.blocks-per-tick", DEFAULT_BATCH));
         activeWorld = world;
-        activeCategory = String.join(",", categories);
+        activeCategory = String.join(",", appliedCategories);
         processed = 0;
         changed = 0;
         total = operations.size();
         detail = "aplicando " + activeCategory;
         final int[] cursor = {0};
-        final MineSite finalMine = mine;
+        final MineSite finalMine = appliedMine;
+        final Set<String> finalCategories = Set.copyOf(appliedCategories);
 
         task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             int limit = Math.min(operations.size(), cursor[0] + batch);
@@ -311,12 +332,12 @@ final class OverworldIslandLoreDecorator {
                 }
             }
             world.save();
-            writeMarker(world, existing, categories, anchors, finalMine, changed);
+            writeMarker(world, existing, finalCategories, anchors, finalMine, changed);
             detail = "completa · " + changed + " bloques cambiados · puerto intacto";
             activeWorld = null;
 
             sender.sendMessage(ChatColor.GREEN + "Decoración terminada: " + activeCategory + ".");
-            if (categories.contains("mine") && finalMine != null) {
+            if (finalCategories.contains("mine") && finalMine != null) {
                 sender.sendMessage(ChatColor.GREEN + "Mina única restaurada y reconstruida con red accesible.");
                 sender.sendMessage(ChatColor.LIGHT_PURPLE + "Geoda gigante: " + ChatColor.WHITE
                         + finalMine.geodeX() + ", " + finalMine.geodeY() + ", " + finalMine.geodeZ());
@@ -327,15 +348,24 @@ final class OverworldIslandLoreDecorator {
                     + "Revisa la isla y guarda con /bingo template overworld commit.");
         }, 1L, 1L);
 
-        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.38 iniciada: " + activeCategory
+        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.39 iniciada: " + activeCategory
                 + " · " + operations.size() + " operaciones protegidas.");
         if (migrateMine) {
             sender.sendMessage(ChatColor.GRAY + "Minas antiguas detectadas para naturalizar: "
                     + legacyMines.size() + ". La restauración ya no depende de encontrar otra montaña.");
-            sender.sendMessage(ChatColor.GRAY + "Mina principal fija: " + finalMine.entranceX() + ","
-                    + finalMine.entranceY() + "," + finalMine.entranceZ() + ".");
+            if (finalMine != null) {
+                sender.sendMessage(ChatColor.GRAY + "Mina principal fija: " + finalMine.entranceX() + ","
+                        + finalMine.entranceY() + "," + finalMine.entranceZ() + ".");
+            }
         }
         sender.sendMessage(ChatColor.GRAY + "El puerto existente no forma parte del plan y no será modificado.");
+    }
+
+    private void mergePlan(Plan target, Plan source) {
+        for (PlannedBlock block : source.blocks.values()) {
+            target.blocks.put(Plan.blockKey(block.x(), block.y(), block.z()), block);
+        }
+        target.postActions.addAll(source.postActions);
     }
 
     private void cancel(CommandSender sender) {
@@ -1363,6 +1393,9 @@ final class OverworldIslandLoreDecorator {
             planPreservedGeodeAccess(plan, mine);
         }
         planMineLore(plan, mine);
+        // Última pasada autoritativa: ningún mueble, marco o geoda puede volver a cerrar
+        // el recorrido principal después de que se hayan colocado los detalles.
+        planFinalAccessibilitySpine(plan, mine);
     }
 
     private void planMineEntrance(World world, Plan plan, MineSite mine) {
@@ -1840,6 +1873,77 @@ final class OverworldIslandLoreDecorator {
         }
     }
 
+    private void planFinalAccessibilitySpine(Plan plan, MineSite mine) {
+        int px = -mine.dz();
+        int pz = mine.dx();
+
+        // Eje principal continuo, tres bloques de ancho y cuatro de alto.
+        for (int t = 0; t <= mine.tunnelLength(); t++) {
+            int floor = mine.entranceY() - 2 - t / 3;
+            int centerX = mine.entranceX() + mine.dx() * t;
+            int centerZ = mine.entranceZ() + mine.dz() * t;
+            for (int side = -1; side <= 1; side++) {
+                int x = centerX + px * side;
+                int z = centerZ + pz * side;
+                plan.put(x, floor, z, Material.POLISHED_ANDESITE, Rule.MINE);
+                plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= 4; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
+            }
+        }
+
+        // Dos galerías de servicio paralelas.
+        for (int lane : new int[]{-23, 23}) {
+            for (int t = 14; t <= 120; t++) {
+                int floor = mine.entranceY() - 2 - t / 3;
+                int centerX = mine.entranceX() + mine.dx() * t + px * lane;
+                int centerZ = mine.entranceZ() + mine.dz() * t + pz * lane;
+                for (int side = -1; side <= 1; side++) {
+                    int x = centerX + px * side;
+                    int z = centerZ + pz * side;
+                    plan.put(x, floor, z, Material.DEEPSLATE_TILES, Rule.MINE);
+                    plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
+                    for (int h = 1; h <= 4; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
+                }
+            }
+        }
+
+        // Cruces frecuentes entre las tres galerías.
+        int[] stations = {14, 18, 34, 47, 55, 68, 70, 79, 88, 94, 108, 112, 120};
+        for (int station : stations) {
+            int floor = mine.entranceY() - 2 - station / 3;
+            int centerX = mine.entranceX() + mine.dx() * station;
+            int centerZ = mine.entranceZ() + mine.dz() * station;
+            for (int offset = -23; offset <= 23; offset++) {
+                int crossX = centerX + px * offset;
+                int crossZ = centerZ + pz * offset;
+                for (int width = -1; width <= 1; width++) {
+                    int x = crossX + mine.dx() * width;
+                    int z = crossZ + mine.dz() * width;
+                    plan.put(x, floor, z, Material.POLISHED_ANDESITE, Rule.MINE);
+                    plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
+                    for (int h = 1; h <= 4; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
+                }
+            }
+        }
+
+        // Corredor final que atraviesa el marco y entra realmente en la geoda.
+        int projection = Math.abs((mine.geodeX() - mine.entranceX()) * mine.dx()
+                + (mine.geodeZ() - mine.entranceZ()) * mine.dz());
+        int gate = Math.max(0, projection - 20);
+        int end = Math.max(gate, projection - 6);
+        for (int t = gate; t <= end; t++) {
+            int centerX = mine.entranceX() + mine.dx() * t;
+            int centerZ = mine.entranceZ() + mine.dz() * t;
+            for (int side = -2; side <= 2; side++) {
+                int x = centerX + px * side;
+                int z = centerZ + pz * side;
+                plan.put(x, mine.bossY(), z, Material.POLISHED_DEEPSLATE, Rule.MINE);
+                plan.put(x, mine.bossY() - 1, z, Material.DEEPSLATE_BRICKS, Rule.MINE);
+                for (int h = 1; h <= 5; h++) plan.put(x, mine.bossY() + h, z, Material.AIR, Rule.MINE);
+            }
+        }
+    }
+
     private boolean validateAccessibleMinePlan(Plan plan, MineSite mine) {
         int px = -mine.dz();
         int pz = mine.dx();
@@ -1848,16 +1952,30 @@ final class OverworldIslandLoreDecorator {
             int floor = mine.entranceY() - 2 - station / 3;
             int x = mine.entranceX() + mine.dx() * station;
             int z = mine.entranceZ() + mine.dz() * station;
-            if (!plannedWalkable(plan, x, floor, z)) return false;
-            if (station >= 14 && !plannedWalkable(plan, x + px * 23, floor, z + pz * 23)) return false;
-            if (station >= 14 && !plannedWalkable(plan, x - px * 23, floor, z - pz * 23)) return false;
+            if (!plannedWalkableNear(plan, x, floor, z, 2, 1)) return false;
+            if (station >= 14 && !plannedWalkableNear(plan,
+                    x + px * 23, floor, z + pz * 23, 2, 1)) return false;
+            if (station >= 14 && !plannedWalkableNear(plan,
+                    x - px * 23, floor, z - pz * 23, 2, 1)) return false;
         }
         int projection = Math.abs((mine.geodeX() - mine.entranceX()) * mine.dx()
                 + (mine.geodeZ() - mine.entranceZ()) * mine.dz());
         int gate = Math.max(0, projection - 18);
         int gateX = mine.entranceX() + mine.dx() * gate;
         int gateZ = mine.entranceZ() + mine.dz() * gate;
-        return plannedWalkable(plan, gateX, mine.bossY(), gateZ);
+        return plannedWalkableNear(plan, gateX, mine.bossY(), gateZ, 4, 2);
+    }
+
+    private boolean plannedWalkableNear(Plan plan, int x, int floor, int z,
+                                        int horizontalRadius, int verticalRadius) {
+        for (int dy = -verticalRadius; dy <= verticalRadius; dy++) {
+            for (int ox = -horizontalRadius; ox <= horizontalRadius; ox++) {
+                for (int oz = -horizontalRadius; oz <= horizontalRadius; oz++) {
+                    if (plannedWalkable(plan, x + ox, floor + dy, z + oz)) return true;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean plannedWalkable(Plan plan, int x, int floor, int z) {
@@ -2799,7 +2917,7 @@ final class OverworldIslandLoreDecorator {
             Files.writeString(marker, text.toString(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException error) {
-            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.38: "
+            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.39: "
                     + error.getMessage());
         }
     }
