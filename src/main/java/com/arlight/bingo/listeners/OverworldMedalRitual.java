@@ -4,6 +4,7 @@ import com.arlight.bingo.BingoPlugin;
 import com.arlight.bingo.util.CampaignItemBridge;
 import com.arlight.bingo.util.CampaignMissionItems;
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
@@ -180,6 +181,7 @@ final class OverworldMedalRitual {
         world.spawnParticle(Particle.TOTEM_OF_UNDYING,
                 layout.ritualGate().clone().add(0.5D, 4.0D, 0.5D), 100,
                 4.5D, 3.0D, 1.5D, 0.05D);
+        runJointAnimation(world, layout, state);
 
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
             try {
@@ -194,7 +196,7 @@ final class OverworldMedalRitual {
             } finally {
                 activeUnlocks.remove(world.getUID());
             }
-        }, 48L);
+        }, 72L);
     }
 
     private Slot slotAt(Location clicked) {
@@ -210,8 +212,71 @@ final class OverworldMedalRitual {
             String current = location.getBlock().getBlockData().getAsString();
             if (current.contains("pedestal_state=" + state)) return;
         } catch (Throwable ignored) { }
-        CampaignItemBridge.updateExistingModBlockProperties(location,
-                Map.of("pedestal_state", state));
+        CampaignItemBridge.animateMedalPedestal(location, state);
+    }
+
+    /** Secuencia conjunta: pulso de los tres pedestales, triángulo de energía y descarga a la reja. */
+    private void runJointAnimation(World world, Layout layout, State state) {
+        List<Location> medals = new ArrayList<>();
+        for (Slot slot : Slot.values()) {
+            Location at = state.location(slot, world);
+            if (at != null) medals.add(at.clone().add(0.5D, 1.85D, 0.5D));
+        }
+        if (medals.size() != 3) return;
+        Location center = medals.get(0).clone().add(medals.get(1)).add(medals.get(2)).multiply(1.0D / 3.0D);
+        Location gate = layout.ritualGate().clone().add(0.5D, 3.6D, 0.5D);
+        Particle.DustOptions home = new Particle.DustOptions(Color.fromRGB(112, 214, 92), 1.25F);
+        Particle.DustOptions trade = new Particle.DustOptions(Color.fromRGB(255, 190, 55), 1.25F);
+        Particle.DustOptions bastion = new Particle.DustOptions(Color.fromRGB(42, 235, 157), 1.25F);
+        Particle.DustOptions[] colors = new Particle.DustOptions[]{home, trade, bastion};
+
+        for (int tick = 0; tick <= 64; tick += 2) {
+            final int frame = tick;
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                if (!activeUnlocks.contains(world.getUID())) return;
+                if (frame < 20) {
+                    for (int i = 0; i < medals.size(); i++) {
+                        Location at = medals.get(i);
+                        double radius = 0.45D + frame * 0.025D;
+                        for (int angle = 0; angle < 360; angle += 45) {
+                            double radians = Math.toRadians(angle + frame * 8.0D);
+                            world.spawnParticle(Particle.DUST, at.clone().add(
+                                    Math.cos(radians) * radius, 0.08D * Math.sin(radians * 2.0D),
+                                    Math.sin(radians) * radius), 1, 0, 0, 0, 0, colors[i]);
+                        }
+                    }
+                    if (frame == 0 || frame == 10) {
+                        world.playSound(center, Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 1.0F, 0.9F + frame * 0.02F);
+                    }
+                } else if (frame < 44) {
+                    for (int i = 0; i < 3; i++) {
+                        spawnBeam(world, medals.get(i), medals.get((i + 1) % 3), colors[i]);
+                        spawnBeam(world, medals.get(i), center, colors[i]);
+                    }
+                    world.spawnParticle(Particle.ENCHANT, center, 8, 0.35D, 0.35D, 0.35D, 0.02D);
+                    if (frame == 20) world.playSound(center, Sound.BLOCK_BEACON_ACTIVATE, 1.2F, 1.15F);
+                } else {
+                    for (int i = 0; i < 3; i++) spawnBeam(world, medals.get(i), center, colors[i]);
+                    spawnBeam(world, center, gate, bastion);
+                    world.spawnParticle(Particle.END_ROD, gate, 12, 0.65D, 0.75D, 0.25D, 0.03D);
+                    if (frame == 44) world.playSound(gate, Sound.BLOCK_CONDUIT_ACTIVATE, 1.3F, 0.8F);
+                }
+            }, tick);
+        }
+    }
+
+    private void spawnBeam(World world, Location from, Location to, Particle.DustOptions dust) {
+        double dx = to.getX() - from.getX();
+        double dy = to.getY() - from.getY();
+        double dz = to.getZ() - from.getZ();
+        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        int steps = Math.max(4, Math.min(42, (int) Math.ceil(length * 2.0D)));
+        for (int step = 0; step <= steps; step++) {
+            double t = step / (double) steps;
+            world.spawnParticle(Particle.DUST,
+                    from.getX() + dx * t, from.getY() + dy * t, from.getZ() + dz * t,
+                    1, 0, 0, 0, 0, dust);
+        }
     }
 
     private String insertionKey(World world, Location location) {
@@ -242,7 +307,7 @@ final class OverworldMedalRitual {
     private void save(World world, State state) {
         if (world == null || state == null) return;
         Properties properties = new Properties();
-        properties.setProperty("version", "1.48.43");
+        properties.setProperty("version", "1.48.44");
         properties.setProperty("unlocked", Boolean.toString(state.unlocked));
         for (Slot slot : Slot.values()) {
             properties.setProperty(slot.key + ".filled", Boolean.toString(state.filled(slot)));

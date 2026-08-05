@@ -194,6 +194,25 @@ public final class CampaignItemBridge {
     }
 
     /**
+     * Cambia el estado animado de un pedestal mediante su BlockEntity nativa.
+     * Este camino fuerza la sincronización cliente y evita que el modelo quede
+     * visualmente en EMPTY aunque el servidor ya haya consumido la medalla.
+     */
+    public static boolean animateMedalPedestal(Location location, String state) {
+        if (location == null || state == null) return false;
+        String method = switch (state.toLowerCase(Locale.ROOT)) {
+            case "inserting" -> "playExternalInsert";
+            case "filled" -> "playExternalFilled";
+            case "unlocking" -> "playExternalUnlock";
+            case "unlocked" -> "playExternalUnlocked";
+            default -> "playExternalReset";
+        };
+        if (ArclightDirectBridge.invokeBlockEntityMethod(location, method)) return true;
+        return ArclightDirectBridge.updateExistingBlockProperties(location,
+                Map.of("pedestal_state", state.toLowerCase(Locale.ROOT)));
+    }
+
+    /**
      * Reproduce la animación nativa de un cofre de ArlightBosses sin ejecutar
      * comandos ni sustituir el bloque. El primer camino llama a la BlockEntity de
      * ArlightBosses 1.19.0; el respaldo cambia sólo la propiedad visual existente.

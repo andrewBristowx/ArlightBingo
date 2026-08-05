@@ -473,7 +473,7 @@ public final class OverworldCampaignLandscape148 {
             saveGateSnapshot(world, folder.resolve(TEST_GATE_SNAPSHOT));
             Files.deleteIfExists(folder.resolve(TEST_OPEN_MARKER));
             Files.writeString(folder.resolve(TEST_ACTIVE_MARKER),
-                    "version=1.48.43\\nstarted=" + System.currentTimeMillis() + "\\n",
+                    "version=1.48.44\\nstarted=" + System.currentTimeMillis() + "\\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
             medalRitual.reset(world);
@@ -575,7 +575,7 @@ public final class OverworldCampaignLandscape148 {
 
     private void saveGateSnapshot(World world, Path file) throws IOException {
         Properties snapshot = new Properties();
-        snapshot.setProperty("version", "1.48.43");
+        snapshot.setProperty("version", "1.48.44");
         snapshot.setProperty("bounds", TEST_GATE_MIN_X + "," + TEST_GATE_MAX_X + ","
                 + TEST_GATE_MIN_Y + "," + TEST_GATE_MAX_Y + "," + TEST_GATE_Z);
         for (int x = TEST_GATE_MIN_X; x <= TEST_GATE_MAX_X; x++) {
@@ -645,7 +645,7 @@ public final class OverworldCampaignLandscape148 {
     private void writeMarker(Path marker, Player player, String stage) {
         try {
             Files.writeString(marker,
-                    "version=1.48.43\nstage=" + stage + "\nplayer="
+                    "version=1.48.44\nstage=" + stage + "\nplayer="
                             + (player == null ? "system" : player.getUniqueId())
                             + "\ntime=" + System.currentTimeMillis() + "\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
