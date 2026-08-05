@@ -54,12 +54,12 @@ final class OverworldIslandLoreDecorator {
     private static final String TEMPLATE_MARKER = "arlight-overworld-template.properties";
     private static final String LEGACY_DECORATION_MARKER = "arlight-overworld-decoration.properties";
     private static final String LORE_MARKER = "arlight-overworld-lore-decoration.properties";
-    private static final String REVISION = "1.48.32-lore-mine-forests-camps-corruption-1";
+    private static final String REVISION = "1.48.35-connected-mine-persistent-ecology-corruption-1";
     private static final int DEFAULT_BATCH = 1400;
     private static final int PORT_PROTECTION_RADIUS = 220;
 
     private static final List<String> ACTIONS = List.of(
-            "preview", "apply", "all", "forests", "camps", "mine", "corruption",
+            "preview", "apply", "upgrade", "all", "forests", "camps", "mine", "corruption",
             "status", "cancel", "force", "help"
     );
 
@@ -100,7 +100,7 @@ final class OverworldIslandLoreDecorator {
             return;
         }
         if (action.equals("status")) {
-            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.32: "
+            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.35: "
                     + ChatColor.WHITE + status(sender));
             return;
         }
@@ -114,6 +114,7 @@ final class OverworldIslandLoreDecorator {
                 ? (secondary.isBlank() ? "all" : secondary)
                 : action;
         if (category.equals("apply")) category = "all";
+        if (category.equals("upgrade")) category = "all";
 
         if (category.equals("preview")) {
             preview(sender, secondary.isBlank() ? "all" : secondary);
@@ -163,7 +164,7 @@ final class OverworldIslandLoreDecorator {
         Anchors anchors = loadAnchors(world);
         MineSite mine = findMineSite(world, anchors);
 
-        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.32 ===");
+        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.35 ===");
         sender.sendMessage(ChatColor.GRAY + "- categoría=" + ChatColor.WHITE + category);
         sender.sendMessage(ChatColor.GRAY + "- puerto=" + ChatColor.GREEN
                 + "PROTEGIDO: el comando no planifica ni cambia ningún bloque del puerto");
@@ -172,11 +173,11 @@ final class OverworldIslandLoreDecorator {
                     + coordinates(anchors.harbor()) + " · radio " + PORT_PROTECTION_RADIUS);
         }
         sender.sendMessage(ChatColor.GRAY + "- bosques=" + ChatColor.WHITE
-                + "3 bosques grandes e irregulares, incluido uno infectado y árboles caídos");
+                + "5 masas forestales grandes, sotobosque denso, troncos y hojas persistentes");
         sender.sendMessage(ChatColor.GRAY + "- campamentos=" + ChatColor.WHITE
-                + "exploradores, guardia abandonada y excavación infectada");
+                + "reconstrucción sobre terrazas y soportes para que ninguno quede flotando");
         sender.sendMessage(ChatColor.GRAY + "- corrupción=" + ChatColor.WHITE
-                + "rastros desde la mina hacia la fortaleza, cristales y vegetación enferma");
+                + "varias venas desde la mina, parches mayores, raíces, cristales y árboles enfermos");
         if (mine == null) {
             sender.sendMessage(ChatColor.RED + "- mina=no se encontró todavía una montaña natural segura");
         } else {
@@ -186,6 +187,8 @@ final class OverworldIslandLoreDecorator {
                     + mine.geodeX() + "," + mine.geodeY() + "," + mine.geodeZ());
             sender.sendMessage(ChatColor.GRAY + "- futura arena opcional=" + ChatColor.GOLD
                     + mine.bossX() + "," + mine.bossY() + "," + mine.bossZ());
+            sender.sendMessage(ChatColor.GRAY + "- conectividad=" + ChatColor.GREEN
+                    + "galería principal, cuartos, ramales y geoda conectados sin picar");
         }
         sender.sendMessage(ChatColor.YELLOW + "Aplicar con: " + ChatColor.WHITE
                 + "/bingo template overworld decorate " + category);
@@ -239,7 +242,11 @@ final class OverworldIslandLoreDecorator {
         Plan plan = new Plan();
         if (categories.contains("forests")) planForests(world, plan, anchors);
         if (categories.contains("camps")) planCamps(world, plan, anchors, mine);
-        if (categories.contains("mine")) planLargeLoreMine(world, plan, anchors, mine);
+        boolean preserveExistingGeode = Boolean.parseBoolean(existing.getProperty("mine", "false"))
+                && readMineSite(existing) != null;
+        if (categories.contains("mine")) {
+            planLargeLoreMine(world, plan, anchors, mine, preserveExistingGeode);
+        }
         if (categories.contains("corruption")) planCorruption(world, plan, anchors, mine);
 
         if (plan.blocks.isEmpty()) {
@@ -295,7 +302,7 @@ final class OverworldIslandLoreDecorator {
                     + "Revisa la isla y guarda con /bingo template overworld commit.");
         }, 1L, 1L);
 
-        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.32 iniciada: " + activeCategory
+        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.35 iniciada: " + activeCategory
                 + " · " + operations.size() + " operaciones protegidas.");
         sender.sendMessage(ChatColor.GRAY + "El puerto existente no forma parte del plan y no será modificado.");
     }
@@ -335,12 +342,12 @@ final class OverworldIslandLoreDecorator {
         if (category.equals("all")) requested.addAll(List.of("forests", "camps", "mine", "corruption"));
         else requested.add(category);
         if (force) return requested;
-        requested.removeIf(value -> Boolean.parseBoolean(existing.getProperty(value, "false")));
+        requested.removeIf(value -> REVISION.equals(existing.getProperty(value + "Revision", "")));
         return requested;
     }
 
     private String normalizeCategory(String raw) {
-        if (raw == null || raw.isBlank() || raw.equals("apply")) return "all";
+        if (raw == null || raw.isBlank() || raw.equals("apply") || raw.equals("upgrade")) return "all";
         String category = raw.toLowerCase(Locale.ROOT);
         if (Set.of("all", "forests", "camps", "mine", "corruption").contains(category)) return category;
         return null;
@@ -459,7 +466,7 @@ final class OverworldIslandLoreDecorator {
     }
 
     private MineSite buildMineSite(World world, MineCandidate candidate) {
-        int tunnelLength = 118;
+        int tunnelLength = 136;
         int geodeDistance = 136;
         int geodeX = candidate.x() + candidate.dx() * geodeDistance;
         int geodeZ = candidate.z() + candidate.dz() * geodeDistance;
@@ -508,15 +515,50 @@ final class OverworldIslandLoreDecorator {
     }
 
     private void planForests(World world, Plan plan, Anchors anchors) {
-        List<Anchor> centers = findDecorationSites(world, anchors, 3, 155, 335, 52, true);
-        long seed = 148320100L;
+        List<Anchor> centers = findDecorationSites(world, anchors, 5, 120, 405, 58, true);
+        long seed = 148350100L;
         for (int index = 0; index < centers.size(); index++) {
             Anchor center = centers.get(index);
-            boolean infected = index == centers.size() - 1;
-            int radius = infected ? 54 : 62 + index * 4;
-            int trees = infected ? 58 : 78 + index * 16;
+            boolean infected = index >= Math.max(2, centers.size() - 2);
+            int radius = infected ? 68 + index * 2 : 76 + index * 5;
+            int trees = infected ? 106 + index * 8 : 132 + index * 18;
             planLargeForest(world, plan, anchors, center, radius, trees, infected,
                     seed + index * 104729L);
+        }
+        planExistingLeafPersistence(world, plan, anchors);
+    }
+
+    private void planExistingLeafPersistence(World world, Plan plan, Anchors anchors) {
+        int minimumX = Math.min(anchors.village().x(), anchors.dungeon().x()) - 430;
+        int maximumX = Math.max(anchors.village().x(), anchors.dungeon().x()) + 430;
+        int minimumZ = Math.min(anchors.village().z(), anchors.dungeon().z()) - 430;
+        int maximumZ = Math.max(anchors.village().z(), anchors.dungeon().z()) + 430;
+        Set<Long> visited = new HashSet<>();
+        for (int x = minimumX; x <= maximumX; x += 6) {
+            for (int z = minimumZ; z <= maximumZ; z += 6) {
+                if (isProtectedPort(anchors, x, z)) continue;
+                int ground = surfaceY(world, x, z);
+                for (int y = ground + 1; y <= ground + 22; y++) {
+                    Material material = world.getBlockAt(x, y, z).getType();
+                    if (!isLeaf(material)) continue;
+                    for (int ox = -4; ox <= 4; ox++) {
+                        for (int oy = -5; oy <= 5; oy++) {
+                            for (int oz = -4; oz <= 4; oz++) {
+                                int bx = x + ox;
+                                int by = y + oy;
+                                int bz = z + oz;
+                                long key = Plan.blockKey(bx, by, bz);
+                                if (!visited.add(key)) continue;
+                                Material leaf = world.getBlockAt(bx, by, bz).getType();
+                                if (isLeaf(leaf)) {
+                                    plan.put(bx, by, bz, leaf, Rule.LEAF_PERSISTENCE);
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
         }
     }
 
@@ -524,7 +566,7 @@ final class OverworldIslandLoreDecorator {
                                  int radius, int treeCount, boolean infected, long seed) {
         Random random = new Random(seed);
         int accepted = 0;
-        int attempts = treeCount * 8;
+        int attempts = treeCount * 12;
         for (int attempt = 0; attempt < attempts && accepted < treeCount; attempt++) {
             double angle = random.nextDouble() * Math.PI * 2.0D;
             double distance = Math.sqrt(random.nextDouble()) * radius
@@ -537,21 +579,26 @@ final class OverworldIslandLoreDecorator {
             planTree(plan, x, y, z, height, infected, random);
             accepted++;
 
-            if (random.nextDouble() < 0.26D) {
+            if (random.nextDouble() < 0.52D) {
                 planUndergrowth(world, plan, anchors, x + random.nextInt(9) - 4,
                         z + random.nextInt(9) - 4, infected, random);
             }
-            if (random.nextDouble() < 0.10D) {
+            if (random.nextDouble() < 0.16D) {
                 planFallenLog(world, plan, anchors, x + random.nextInt(13) - 6,
                         z + random.nextInt(13) - 6, random);
             }
+            if (random.nextDouble() < 0.11D) {
+                planForestBoulder(world, plan, anchors, x + random.nextInt(17) - 8,
+                        z + random.nextInt(17) - 8, infected, random);
+            }
         }
 
-        for (int i = 0; i < radius * 2; i++) {
+        for (int i = 0; i < radius * 5; i++) {
             int x = center.x() + random.nextInt(radius * 2 + 1) - radius;
             int z = center.z() + random.nextInt(radius * 2 + 1) - radius;
             planUndergrowth(world, plan, anchors, x, z, infected, random);
         }
+        planForestWaypoint(world, plan, anchors, center, infected);
     }
 
     private void planTree(Plan plan, int x, int y, int z, int height,
@@ -638,11 +685,52 @@ final class OverworldIslandLoreDecorator {
         }
     }
 
+    private void planForestBoulder(World world, Plan plan, Anchors anchors,
+                                   int x, int z, boolean infected, Random random) {
+        if (!safeNaturalSurface(world, anchors, x, z, 3)) return;
+        int y = surfaceY(world, x, z) + 1;
+        int radius = 2 + random.nextInt(2);
+        for (int ox = -radius; ox <= radius; ox++) {
+            for (int oy = 0; oy <= radius; oy++) {
+                for (int oz = -radius; oz <= radius; oz++) {
+                    if (ox * ox + oz * oz + oy * oy > radius * radius + 1) continue;
+                    Material material = infected && Math.floorMod(ox + oy + oz, 5) == 0
+                            ? Material.MOSS_BLOCK
+                            : (random.nextBoolean() ? Material.MOSSY_COBBLESTONE : Material.ANDESITE);
+                    plan.put(x + ox, y + oy, z + oz, material, Rule.NATURAL_OR_AIR);
+                }
+            }
+        }
+    }
+
+    private void planForestWaypoint(World world, Plan plan, Anchors anchors,
+                                    Anchor center, boolean infected) {
+        int x = center.x();
+        int z = center.z();
+        if (!safeNaturalSurface(world, anchors, x, z, 5)) return;
+        int y = surfaceY(world, x, z) + 1;
+        Material base = infected ? Material.MOSSY_STONE_BRICKS : Material.COBBLESTONE;
+        for (int ox = -3; ox <= 3; ox++) {
+            for (int oz = -3; oz <= 3; oz++) {
+                if (ox * ox + oz * oz > 10) continue;
+                plan.put(x + ox, y - 1, z + oz, base, Rule.NATURAL);
+            }
+        }
+        for (int h = 0; h <= 5; h++) {
+            plan.put(x, y + h, z, infected ? Material.DARK_OAK_LOG : Material.SPRUCE_LOG,
+                    Rule.AIR_OR_PLANT);
+        }
+        plan.put(x, y + 6, z, infected ? Material.SOUL_LANTERN : Material.LANTERN,
+                Rule.AIR_OR_PLANT);
+        plan.put(x + 2, y, z, Material.BARREL, Rule.AIR_OR_PLANT);
+        plan.put(x - 2, y, z, Material.CAMPFIRE, Rule.AIR_OR_PLANT);
+    }
+
     private void planCamps(World world, Plan plan, Anchors anchors, MineSite mine) {
-        List<Anchor> sites = findDecorationSites(world, anchors, 3, 125, 310, 22, false);
+        List<Anchor> sites = findDecorationSites(world, anchors, 4, 120, 340, 24, false);
         for (int index = 0; index < sites.size(); index++) {
-            planCamp(world, plan, anchors, sites.get(index), index,
-                    148320700L + index * 8191L);
+            planCamp(world, plan, anchors, sites.get(index), index % 3,
+                    148350700L + index * 8191L);
         }
         if (mine != null) planMineSurfaceCamp(world, plan, anchors, mine);
     }
@@ -650,50 +738,146 @@ final class OverworldIslandLoreDecorator {
     private void planCamp(World world, Plan plan, Anchors anchors, Anchor center,
                           int type, long seed) {
         Random random = new Random(seed);
-        int y = surfaceY(world, center.x(), center.z()) + 1;
+        int baseY = medianSurfaceY(world, center.x(), center.z(), 11, 3);
         Material cloth = type == 0 ? Material.WHITE_WOOL
                 : type == 1 ? Material.GRAY_WOOL : Material.GREEN_WOOL;
         Material frame = type == 2 ? Material.DARK_OAK_LOG : Material.SPRUCE_LOG;
 
+        clearOldCampVolume(world, plan, center.x(), baseY, center.z(), 18, 11);
+        planCampTerrace(world, plan, center.x(), baseY, center.z(), 15, 12);
+
         for (int tent = -1; tent <= 1; tent += 2) {
             int tx = center.x() + tent * 8;
             int tz = center.z() + (tent == -1 ? -3 : 4);
+            int tentBase = baseY + 1;
             for (int length = -4; length <= 4; length++) {
                 for (int width = -3; width <= 3; width++) {
-                    int ground = surfaceY(world, tx + width, tz + length);
-                    if (Math.abs(ground - (y - 1)) > 2) continue;
                     int roofHeight = 4 - Math.abs(width);
                     if (roofHeight >= 1) {
-                        plan.put(tx + width, y + roofHeight, tz + length,
-                                cloth, Rule.AIR_OR_PLANT);
+                        plan.put(tx + width, tentBase + roofHeight, tz + length,
+                                cloth, Rule.CAMP_REPAIR);
                     }
                     if (Math.abs(width) == 3 && (length == -4 || length == 4)) {
                         for (int h = 0; h <= 4; h++) {
-                            plan.put(tx + width, y + h, tz + length,
-                                    frame, Rule.AIR_OR_PLANT);
+                            plan.put(tx + width, tentBase + h, tz + length,
+                                    frame, Rule.CAMP_REPAIR);
                         }
+                        for (int depth = 1; depth <= 6; depth++) {
+                            plan.put(tx + width, tentBase - depth, tz + length,
+                                    Material.COBBLESTONE, Rule.CAMP_REPAIR);
+                        }
+                    }
+                    if (Math.abs(width) <= 2) {
+                        plan.put(tx + width, baseY, tz + length,
+                                Math.floorMod(length + width, 7) == 0
+                                        ? Material.COARSE_DIRT : Material.PACKED_MUD,
+                                Rule.CAMP_REPAIR);
                     }
                 }
             }
         }
 
-        plan.put(center.x(), y, center.z(), Material.CAMPFIRE, Rule.AIR_OR_PLANT);
+        plan.put(center.x(), baseY + 1, center.z(), Material.CAMPFIRE, Rule.CAMP_REPAIR);
         for (int[] offset : new int[][]{{-2, 0}, {2, 0}, {0, -2}, {0, 2}}) {
-            plan.put(center.x() + offset[0], y, center.z() + offset[1],
-                    Material.STRIPPED_SPRUCE_LOG, Rule.AIR_OR_PLANT);
+            plan.put(center.x() + offset[0], baseY + 1, center.z() + offset[1],
+                    Material.STRIPPED_SPRUCE_LOG, Rule.CAMP_REPAIR);
         }
-        for (int i = 0; i < 7; i++) {
-            int x = center.x() + random.nextInt(15) - 7;
-            int z = center.z() + random.nextInt(15) - 7;
-            int sy = surfaceY(world, x, z) + 1;
-            plan.put(x, sy, z, i % 3 == 0 ? Material.BARREL : Material.OAK_FENCE,
-                    Rule.AIR_OR_PLANT);
-            if (i % 3 == 1) plan.put(x, sy + 1, z, Material.LANTERN, Rule.AIR);
+        for (int i = 0; i < 10; i++) {
+            int x = center.x() + random.nextInt(17) - 8;
+            int z = center.z() + random.nextInt(17) - 8;
+            Material decoration = switch (i % 5) {
+                case 0 -> Material.BARREL;
+                case 1 -> Material.CHEST;
+                case 2 -> Material.OAK_FENCE;
+                case 3 -> Material.CRAFTING_TABLE;
+                default -> Material.HAY_BLOCK;
+            };
+            plan.put(x, baseY + 1, z, decoration, Rule.CAMP_REPAIR);
+            if (i % 3 == 1) {
+                plan.put(x, baseY + 2, z, Material.LANTERN, Rule.CAMP_REPAIR);
+            }
         }
+
+        // Pequeña empalizada y acceso nivelado para integrar el campamento con el terreno.
+        for (int x = -10; x <= 10; x++) {
+            if (Math.abs(x) <= 2) continue;
+            if (Math.floorMod(x, 3) == 0) {
+                plan.put(center.x() + x, baseY + 1, center.z() - 10,
+                        Material.SPRUCE_FENCE, Rule.CAMP_REPAIR);
+            }
+        }
+        for (int step = 0; step <= 14; step++) {
+            int x = center.x();
+            int z = center.z() - 10 - step;
+            int ground = surfaceY(world, x, z);
+            int target = Math.max(Math.min(baseY, ground + 1), ground - 1);
+            plan.put(x, target, z, Material.DIRT_PATH, Rule.CAMP_REPAIR);
+            plan.put(x + 1, target, z, Material.COARSE_DIRT, Rule.CAMP_REPAIR);
+            plan.put(x - 1, target, z, Material.COARSE_DIRT, Rule.CAMP_REPAIR);
+        }
+
         if (type == 2) {
-            for (int i = 0; i < 5; i++) {
-                planCrystal(plan, center.x() + random.nextInt(17) - 8, y,
-                        center.z() + random.nextInt(17) - 8, 2 + random.nextInt(3));
+            for (int i = 0; i < 8; i++) {
+                planCrystal(plan, center.x() + random.nextInt(19) - 9, baseY + 1,
+                        center.z() + random.nextInt(19) - 9, 2 + random.nextInt(4));
+            }
+        }
+    }
+
+    private void clearOldCampVolume(World world, Plan plan, int cx, int baseY, int cz,
+                                    int radius, int height) {
+        for (int x = cx - radius; x <= cx + radius; x++) {
+            for (int z = cz - radius; z <= cz + radius; z++) {
+                if (distanceSquared(x, z, cx, cz) > (long) radius * radius) continue;
+                for (int y = baseY + 1; y <= baseY + height; y++) {
+                    Material current = world.getBlockAt(x, y, z).getType();
+                    if (isCampDecoration(current)) {
+                        plan.put(x, y, z, Material.AIR, Rule.CAMP_REPAIR);
+                    }
+                }
+            }
+        }
+    }
+
+    private void planCampTerrace(World world, Plan plan, int cx, int baseY, int cz,
+                                 int radiusX, int radiusZ) {
+        for (int ox = -radiusX; ox <= radiusX; ox++) {
+            for (int oz = -radiusZ; oz <= radiusZ; oz++) {
+                double normalized = square(ox / (double) radiusX)
+                        + square(oz / (double) radiusZ);
+                if (normalized > 1.0D) continue;
+                int x = cx + ox;
+                int z = cz + oz;
+                int surface = surfaceY(world, x, z);
+                int target = normalized <= 0.68D
+                        ? baseY
+                        : (int) Math.round(baseY + (surface - baseY) * ((normalized - 0.68D) / 0.32D));
+                target = Math.max(baseY - 2, Math.min(baseY + 2, target));
+
+                if (surface > target) {
+                    for (int y = target + 1; y <= Math.min(surface + 1, target + 10); y++) {
+                        plan.put(x, y, z, Material.AIR, Rule.CAMP_REPAIR);
+                    }
+                } else if (surface < target) {
+                    for (int y = surface + 1; y <= target; y++) {
+                        plan.put(x, y, z,
+                                normalized > 0.78D ? Material.COBBLESTONE : Material.PACKED_MUD,
+                                Rule.CAMP_REPAIR);
+                    }
+                }
+                Material top = normalized > 0.78D ? Material.MOSSY_COBBLESTONE
+                        : (Math.floorMod(x * 17 + z * 31, 9) == 0
+                        ? Material.COARSE_DIRT : Material.PACKED_MUD);
+                plan.put(x, target, z, top, Rule.CAMP_REPAIR);
+                plan.put(x, target - 1, z,
+                        normalized > 0.72D ? Material.COBBLESTONE : Material.DIRT,
+                        Rule.CAMP_REPAIR);
+
+                if (normalized > 0.82D && Math.floorMod(x + z, 3) == 0) {
+                    for (int depth = 2; depth <= 7; depth++) {
+                        plan.put(x, target - depth, z, Material.COBBLESTONE, Rule.CAMP_REPAIR);
+                    }
+                }
             }
         }
     }
@@ -703,21 +887,34 @@ final class OverworldIslandLoreDecorator {
         int pz = mine.dx();
         int cx = mine.entranceX() - mine.dx() * 12 + px * 16;
         int cz = mine.entranceZ() - mine.dz() * 12 + pz * 16;
-        if (!safeNaturalSurface(world, anchors, cx, cz, 8)) return;
+        if (!safeNaturalSurface(world, anchors, cx, cz, 8)
+                && !looksLikeCamp(world, cx, cz, 24)) return;
         planCamp(world, plan, anchors, surfaceAnchor(world, cx, cz), 0, 148321111L);
     }
 
-    private void planLargeLoreMine(World world, Plan plan, Anchors anchors, MineSite mine) {
+    private void planLargeLoreMine(World world, Plan plan, Anchors anchors, MineSite mine,
+                                   boolean preserveExistingGeode) {
         planMineEntrance(world, plan, mine);
         planMainTunnel(plan, mine);
+        planMineWorkshop(plan, mine, 18, -15);
         planExtractionHall(plan, mine, 55);
         planMinersRest(plan, mine, 34);
+        planPumpStation(plan, mine, 68, -15);
+        planQuarantineLab(plan, mine, 79, 16);
         planCollapsedGallery(plan, mine, 88);
+        planOreDepot(plan, mine, 108, 14);
         planBranchTunnel(plan, mine, 28, 1, 38, false);
         planBranchTunnel(plan, mine, 47, -1, 46, false);
         planBranchTunnel(plan, mine, 70, 1, 52, true);
         planBranchTunnel(plan, mine, 94, -1, 38, true);
-        planGeode(plan, mine);
+        planBranchTunnel(plan, mine, 112, 1, 30, true);
+        planMineConnections(plan, mine);
+        planFinalGeodeApproach(plan, mine, preserveExistingGeode);
+        if (!preserveExistingGeode) {
+            planGeode(plan, mine);
+        } else {
+            planPreservedGeodeAccess(plan, mine);
+        }
         planMineLore(plan, mine);
     }
 
@@ -793,6 +990,8 @@ final class OverworldIslandLoreDecorator {
                 Material floorMaterial = Math.floorMod(t + side, 11) == 0
                         ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_ANDESITE;
                 plan.put(x + px * side, floor, z + pz * side, floorMaterial, Rule.MINE);
+                plan.put(x + px * side, floor - 1, z + pz * side,
+                        Material.COBBLED_DEEPSLATE, Rule.MINE);
             }
             plan.put(x, floor + 1, z, Material.RAIL, Rule.MINE);
 
@@ -808,9 +1007,9 @@ final class OverworldIslandLoreDecorator {
                             Material.SPRUCE_LOG, Rule.MINE);
                 }
                 if (t % 14 == 0) {
-                    plan.put(x + px * 2, floor + 5, z + pz * 2,
+                    plan.put(x + px * 2, floor + 6, z + pz * 2,
                             Material.CHAIN, Rule.MINE);
-                    plan.put(x + px * 2, floor + 4, z + pz * 2,
+                    plan.put(x + px * 2, floor + 5, z + pz * 2,
                             Material.LANTERN, Rule.MINE);
                 }
             }
@@ -936,6 +1135,109 @@ final class OverworldIslandLoreDecorator {
         plan.put(cx, floor + 1, cz, Material.CAMPFIRE, Rule.MINE);
     }
 
+    private void planMineWorkshop(Plan plan, MineSite mine, int at, int sideOffset) {
+        int px = -mine.dz();
+        int pz = mine.dx();
+        int cx = mine.entranceX() + mine.dx() * at + px * sideOffset;
+        int cz = mine.entranceZ() + mine.dz() * at + pz * sideOffset;
+        int floor = mine.entranceY() - 2 - at / 3;
+        planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 9, 8, 7,
+                Material.STONE_BRICKS, Material.POLISHED_ANDESITE);
+        int[][] stations = {{-5, -5}, {-5, 0}, {-5, 5}, {5, -5}, {5, 0}, {5, 5}};
+        Material[] blocks = {
+                Material.CRAFTING_TABLE, Material.SMITHING_TABLE, Material.STONECUTTER,
+                Material.BLAST_FURNACE, Material.ANVIL, Material.GRINDSTONE
+        };
+        for (int i = 0; i < stations.length; i++) {
+            int forward = stations[i][0];
+            int side = stations[i][1];
+            plan.put(cx + mine.dx() * forward + px * side, floor + 1,
+                    cz + mine.dz() * forward + pz * side, blocks[i], Rule.MINE);
+        }
+        for (int side = -5; side <= 5; side += 5) {
+            plan.put(cx + px * side, floor + 1, cz + pz * side, Material.BARREL, Rule.MINE);
+            plan.put(cx + px * side, floor + 6, cz + pz * side, Material.LANTERN, Rule.MINE);
+        }
+    }
+
+    private void planPumpStation(Plan plan, MineSite mine, int at, int sideOffset) {
+        int px = -mine.dz();
+        int pz = mine.dx();
+        int cx = mine.entranceX() + mine.dx() * at + px * sideOffset;
+        int cz = mine.entranceZ() + mine.dz() * at + pz * sideOffset;
+        int floor = mine.entranceY() - 2 - at / 3;
+        planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 8, 8, 8,
+                Material.DEEPSLATE_BRICKS, Material.COBBLED_DEEPSLATE);
+        for (int forward = -5; forward <= 5; forward += 5) {
+            for (int side = -4; side <= 4; side += 4) {
+                int x = cx + mine.dx() * forward + px * side;
+                int z = cz + mine.dz() * forward + pz * side;
+                plan.put(x, floor + 1, z, Material.CAULDRON, Rule.MINE);
+                plan.put(x, floor + 2, z, Material.CHAIN, Rule.MINE);
+            }
+        }
+        for (int forward = -6; forward <= 6; forward++) {
+            int x = cx + mine.dx() * forward;
+            int z = cz + mine.dz() * forward;
+            plan.put(x, floor + 1, z, Material.WATER, Rule.MINE);
+            plan.put(x + px, floor + 1, z + pz, Material.IRON_BARS, Rule.MINE);
+            plan.put(x - px, floor + 1, z - pz, Material.IRON_BARS, Rule.MINE);
+        }
+        plan.put(cx, floor + 6, cz, Material.LANTERN, Rule.MINE);
+    }
+
+    private void planQuarantineLab(Plan plan, MineSite mine, int at, int sideOffset) {
+        int px = -mine.dz();
+        int pz = mine.dx();
+        int cx = mine.entranceX() + mine.dx() * at + px * sideOffset;
+        int cz = mine.entranceZ() + mine.dz() * at + pz * sideOffset;
+        int floor = mine.entranceY() - 2 - at / 3;
+        planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 10, 8, 7,
+                Material.POLISHED_DEEPSLATE, Material.DEEPSLATE_TILES);
+        for (int side = -5; side <= 5; side += 5) {
+            for (int forward = -6; forward <= 6; forward += 6) {
+                int x = cx + mine.dx() * forward + px * side;
+                int z = cz + mine.dz() * forward + pz * side;
+                plan.put(x, floor + 1, z, Material.GLASS, Rule.MINE);
+                plan.put(x, floor + 2, z, Material.GLASS, Rule.MINE);
+                plan.put(x, floor + 3, z, Material.GLASS, Rule.MINE);
+                plan.put(x + px, floor + 1, z + pz, Material.MOSS_BLOCK, Rule.MINE);
+                plan.put(x - px, floor + 1, z - pz, Material.EMERALD_BLOCK, Rule.MINE);
+            }
+        }
+        plan.put(cx, floor + 1, cz, Material.LECTERN, Rule.MINE);
+        plan.postActions.add(world -> setLecternBook(world, new Anchor(cx, floor + 1, cz),
+                "Protocolo de cuarentena", "Dra. S. Vale", List.of(
+                        "La Veta 7 no es una veta mineral. Es tejido cristalino que reacciona al calor, al sueño y a la sangre.",
+                        "Los síntomas comienzan con musgo en la ropa. Después aparecen filamentos verdes bajo la piel.",
+                        "Nadie debe abandonar la mina con muestras. La orden llegó demasiado tarde.")));
+        plan.put(cx, floor + 6, cz, Material.SOUL_LANTERN, Rule.MINE);
+    }
+
+    private void planOreDepot(Plan plan, MineSite mine, int at, int sideOffset) {
+        int px = -mine.dz();
+        int pz = mine.dx();
+        int cx = mine.entranceX() + mine.dx() * at + px * sideOffset;
+        int cz = mine.entranceZ() + mine.dz() * at + pz * sideOffset;
+        int floor = mine.entranceY() - 2 - at / 3;
+        planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 9, 7, 6,
+                Material.DEEPSLATE_BRICKS, Material.POLISHED_DEEPSLATE);
+        for (int forward = -6; forward <= 6; forward += 3) {
+            for (int side : new int[]{-5, 5}) {
+                int x = cx + mine.dx() * forward + px * side;
+                int z = cz + mine.dz() * forward + pz * side;
+                plan.put(x, floor + 1, z,
+                        Math.floorMod(forward + side, 2) == 0 ? Material.BARREL : Material.CHEST,
+                        Rule.MINE);
+            }
+        }
+        planOreVein(plan, cx + mine.dx() * 6, floor + 2, cz + mine.dz() * 6,
+                Material.EMERALD_ORE, 24);
+        planOreVein(plan, cx - mine.dx() * 6, floor + 2, cz - mine.dz() * 6,
+                Material.DEEPSLATE_IRON_ORE, 20);
+        plan.put(cx, floor + 5, cz, Material.LANTERN, Rule.MINE);
+    }
+
     private void planCollapsedGallery(Plan plan, MineSite mine, int at) {
         int px = -mine.dz();
         int pz = mine.dx();
@@ -958,6 +1260,172 @@ final class OverworldIslandLoreDecorator {
         }
     }
 
+    private void planMineConnections(Plan plan, MineSite mine) {
+        planSideConnector(plan, mine, 18, -15, 2, 6);
+        planSideConnector(plan, mine, 34, 10, 2, 6);
+        planSideConnector(plan, mine, 68, -15, 2, 6);
+        planSideConnector(plan, mine, 79, 16, 2, 6);
+        planSideConnector(plan, mine, 88, -11, 2, 6);
+        planSideConnector(plan, mine, 108, 14, 2, 6);
+
+        // El gran salón cruza el eje principal; esta pasada final abre las dos paredes
+        // que antes podían volver a cerrarlo al construir la sala.
+        planMainAxisOpening(plan, mine, 55, 15, 4, 8);
+
+        // El derrumbe queda como ambientación en los laterales, pero conserva un pasillo
+        // central completamente transitable hasta la veta infectada.
+        int px = -mine.dz();
+        int pz = mine.dx();
+        int centerX = mine.entranceX() + mine.dx() * 88 - px * 11;
+        int centerZ = mine.entranceZ() + mine.dz() * 88 - pz * 11;
+        int floor = mine.entranceY() - 2 - 88 / 3;
+        for (int forward = -9; forward <= 9; forward++) {
+            for (int side = -2; side <= 2; side++) {
+                int x = centerX + mine.dx() * forward + px * side;
+                int z = centerZ + mine.dz() * forward + pz * side;
+                plan.put(x, floor, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
+                plan.put(x, floor - 1, z, Material.DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= 6; h++) {
+                    plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
+                }
+            }
+        }
+    }
+
+    private void planSideConnector(Plan plan, MineSite mine, int at, int targetSide,
+                                   int halfWidth, int height) {
+        int px = -mine.dz();
+        int pz = mine.dx();
+        int direction = Integer.signum(targetSide);
+        int distance = Math.abs(targetSide);
+        int originX = mine.entranceX() + mine.dx() * at;
+        int originZ = mine.entranceZ() + mine.dz() * at;
+        int floor = mine.entranceY() - 2 - at / 3;
+        for (int step = 0; step <= distance; step++) {
+            int centerX = originX + px * direction * step;
+            int centerZ = originZ + pz * direction * step;
+            for (int width = -halfWidth; width <= halfWidth; width++) {
+                int x = centerX + mine.dx() * width;
+                int z = centerZ + mine.dz() * width;
+                plan.put(x, floor, z,
+                        Math.floorMod(step + width, 9) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_ANDESITE,
+                        Rule.MINE);
+                plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= height; h++) {
+                    plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
+                }
+            }
+            if (step > 0 && step % 6 == 0) {
+                for (int width : new int[]{-halfWidth, halfWidth}) {
+                    int x = centerX + mine.dx() * width;
+                    int z = centerZ + mine.dz() * width;
+                    for (int h = 1; h <= height; h++) {
+                        plan.put(x, floor + h, z, Material.SPRUCE_LOG, Rule.MINE);
+                    }
+                }
+                plan.put(centerX, floor + height - 1, centerZ, Material.LANTERN, Rule.MINE);
+            }
+        }
+    }
+
+    private void planMainAxisOpening(Plan plan, MineSite mine, int at, int halfLength,
+                                     int halfWidth, int height) {
+        int px = -mine.dz();
+        int pz = mine.dx();
+        int centerX = mine.entranceX() + mine.dx() * at;
+        int centerZ = mine.entranceZ() + mine.dz() * at;
+        int floor = mine.entranceY() - 2 - at / 3;
+        for (int forward = -halfLength; forward <= halfLength; forward++) {
+            for (int side = -halfWidth; side <= halfWidth; side++) {
+                int x = centerX + mine.dx() * forward + px * side;
+                int z = centerZ + mine.dz() * forward + pz * side;
+                plan.put(x, floor, z, Material.DEEPSLATE_TILES, Rule.MINE);
+                plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= height; h++) {
+                    plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
+                }
+            }
+            plan.put(centerX + mine.dx() * forward, floor + 1,
+                    centerZ + mine.dz() * forward, Material.RAIL, Rule.MINE);
+        }
+    }
+
+    private void planFinalGeodeApproach(Plan plan, MineSite mine, boolean preserveExistingGeode) {
+        int projection = Math.abs((mine.geodeX() - mine.entranceX()) * mine.dx()
+                + (mine.geodeZ() - mine.entranceZ()) * mine.dz());
+        int start = Math.max(96, Math.min(mine.tunnelLength(), projection - 30));
+        int end = Math.max(start + 1, projection - 18);
+        int startFloor = mine.entranceY() - 2 - start / 3;
+        int targetFloor = mine.bossY();
+        int px = -mine.dz();
+        int pz = mine.dx();
+        for (int t = start; t <= end; t++) {
+            double progress = (t - start) / (double) Math.max(1, end - start);
+            int floor = (int) Math.round(startFloor + (targetFloor - startFloor) * progress);
+            int x = mine.entranceX() + mine.dx() * t;
+            int z = mine.entranceZ() + mine.dz() * t;
+            for (int side = -4; side <= 4; side++) {
+                int bx = x + px * side;
+                int bz = z + pz * side;
+                plan.put(bx, floor, bz,
+                        Math.floorMod(t + side, 11) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_DEEPSLATE,
+                        Rule.MINE);
+                plan.put(bx, floor - 1, bz, Material.DEEPSLATE_BRICKS, Rule.MINE);
+                plan.put(bx, floor - 2, bz, Material.COBBLED_DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= 8; h++) {
+                    plan.put(bx, floor + h, bz, Material.AIR, Rule.MINE);
+                }
+            }
+            if ((t - start) % 7 == 0) {
+                plan.put(x + px * 3, floor + 6, z + pz * 3, Material.SOUL_LANTERN, Rule.MINE);
+            }
+        }
+
+        // Pasarela final desde el umbral hasta el corazón de la geoda.
+        int gateDistance = Math.max(0, projection - 19);
+        int walkwayEnd = preserveExistingGeode ? Math.max(gateDistance, projection - 7) : projection;
+        for (int t = gateDistance; t <= walkwayEnd; t++) {
+            int x = mine.entranceX() + mine.dx() * t;
+            int z = mine.entranceZ() + mine.dz() * t;
+            for (int side = -5; side <= 5; side++) {
+                int bx = x + px * side;
+                int bz = z + pz * side;
+                plan.put(bx, targetFloor, bz,
+                        Math.abs(side) == 5 ? Material.DEEPSLATE_BRICKS : Material.POLISHED_DEEPSLATE,
+                        Rule.MINE);
+                plan.put(bx, targetFloor - 1, bz, Material.DEEPSLATE_BRICKS, Rule.MINE);
+                for (int h = 1; h <= 9; h++) {
+                    plan.put(bx, targetFloor + h, bz, Material.AIR, Rule.MINE);
+                }
+                if (Math.abs(side) == 5 && t % 4 == 0) {
+                    plan.put(bx, targetFloor + 1, bz, Material.IRON_BARS, Rule.MINE);
+                }
+            }
+        }
+    }
+
+    private void planPreservedGeodeAccess(Plan plan, MineSite mine) {
+        int floor = mine.bossY();
+        for (int ox = -15; ox <= 15; ox++) {
+            for (int oz = -15; oz <= 15; oz++) {
+                int distanceSq = ox * ox + oz * oz;
+                if (distanceSq < 8 * 8 || distanceSq > 15 * 15) continue;
+                int x = mine.bossX() + ox;
+                int z = mine.bossZ() + oz;
+                plan.put(x, floor, z,
+                        Math.floorMod(ox * 7 + oz * 11, 17) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_DEEPSLATE,
+                        Rule.MINE);
+                plan.put(x, floor - 1, z, Material.DEEPSLATE_BRICKS, Rule.MINE);
+                for (int h = 1; h <= 6; h++) {
+                    plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
+                }
+            }
+        }
+    }
+
     private void planRectangularRoom(Plan plan, int cx, int floor, int cz,
                                      int dx, int dz, int halfForward, int halfSide,
                                      int height, Material wall, Material floorMaterial) {
@@ -968,11 +1436,17 @@ final class OverworldIslandLoreDecorator {
                 int x = cx + dx * forward + px * side;
                 int z = cz + dz * forward + pz * side;
                 plan.put(x, floor, z, floorMaterial, Rule.MINE);
+                plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
                 for (int h = 1; h <= height; h++) {
                     boolean edge = Math.abs(forward) == halfForward || Math.abs(side) == halfSide;
                     plan.put(x, floor + h, z, edge ? wall : Material.AIR, Rule.MINE);
                 }
                 plan.put(x, floor + height + 1, z, wall, Rule.MINE);
+                if (Math.floorMod(forward, 5) == 0 && Math.floorMod(side, 5) == 0) {
+                    for (int depth = 2; depth <= 8; depth++) {
+                        plan.put(x, floor - depth, z, Material.DEEPSLATE_BRICKS, Rule.MINE);
+                    }
+                }
             }
         }
     }
@@ -1158,33 +1632,52 @@ final class OverworldIslandLoreDecorator {
             Properties marker = readProperties(world.getWorldFolder().toPath().resolve(LORE_MARKER));
             mine = readMineSite(marker);
         }
-        Random random = new Random(148324444L);
+        Random random = new Random(148354444L);
         if (mine != null) {
             int startX = mine.entranceX();
             int startZ = mine.entranceZ();
             int endX = anchors.dungeon().x();
             int endZ = anchors.dungeon().z();
-            int segments = Math.max(12, (int) Math.sqrt(distanceSquared(startX, startZ, endX, endZ)) / 12);
-            for (int i = 0; i <= segments; i++) {
-                double progress = i / (double) segments;
-                int cx = (int) Math.round(startX + (endX - startX) * progress)
-                        + random.nextInt(17) - 8;
-                int cz = (int) Math.round(startZ + (endZ - startZ) * progress)
-                        + random.nextInt(17) - 8;
+            int vx = endX - startX;
+            int vz = endZ - startZ;
+            double length = Math.max(1.0D, Math.sqrt((double) vx * vx + (double) vz * vz));
+            double nx = -vz / length;
+            double nz = vx / length;
+            int segments = Math.max(24, (int) length / 8);
+            for (int lane : new int[]{-1, 0, 1}) {
+                double laneOffset = lane * 17.0D;
+                for (int i = 0; i <= segments; i++) {
+                    double progress = i / (double) segments;
+                    int cx = (int) Math.round(startX + vx * progress + nx * laneOffset)
+                            + random.nextInt(13) - 6;
+                    int cz = (int) Math.round(startZ + vz * progress + nz * laneOffset)
+                            + random.nextInt(13) - 6;
+                    int radius = 9 + random.nextInt(10) + (lane == 0 ? 3 : 0);
+                    planCorruptionPatch(world, plan, anchors, cx, cz, radius,
+                            2 + random.nextInt(4), random);
+                }
+            }
+
+            for (int ring = 0; ring < 10; ring++) {
+                double angle = ring * Math.PI * 2.0D / 10.0D;
+                int cx = mine.entranceX() + (int) Math.round(Math.cos(angle) * (42 + ring % 3 * 11));
+                int cz = mine.entranceZ() + (int) Math.round(Math.sin(angle) * (42 + ring % 3 * 11));
                 planCorruptionPatch(world, plan, anchors, cx, cz,
-                        7 + random.nextInt(8), 1 + random.nextInt(3), random);
+                        14 + random.nextInt(9), 3 + random.nextInt(4), random);
             }
         }
 
         int dx = anchors.dungeon().x();
         int dz = anchors.dungeon().z();
         int[][] patches = {
-                {-165, -95}, {-145, 120}, {158, -112}, {172, 105},
-                {-35, 205}, {42, -210}, {-225, 35}, {228, 48}
+                {-190, -125}, {-175, -45}, {-160, 120}, {-105, 185},
+                {-35, 230}, {55, 220}, {145, 165}, {195, 92},
+                {205, 12}, {178, -105}, {115, -188}, {35, -235},
+                {-55, -225}, {-145, -175}, {-235, -55}, {-230, 70}
         };
         for (int[] patch : patches) {
             planCorruptionPatch(world, plan, anchors, dx + patch[0], dz + patch[1],
-                    12 + random.nextInt(8), 2 + random.nextInt(4), random);
+                    16 + random.nextInt(13), 3 + random.nextInt(6), random);
         }
     }
 
@@ -1194,22 +1687,30 @@ final class OverworldIslandLoreDecorator {
         for (int ox = -radius; ox <= radius; ox++) {
             for (int oz = -radius; oz <= radius; oz++) {
                 double normalized = (ox * ox + oz * oz) / (double) (radius * radius);
-                if (normalized > 1.0D || random.nextDouble() < normalized * 0.42D) continue;
+                if (normalized > 1.0D || random.nextDouble() < normalized * 0.34D) continue;
                 int x = cx + ox;
                 int z = cz + oz;
                 if (!safeNaturalSurface(world, anchors, x, z, 2)) continue;
                 int y = surfaceY(world, x, z);
                 Material material;
-                int roll = random.nextInt(10);
-                if (roll <= 4) material = Material.MOSS_BLOCK;
-                else if (roll <= 6) material = Material.MOSSY_COBBLESTONE;
-                else if (roll == 7) material = Material.COARSE_DIRT;
+                int roll = random.nextInt(20);
+                if (roll <= 8) material = Material.MOSS_BLOCK;
+                else if (roll <= 12) material = Material.MOSSY_COBBLESTONE;
+                else if (roll <= 14) material = Material.COARSE_DIRT;
+                else if (roll <= 16) material = Material.ROOTED_DIRT;
+                else if (roll == 17) material = Material.VERDANT_FROGLIGHT;
                 else material = world.getBlockAt(x, y, z).getType();
                 plan.put(x, y, z, material, Rule.NATURAL);
-                if (random.nextDouble() < 0.15D) {
-                    plan.put(x, y + 1, z,
-                            random.nextBoolean() ? Material.MOSS_CARPET : Material.DEAD_BUSH,
-                            Rule.AIR_OR_PLANT);
+                if (random.nextDouble() < 0.27D) {
+                    Material growth = switch (random.nextInt(6)) {
+                        case 0 -> Material.MOSS_CARPET;
+                        case 1 -> Material.DEAD_BUSH;
+                        case 2 -> Material.BROWN_MUSHROOM;
+                        case 3 -> Material.AZALEA;
+                        case 4 -> Material.FERN;
+                        default -> Material.MOSS_CARPET;
+                    };
+                    plan.put(x, y + 1, z, growth, Rule.AIR_OR_PLANT);
                 }
             }
         }
@@ -1218,7 +1719,72 @@ final class OverworldIslandLoreDecorator {
             int z = cz + random.nextInt(radius * 2 + 1) - radius;
             if (!safeNaturalSurface(world, anchors, x, z, 2)) continue;
             int y = surfaceY(world, x, z) + 1;
-            planCrystal(plan, x, y, z, 2 + random.nextInt(5));
+            planCrystal(plan, x, y, z, 3 + random.nextInt(6));
+        }
+        int sickTrees = Math.max(1, radius / 9);
+        for (int i = 0; i < sickTrees; i++) {
+            int x = cx + random.nextInt(radius * 2 + 1) - radius;
+            int z = cz + random.nextInt(radius * 2 + 1) - radius;
+            planCorruptedTree(world, plan, anchors, x, z, random);
+        }
+        for (int i = 0; i < Math.max(2, radius / 6); i++) {
+            int x = cx + random.nextInt(radius * 2 + 1) - radius;
+            int z = cz + random.nextInt(radius * 2 + 1) - radius;
+            planCorruptionRoot(world, plan, anchors, x, z, random);
+        }
+    }
+
+    private void planCorruptedTree(World world, Plan plan, Anchors anchors,
+                                   int x, int z, Random random) {
+        if (!safeNaturalSurface(world, anchors, x, z, 4)) return;
+        int y = surfaceY(world, x, z) + 1;
+        int height = 7 + random.nextInt(7);
+        for (int h = 0; h < height; h++) {
+            int leanX = h > height / 2 ? (h - height / 2) / 3 : 0;
+            plan.put(x + leanX, y + h, z,
+                    h % 4 == 0 ? Material.STRIPPED_DARK_OAK_LOG : Material.DARK_OAK_LOG,
+                    Rule.SURFACE_DECORATION);
+        }
+        for (int branch = 0; branch < 5; branch++) {
+            int directionX = random.nextBoolean() ? 1 : -1;
+            int directionZ = random.nextBoolean() ? 1 : -1;
+            int branchY = y + height - 3 - random.nextInt(4);
+            for (int step = 1; step <= 3 + random.nextInt(3); step++) {
+                plan.put(x + directionX * step, branchY + step / 2,
+                        z + directionZ * step, Material.DARK_OAK_LOG,
+                        Rule.AIR_OR_PLANT);
+            }
+        }
+        for (int ox = -3; ox <= 3; ox++) {
+            for (int oz = -3; oz <= 3; oz++) {
+                if (ox * ox + oz * oz > 10 || random.nextDouble() < 0.48D) continue;
+                plan.put(x + ox, y + height - 1 + random.nextInt(3), z + oz,
+                        random.nextBoolean() ? Material.AZALEA_LEAVES : Material.DARK_OAK_LEAVES,
+                        Rule.AIR_OR_PLANT);
+            }
+        }
+        plan.put(x, y - 1, z, Material.MOSS_BLOCK, Rule.NATURAL);
+        if (random.nextBoolean()) {
+            plan.put(x + 1, y + 1, z, Material.VERDANT_FROGLIGHT, Rule.NATURAL_OR_AIR);
+        }
+    }
+
+    private void planCorruptionRoot(World world, Plan plan, Anchors anchors,
+                                    int x, int z, Random random) {
+        if (!safeNaturalSurface(world, anchors, x, z, 2)) return;
+        int dx = random.nextBoolean() ? 1 : 0;
+        int dz = dx == 0 ? 1 : 0;
+        int length = 5 + random.nextInt(8);
+        for (int step = 0; step < length; step++) {
+            int bx = x + dx * step;
+            int bz = z + dz * step;
+            int y = surfaceY(world, bx, bz) + 1;
+            plan.put(bx, y, bz,
+                    step % 4 == 0 ? Material.EMERALD_BLOCK : Material.MOSS_BLOCK,
+                    Rule.NATURAL_OR_AIR);
+            if (step % 3 == 1) {
+                plan.put(bx, y + 1, bz, Material.MOSS_CARPET, Rule.AIR_OR_PLANT);
+            }
         }
     }
 
@@ -1252,9 +1818,14 @@ final class OverworldIslandLoreDecorator {
                 if (!isNatural(world.getBlockAt(x, y, z).getType())) continue;
                 double natural = naturalSurfaceRatio(world, x, z, sampleRadius, Math.max(3, sampleRadius / 7));
                 int constructed = constructedCount(world, x, y, z, sampleRadius / 2, 8);
-                if (natural < (forest ? 0.86D : 0.93D) || constructed > (forest ? 10 : 2)) continue;
+                boolean existingCamp = !forest && looksLikeCamp(world, x, z, 24);
+                int relief = surfaceRelief(world, x, z, Math.max(8, sampleRadius / 2), 4);
+                if (!existingCamp && (natural < (forest ? 0.82D : 0.91D)
+                        || constructed > (forest ? 14 : 3))) continue;
+                if (!forest && !existingCamp && relief > 5) continue;
                 double score = natural * 100.0D - constructed * 6.0D
-                        - Math.abs(y - origin.y()) * 0.15D;
+                        - Math.abs(y - origin.y()) * 0.15D - relief * 2.5D
+                        + (existingCamp ? 280.0D : 0.0D);
                 candidates.add(new ScoredAnchor(new Anchor(x, y, z), score));
             }
         }
@@ -1269,6 +1840,35 @@ final class OverworldIslandLoreDecorator {
             if (selected.size() >= count) break;
         }
         return selected;
+    }
+
+    private boolean looksLikeCamp(World world, int cx, int cz, int radius) {
+        int campfires = 0;
+        int campBlocks = 0;
+        for (int x = cx - radius; x <= cx + radius; x += 2) {
+            for (int z = cz - radius; z <= cz + radius; z += 2) {
+                int top = surfaceY(world, x, z);
+                for (int y = top - 3; y <= top + 10; y++) {
+                    Material material = world.getBlockAt(x, y, z).getType();
+                    if (material == Material.CAMPFIRE || material == Material.SOUL_CAMPFIRE) campfires++;
+                    if (isCampDecoration(material)) campBlocks++;
+                }
+            }
+        }
+        return campfires > 0 && campBlocks >= 5;
+    }
+
+    private int surfaceRelief(World world, int cx, int cz, int radius, int step) {
+        int minimum = Integer.MAX_VALUE;
+        int maximum = Integer.MIN_VALUE;
+        for (int x = cx - radius; x <= cx + radius; x += Math.max(1, step)) {
+            for (int z = cz - radius; z <= cz + radius; z += Math.max(1, step)) {
+                int y = surfaceY(world, x, z);
+                minimum = Math.min(minimum, y);
+                maximum = Math.max(maximum, y);
+            }
+        }
+        return minimum == Integer.MAX_VALUE ? Integer.MAX_VALUE : maximum - minimum;
     }
 
     private boolean safeNaturalSurface(World world, Anchors anchors, int x, int z, int radius) {
@@ -1332,7 +1932,15 @@ final class OverworldIslandLoreDecorator {
         Block block = world.getBlockAt(operation.x(), operation.y(), operation.z());
         Material current = block.getType();
         if (!canReplace(current, operation.rule())) return false;
-        if (current == operation.material()) return false;
+        if (current == operation.material()) {
+            if (isLeaf(current) && block.getBlockData() instanceof Leaves leaves
+                    && !leaves.isPersistent()) {
+                leaves.setPersistent(true);
+                block.setBlockData(leaves, false);
+                return true;
+            }
+            return false;
+        }
 
         if (isLeaf(operation.material())) {
             BlockData data = operation.material().createBlockData();
@@ -1352,7 +1960,23 @@ final class OverworldIslandLoreDecorator {
             case NATURAL_OR_AIR -> current.isAir() || isPlant(current) || isNatural(current);
             case SURFACE_DECORATION -> current.isAir() || isPlant(current) || isNatural(current);
             case MINE -> isMineReplaceable(current);
+            case CAMP_REPAIR -> current.isAir() || isPlant(current) || isNatural(current)
+                    || isCampDecoration(current);
+            case LEAF_PERSISTENCE -> isLeaf(current);
         };
+    }
+
+    private boolean isCampDecoration(Material material) {
+        String name = material.name();
+        return material == Material.CAMPFIRE || material == Material.SOUL_CAMPFIRE
+                || material == Material.BARREL || material == Material.CHEST
+                || material == Material.CRAFTING_TABLE || material == Material.HAY_BLOCK
+                || material == Material.LANTERN || material == Material.SOUL_LANTERN
+                || material == Material.CHAIN || material == Material.PACKED_MUD
+                || material == Material.DIRT_PATH || material == Material.COARSE_DIRT
+                || name.endsWith("_WOOL") || name.endsWith("_FENCE")
+                || name.endsWith("_LOG") || name.endsWith("_PLANKS")
+                || name.endsWith("_SLAB") || name.endsWith("_STAIRS");
     }
 
     private boolean isMineReplaceable(Material material) {
@@ -1408,6 +2032,19 @@ final class OverworldIslandLoreDecorator {
         return world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
     }
 
+    private int medianSurfaceY(World world, int cx, int cz, int radius, int step) {
+        List<Integer> heights = new ArrayList<>();
+        int increment = Math.max(1, step);
+        for (int x = cx - radius; x <= cx + radius; x += increment) {
+            for (int z = cz - radius; z <= cz + radius; z += increment) {
+                heights.add(surfaceY(world, x, z));
+            }
+        }
+        if (heights.isEmpty()) return surfaceY(world, cx, cz);
+        heights.sort(Integer::compareTo);
+        return heights.get(heights.size() / 2);
+    }
+
     private Anchor surfaceAnchor(World world, int x, int z) {
         int y = surfaceY(world, x, z);
         return new Anchor(x, y, z);
@@ -1442,7 +2079,10 @@ final class OverworldIslandLoreDecorator {
 
     private void writeMarker(World world, Properties existing, Set<String> categories,
                              Anchors anchors, MineSite mine, int changedBlocks) {
-        for (String category : categories) existing.setProperty(category, "true");
+        for (String category : categories) {
+            existing.setProperty(category, "true");
+            existing.setProperty(category + "Revision", REVISION);
+        }
         existing.setProperty("revision", REVISION);
         existing.setProperty("updatedAt", String.valueOf(System.currentTimeMillis()));
         existing.setProperty("changedBlocksLastRun", String.valueOf(changedBlocks));
@@ -1463,6 +2103,8 @@ final class OverworldIslandLoreDecorator {
             existing.setProperty("optionalBossId", "mossy_emerald_geode_heart");
             existing.setProperty("optionalBossImplemented", "false");
             existing.setProperty("loreOrigin", "mossy_emerald_corruption_origin");
+            existing.setProperty("mineAccessibleWithoutMining", "true");
+            existing.setProperty("geodePreservedAsFinalZone", "true");
         }
         existing.setProperty("categories", appliedCategoryList(existing));
 
@@ -1474,7 +2116,7 @@ final class OverworldIslandLoreDecorator {
             Files.writeString(marker, text.toString(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException error) {
-            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.32: "
+            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.35: "
                     + error.getMessage());
         }
     }
@@ -1497,7 +2139,10 @@ final class OverworldIslandLoreDecorator {
         try {
             int dx = Integer.parseInt(parts[0].trim());
             int dz = Integer.parseInt(parts[1].trim());
-            return new MineSite(entrance.x(), entrance.y(), entrance.z(), dx, dz, 118,
+            int projection = Math.abs((geode.x() - entrance.x()) * dx
+                    + (geode.z() - entrance.z()) * dz);
+            int tunnelLength = Math.max(118, projection - 18);
+            return new MineSite(entrance.x(), entrance.y(), entrance.z(), dx, dz, tunnelLength,
                     geode.x(), geode.y(), geode.z(), boss.x(), boss.y(), boss.z());
         } catch (NumberFormatException ignored) {
             return null;
@@ -1546,9 +2191,9 @@ final class OverworldIslandLoreDecorator {
 
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo template overworld decorate "
-                + "<preview|all|forests|camps|mine|corruption|status|cancel|force> [categoría]");
+                + "<preview|upgrade|all|forests|camps|mine|corruption|status|cancel|force> [categoría]");
         sender.sendMessage(ChatColor.GRAY + "El puerto editado manualmente queda protegido y nunca se reconstruye.");
-        sender.sendMessage(ChatColor.GRAY + "Ejemplos: decorate preview mine · decorate mine · decorate force mine");
+        sender.sendMessage(ChatColor.GRAY + "Ejemplos: decorate preview upgrade · decorate upgrade · decorate force mine");
     }
 
     private static long distanceSquared(int x1, int z1, int x2, int z2) {
@@ -1567,7 +2212,9 @@ final class OverworldIslandLoreDecorator {
         NATURAL,
         NATURAL_OR_AIR,
         SURFACE_DECORATION,
-        MINE
+        MINE,
+        CAMP_REPAIR,
+        LEAF_PERSISTENCE
     }
 
     private static final class Plan {
