@@ -1,0 +1,16 @@
+ArlightBingo 1.48.23 - FORTRESS INTEGRATION & COLISEUM CLOSURE
+
+Base: 1.48.22 Strict Road Continuity.
+
+Cambios del Overworld:
+- No se modifican las aldeas, Nether ni End.
+- La franja interior junto a la muralla de la ciudadela se nivela y se rellena al final.
+- Los contrafuertes de la ciudadela bajan hasta terreno real en vez de quedar flotando.
+- Las cuatro entradas de la ciudadela reciben camino continuo, arco final y terrazas laterales simétricas.
+- La entrada sur queda conectada con la calzada sin montículos de madera ni cortes de tierra.
+- La subida norte del boss conecta exactamente el final de la ruta citadel-boss con la puerta monumental.
+- La subida del boss usa una pendiente monotónica de cuatro bloques, descansillos y muros laterales.
+- El coliseo circular se reconstruye después de caminos y terreno, dejando solo la apertura ceremonial exacta.
+- Se añade un corredor interior continuo junto al muro del coliseo.
+- La autorreparación vuelve a ejecutar la integración final después de cualquier reparación de camino, terreno o fortificación.
+- La auditoría rechaza un coliseo con huecos fuera de la puerta ceremonial.

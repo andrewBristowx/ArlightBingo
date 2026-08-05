@@ -346,7 +346,10 @@ public class ConfigManager {
     public boolean isWorldPoolAutoConfigureInventories() { return worldPoolAutoConfigureInventories; }
     public boolean isTemplateMatchesEnabled() { return templateMatchesEnabled; }
     public boolean isTemplateMatchesRequireComplete() { return templateMatchesRequireComplete; }
-    public String getOverworldTemplateWorld() { return overworldTemplateWorld; }
+    public String getOverworldTemplateWorld() {
+        return com.arlight.bingo.template.TemplateRevisionManager
+                .activeOverworldWorld(plugin, overworldTemplateWorld);
+    }
     public String getNetherTemplateWorld() { return netherTemplateWorld; }
     public String getEndTemplateWorld() { return endTemplateWorld; }
     public boolean isSafeWorldHandoffEnabled() { return safeWorldHandoffEnabled; }

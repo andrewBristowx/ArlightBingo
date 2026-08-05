@@ -1,0 +1,12 @@
+ARLIGHTBINGO 1.48.16 - AUTORREPARACIÓN TRANSACCIONAL
+
+- Ciclo automático generar -> auditar -> reparar -> volver a auditar.
+- Máximo configurable de tres intentos antes de rechazar la revisión.
+- Instantánea de todos los bloques modificados y rollback seguro.
+- Memoria persistente por categoría de fallo y estrategia aplicada.
+- Contexto estructural persistido para reparar después de reiniciar.
+- Suavizado regional de cortes abruptos sin volver a aplanar toda la arena del boss.
+- Reparación dirigida de caminos, accesos, casas, torres, chimeneas y puerta ritual.
+- Comandos /bingo repair overworld scan|preview|apply|region|rollback|status.
+- Aplicación por lotes con límites de bloques y milisegundos por tick.
+- Nether y End nunca son modificados por este sistema.

@@ -1,0 +1,17 @@
+PRUEBA LIMPIA ARLIGHTBINGO 1.48.28
+
+1. Apaga el servidor y reemplaza solo el JAR de ArlightBingo.
+2. Enciende el servidor.
+3. Ejecuta:
+
+/bingo template overworld reset
+/bingo template overworld generate island-1.48.28-test1
+/bingo template overworld status
+
+4. Cuando quede READY:
+
+/bingo template overworld audit
+/bingo template overworld tp
+
+No ejecutes autorreparación antes de revisar la generación inicial.
+No reutilices una plantilla 1.48.27, porque conservará bloques de la geometría anterior.

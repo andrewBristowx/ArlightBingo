@@ -1,0 +1,14 @@
+Prueba segura ArlightBingo 1.48.35
+
+- Detén el servidor y reemplaza el JAR. No uses /reload.
+- Crea un snapshot antes de decorar:
+  /bingo template overworld snapshot create pre-14835
+- Revisa el plan:
+  /bingo template overworld decorate preview upgrade
+- Aplica la actualización:
+  /bingo template overworld decorate upgrade
+- Consulta progreso:
+  /bingo template overworld decorate status
+- Recorre toda la mina sin romper bloques: entrada, taller, descanso, extracción, bombeo, laboratorio, derrumbe, depósito, galerías y geoda.
+- Comprueba que el puerto no cambió, que los campamentos no flotan y que las hojas no desaparecen.
+- Solo después usa /bingo template overworld commit.

@@ -1,0 +1,16 @@
+ARLIGHTBINGO 1.48.6 - CIMIENTOS Y ESCALERAS FINALIZADOS
+
+Correcciones de la prueba 1.48.5
+- La escalera de boss-gate-west se restaura en la última fase junto con su respaldo.
+- Todas las torres registradas reciben la misma restauración vertical determinista.
+- Cada piso intermedio conserva un desembarco sólido y dos bloques de altura libres.
+- Los cimientos de military-wall y citadel-wall sellan doce capas continuas.
+- El relleno profundo vuelve a detenerse al enlazar con terreno natural bajo ese núcleo.
+- La auditoría comparte la misma profundidad de cimiento que el generador.
+- Los errores de escalera y cimiento incluyen altura, material u offset para diagnóstico.
+- Un rechazo continúa terminando en FAILED sin reconstrucción automática.
+
+Alcance
+- Solo cambia el diseño generado del Overworld.
+- Nether y End no se regeneran ni reciben cambios.
+- Requiere reset y generación limpia de la plantilla Overworld.
