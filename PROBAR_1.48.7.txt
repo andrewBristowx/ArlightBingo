@@ -1,0 +1,22 @@
+PRUEBA DE ARLIGHTBINGO 1.48.7
+
+1. Apaga completamente el servidor. No uses /reload.
+2. Retira ArlightBingo 1.48.6 de plugins e instala únicamente 1.48.7.
+3. Regenera solo Overworld:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.7-test1
+   /bingo template overworld status
+4. Cuando el estado sea READY:
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+Revisión dirigida
+- Confirma que boss-north-approach termina en READY y no toca boss-gate-west.
+- Recorre el acceso desde la ciudadela hasta la puerta: no debe haber zanja ni meseta binaria.
+- Revisa las gradas del patio: deben ser bandas continuas y dejar abierto el pasillo norte.
+- Revisa la plaza inicial, la fuente y el pabellón elevado de la campana.
+- Comprueba varias macetas: deben apoyarse al ras y no flotar sobre una losa enterrada.
+- Confirma que el césped no tenga cuadros aislados de tierra repetidos.
+- Confirma que no aparezca una segunda construcción después de READY o FAILED.
+
+No regeneres Nether ni End. Conserva 1.48.6 y 1.48.5 como retrocesos.

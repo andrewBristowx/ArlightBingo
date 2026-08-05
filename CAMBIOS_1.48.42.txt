@@ -1,0 +1,9 @@
+ArlightBingo 1.48.42
+
+- Integra tres medallas físicas de ArlightBosses 1.22.0.
+- Cada medalla debe insertarse en su pedestal GeckoLib correspondiente.
+- Los estados de los pedestales persisten tras reinicios y copias de arena.
+- Las tres inserciones activan una animación conjunta y abren la puerta del jefe.
+- El jefe continúa dormido hasta usar el altar interior.
+- Compatible con la plantilla Overworld editada manualmente aunque no tenga el marcador de layout 1.48.
+- Añade comandos administrativos givemedals y givepedestals.

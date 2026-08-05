@@ -1,0 +1,7 @@
+1. Detener el servidor y reemplazar el JAR. No usar /reload.
+2. Confirmar en el inicio: ArlightBingo 1.48.36.
+3. Ejecutar: /bingo template overworld recover preview all
+4. Crear snapshot manual opcional: /bingo template overworld snapshot create pre-recover-14836
+5. Ejecutar: /bingo template overworld recover apply all
+6. Ver progreso: /bingo template overworld recover status
+7. Revisar el mundo antes del commit seguro.

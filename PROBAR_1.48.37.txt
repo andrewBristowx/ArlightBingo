@@ -1,0 +1,27 @@
+PRUEBA DE ARLIGHTBINGO 1.48.37
+
+1. Instalar el JAR sobre una copia de la plantilla de trabajo 1.48.36.
+2. Ejecutar: /bingo template overworld decorate preview upgrade
+3. Ejecutar: /bingo template overworld decorate upgrade
+4. Vigilar: /bingo template overworld decorate status
+5. Confirmar que el mensaje indique las minas antiguas detectadas y una sola mina nueva.
+6. Revisar las dos ubicaciones anteriores: deben haber recuperado ladera/terreno y no conservar entradas, galerías ni geodas expuestas.
+7. Recorrer la nueva mina sin romper bloques:
+   - entrada y campamento;
+   - taller;
+   - descanso;
+   - salón de extracción;
+   - bombeo;
+   - laboratorio;
+   - galería derrumbada;
+   - depósito;
+   - cinco ramales;
+   - ambos corredores laterales;
+   - geoda final.
+8. Confirmar que todos los desniveles se superen caminando y que no haya salas aisladas.
+9. Revisar los laterales de los bosques: deben aparecer masas y bandas nuevas sin hojas decayendo.
+10. Revisar la mitad opuesta: la contaminación de musgo/esmeralda debe cubrir casi toda el área natural sin borrar caminos, edificios, agua ni puerto.
+11. Reiniciar el servidor y ejecutar force mine. Debe reconstruir la misma mina, nunca buscar otra.
+12. Solo después de la revisión visual ejecutar /bingo template overworld commit.
+
+No regenerar Nether ni End. No promover hasta completar la prueba dentro de Arclight 1.21.1.

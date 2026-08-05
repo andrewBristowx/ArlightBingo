@@ -1,0 +1,8 @@
+ArlightBingo 1.48.44
+
+- Usa los métodos nativos de ArlightBosses 1.22.2 para sincronizar los estados de los pedestales.
+- La medalla insertada queda visible, levitando y girando.
+- Al colocar la tercera medalla comienza una secuencia conjunta de 72 ticks.
+- Los tres pedestales pulsan, forman un triángulo de energía y descargan la energía hacia la reja.
+- La reja se abre solamente al terminar la secuencia.
+- ritual reset restaura la reja y vacía los tres pedestales.
