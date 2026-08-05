@@ -126,11 +126,11 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                         return filter(Arrays.asList("generate", "resume", "status", "audit",
                                 "revisions", "commit", "snapshot", "village", "recover", "decorate", "terrain",
                                 "promote", "rollback", "force-stage", "cancel", "reset", "tp",
-                                "lootr", "testboss"), args[2]);
+                                "lootr", "testboss", "ritual"), args[2]);
                     }
                     if (Arrays.asList("nether", "end").contains(args[1].toLowerCase())) {
                         return filter(Arrays.asList("generate", "resume", "status", "audit",
-                                "cancel", "reset", "tp", "lootr", "testboss"), args[2]);
+                                "cancel", "reset", "tp", "lootr", "testboss", "ritual"), args[2]);
                     }
                     return List.of();
                 case "repair":

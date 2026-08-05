@@ -1,0 +1,7 @@
+1. Instalar ArlightBosses 1.22.1 y ArlightBingo 1.48.43.
+2. /bingo template overworld ritual start
+3. /bingo template overworld ritual give
+4. Colocar los tres pedestales e insertar sus medallas.
+5. Verificar flotación, animación conjunta y apertura de la reja.
+6. /bingo template overworld ritual reset
+7. Confirmar que la reja volvió exactamente al estado inicial.

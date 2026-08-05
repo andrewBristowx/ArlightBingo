@@ -138,6 +138,25 @@ final class OverworldMedalRitual {
         }
     }
 
+
+    void reset(World world) {
+        if (world == null) return;
+        State state = load(world);
+        for (Slot slot : Slot.values()) {
+            Location at = state.location(slot, world);
+            if (at != null && CampaignItemBridge.isBlock(at, slot.blockId)) {
+                restorePedestal(at, "empty");
+            }
+        }
+        activeUnlocks.remove(world.getUID());
+        activeInsertions.removeIf(value -> value.startsWith(world.getUID().toString() + ":"));
+        try {
+            Files.deleteIfExists(world.getWorldFolder().toPath().resolve(MARKER_FILE));
+        } catch (IOException exception) {
+            plugin.getLogger().warning("No se pudo reiniciar el ritual de medallas: " + exception.getMessage());
+        }
+    }
+
     void onWorldUnload(World world) {
         if (world == null) return;
         activeUnlocks.remove(world.getUID());
@@ -223,7 +242,7 @@ final class OverworldMedalRitual {
     private void save(World world, State state) {
         if (world == null || state == null) return;
         Properties properties = new Properties();
-        properties.setProperty("version", "1.48.42");
+        properties.setProperty("version", "1.48.43");
         properties.setProperty("unlocked", Boolean.toString(state.unlocked));
         for (Slot slot : Slot.values()) {
             properties.setProperty(slot.key + ".filled", Boolean.toString(state.filled(slot)));

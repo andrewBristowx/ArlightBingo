@@ -43,6 +43,7 @@ public final class OverworldVillageSafety implements Listener {
     private final OverworldTemplateRecoveryCommands recoveryCommands;
     private final OverworldCampaignRecoveryCommands campaignRecoveryCommands;
     private final OverworldTerrainBlendCommands terrainBlendCommands;
+    private final OverworldRitualTestCommands ritualTestCommands;
     private final Map<UUID, SafeZone> zones = new HashMap<>();
     private final Map<UUID, Long> retryAfter = new HashMap<>();
 
@@ -53,12 +54,17 @@ public final class OverworldVillageSafety implements Listener {
         this.recoveryCommands = new OverworldTemplateRecoveryCommands(plugin);
         this.campaignRecoveryCommands = new OverworldCampaignRecoveryCommands(plugin);
         this.terrainBlendCommands = new OverworldTerrainBlendCommands(plugin);
+        this.ritualTestCommands = new OverworldRitualTestCommands(plugin, campaignLayout);
         long interval = Math.max(20L, plugin.getConfig().getLong(
                 "template-worlds.overworld.safe-village.purge-interval-ticks", 40L));
         Bukkit.getScheduler().runTaskTimer(plugin, this::maintenanceTick, interval, interval);
     }
 
     public boolean dispatchTemplateUtility(CommandSender sender, String rawCommand) {
+        if (ritualTestCommands.matches(rawCommand)) {
+            ritualTestCommands.execute(sender, rawCommand);
+            return true;
+        }
         if (terrainBlendCommands.matches(rawCommand)) {
             terrainBlendCommands.execute(sender, rawCommand);
             return true;
@@ -79,6 +85,8 @@ public final class OverworldVillageSafety implements Listener {
     }
 
     public List<String> templateUtilityCompletions(String rawCommand) {
+        List<String> ritual = ritualTestCommands.completions(rawCommand);
+        if (!ritual.isEmpty()) return ritual;
         List<String> terrain = terrainBlendCommands.completions(rawCommand);
         if (!terrain.isEmpty()) return terrain;
         List<String> campaign = campaignRecoveryCommands.completions(rawCommand);
@@ -117,6 +125,11 @@ public final class OverworldVillageSafety implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onTabComplete(TabCompleteEvent event) {
+        var ritualCompletions = ritualTestCommands.completions(event.getBuffer());
+        if (!ritualCompletions.isEmpty()) {
+            event.setCompletions(ritualCompletions);
+            return;
+        }
         var terrainCompletions = terrainBlendCommands.completions(event.getBuffer());
         if (!terrainCompletions.isEmpty()) {
             event.setCompletions(terrainCompletions);

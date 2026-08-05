@@ -12,6 +12,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
+import org.bukkit.command.CommandSender;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 
@@ -23,6 +24,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,11 +45,20 @@ public final class OverworldCampaignLandscape148 {
     static final String REPORT_FILE = "arlight-overworld-campaign-1.48-report.txt";
     static final String GATE_OPEN_MARKER = "arlight-overworld-ritual-gate-open.properties";
     private static final String BOSS_AWAKENED_MARKER = "arlight-overworld-boss-awakened.properties";
+    private static final String TEST_ACTIVE_MARKER = "arlight-overworld-ritual-test.active";
+    private static final String TEST_OPEN_MARKER = "arlight-overworld-ritual-test.open";
+    private static final String TEST_GATE_SNAPSHOT = "arlight-overworld-ritual-test-gate.snapshot";
+    private static final int TEST_GATE_MIN_X = 133;
+    private static final int TEST_GATE_MAX_X = 147;
+    private static final int TEST_GATE_MIN_Y = 90;
+    private static final int TEST_GATE_MAX_Y = 96;
+    private static final int TEST_GATE_Z = 192;
 
     private final BingoPlugin plugin;
     private final long startupEpochMillis = System.currentTimeMillis();
     private final Set<UUID> activeBuilds = new HashSet<>();
     private final Set<UUID> dormantBossNotices = new HashSet<>();
+    private final Set<UUID> activeGateAnimations = new HashSet<>();
     private final Map<UUID, Layout> layouts = new HashMap<>();
     private final OverworldMedalRitual medalRitual;
 
@@ -69,6 +80,7 @@ public final class OverworldCampaignLandscape148 {
         if (world == null) return;
         activeBuilds.remove(world.getUID());
         dormantBossNotices.remove(world.getUID());
+        activeGateAnimations.remove(world.getUID());
         layouts.remove(world.getUID());
         medalRitual.onWorldUnload(world);
     }
@@ -229,8 +241,17 @@ public final class OverworldCampaignLandscape148 {
 
     private void maintainGate(World world) {
         Layout layout = loadLayout(world);
-        if (layout == null || activeBuilds.contains(world.getUID())) return;
-        Path marker = world.getWorldFolder().toPath().resolve(GATE_OPEN_MARKER);
+        if (layout == null || activeBuilds.contains(world.getUID())
+                || activeGateAnimations.contains(world.getUID())) return;
+        Path folder = world.getWorldFolder().toPath();
+        if (Files.isRegularFile(folder.resolve(TEST_ACTIVE_MARKER))) {
+            if (Files.isRegularFile(folder.resolve(TEST_OPEN_MARKER))) {
+                setRegionAir(world, TEST_GATE_MIN_X, TEST_GATE_MAX_X,
+                        TEST_GATE_MIN_Y, TEST_GATE_MAX_Y, TEST_GATE_Z);
+            }
+            return;
+        }
+        Path marker = folder.resolve(GATE_OPEN_MARKER);
         boolean open = Files.isRegularFile(marker);
         if (open) {
             if (!isGateOpen(world, layout)) openGate(world, layout);
@@ -320,24 +341,47 @@ public final class OverworldCampaignLandscape148 {
     private void maintainMedalRitual(World world) {
         Layout layout = loadLayout(world);
         if (layout == null) return;
-        boolean gateOpen = Files.isRegularFile(
-                world.getWorldFolder().toPath().resolve(GATE_OPEN_MARKER));
+        Path folder = world.getWorldFolder().toPath();
+        boolean test = Files.isRegularFile(folder.resolve(TEST_ACTIVE_MARKER));
+        boolean gateOpen = Files.isRegularFile(folder.resolve(
+                test ? TEST_OPEN_MARKER : GATE_OPEN_MARKER));
         medalRitual.maintain(world, layout, gateOpen);
     }
 
     private void completeMedalRitual(World world, Layout layout, Player activator) {
-        Path marker = world.getWorldFolder().toPath().resolve(GATE_OPEN_MARKER);
-        if (Files.isRegularFile(marker)) return;
-        openGate(world, layout);
-        writeMarker(marker, activator, "three-medals");
-        for (Player online : world.getPlayers()) {
-            online.sendTitle(ChatColor.GOLD + "Las tres medallas resonaron",
-                    ChatColor.GREEN + "La puerta del Guardián se ha abierto", 10, 75, 20);
-            online.sendMessage(ChatColor.GREEN + "[Bingo] El sello exterior fue destruido. "
-                    + ChatColor.WHITE + "El Guardián aún debe ser invocado desde el altar central.");
-            online.playSound(online.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.1F, 0.75F);
-            online.spawnParticle(Particle.TOTEM_OF_UNDYING,
-                    online.getLocation().add(0, 1.2D, 0), 42, 0.8D, 0.8D, 0.8D, 0.04D);
+        Path folder = world.getWorldFolder().toPath();
+        boolean test = Files.isRegularFile(folder.resolve(TEST_ACTIVE_MARKER));
+        Path marker = folder.resolve(test ? TEST_OPEN_MARKER : GATE_OPEN_MARKER);
+        if (Files.isRegularFile(marker) || activeGateAnimations.contains(world.getUID())) return;
+
+        Runnable completed = () -> {
+            writeMarker(marker, activator, test ? "template-test-three-medals" : "three-medals");
+            for (Player online : world.getPlayers()) {
+                online.sendTitle(ChatColor.GOLD + "Las tres medallas resonaron",
+                        ChatColor.GREEN + "La reja del Guardián se ha abierto", 10, 75, 20);
+                online.sendMessage(ChatColor.GREEN + "[Bingo] El sello exterior fue destruido. "
+                        + ChatColor.WHITE + (test
+                        ? "Usa /bingo template overworld ritual reset para restaurar la prueba."
+                        : "El Guardián aún debe ser invocado desde el altar central."));
+                online.playSound(online.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.1F, 0.75F);
+                online.spawnParticle(Particle.TOTEM_OF_UNDYING,
+                        online.getLocation().add(0, 1.2D, 0), 42, 0.8D, 0.8D, 0.8D, 0.04D);
+            }
+        };
+
+        if (test) {
+            animateGateOpen(world, TEST_GATE_MIN_X, TEST_GATE_MAX_X,
+                    TEST_GATE_MIN_Y, TEST_GATE_MAX_Y, TEST_GATE_Z,
+                    new Location(world, 140.0D, 93.0D, 192.0D), completed);
+        } else {
+            int gx = layout.ritualGate().getBlockX();
+            int gy = layout.ritualGate().getBlockY();
+            int gz = OverworldCampaignArchitecture148.bossRitualGatePlaneZ(layout.ritualGate());
+            animateGateOpen(world,
+                    gx - OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HALF_WIDTH,
+                    gx + OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HALF_WIDTH,
+                    gy, gy + OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HEIGHT - 1,
+                    gz, layout.ritualGate(), completed);
         }
     }
 
@@ -417,10 +461,190 @@ public final class OverworldCampaignLandscape148 {
                 130, 5.0D, 5.0D, 2.0D, 0.05D);
     }
 
+    public boolean debugRitualTestStart(CommandSender sender) {
+        World world = resolveTemplateWorld(sender);
+        if (world == null) return false;
+        Path folder = world.getWorldFolder().toPath();
+        if (Files.isRegularFile(folder.resolve(TEST_ACTIVE_MARKER))) {
+            sender.sendMessage(ChatColor.YELLOW + "Ya hay una prueba ritual activa. Usa ritual reset antes de iniciar otra.");
+            return false;
+        }
+        try {
+            saveGateSnapshot(world, folder.resolve(TEST_GATE_SNAPSHOT));
+            Files.deleteIfExists(folder.resolve(TEST_OPEN_MARKER));
+            Files.writeString(folder.resolve(TEST_ACTIVE_MARKER),
+                    "version=1.48.43\\nstarted=" + System.currentTimeMillis() + "\\n",
+                    StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING);
+            medalRitual.reset(world);
+            sender.sendMessage(ChatColor.GREEN + "Prueba ritual iniciada. La reja 133..147 / 90..96 / z=192 fue respaldada.");
+            sender.sendMessage(ChatColor.AQUA + "Coloca los pedestales y usa ritual give para recibir los objetos.");
+            return true;
+        } catch (IOException exception) {
+            sender.sendMessage(ChatColor.RED + "No se pudo iniciar la prueba: " + exception.getMessage());
+            return false;
+        }
+    }
+
+    public boolean debugRitualTestGive(Player player) {
+        World world = resolveTemplateWorld(player);
+        if (world == null) return false;
+        Path active = world.getWorldFolder().toPath().resolve(TEST_ACTIVE_MARKER);
+        if (!Files.isRegularFile(active)) {
+            player.sendMessage(ChatColor.RED + "Primero usa /bingo template overworld ritual start.");
+            return false;
+        }
+        CampaignItemBridge.give(player, CampaignItemBridge.HOME_MEDAL_PEDESTAL);
+        CampaignItemBridge.give(player, CampaignItemBridge.TRADE_MEDAL_PEDESTAL);
+        CampaignItemBridge.give(player, CampaignItemBridge.BASTION_MEDAL_PEDESTAL);
+        CampaignItemBridge.give(player, CampaignItemBridge.MOSSBOUND_HOME_MEDAL);
+        CampaignItemBridge.give(player, CampaignItemBridge.GILDED_TRADE_MEDAL);
+        CampaignItemBridge.give(player, CampaignItemBridge.EMERALD_BASTION_MEDAL);
+        player.sendMessage(ChatColor.GREEN + "Recibiste los tres pedestales y las tres medallas de prueba.");
+        return true;
+    }
+
+    public boolean debugRitualTestOpen(CommandSender sender) {
+        World world = resolveTemplateWorld(sender);
+        if (world == null) return false;
+        Path folder = world.getWorldFolder().toPath();
+        if (!Files.isRegularFile(folder.resolve(TEST_ACTIVE_MARKER))) {
+            sender.sendMessage(ChatColor.RED + "Primero usa /bingo template overworld ritual start.");
+            return false;
+        }
+        if (Files.isRegularFile(folder.resolve(TEST_OPEN_MARKER))) {
+            sender.sendMessage(ChatColor.YELLOW + "La reja de prueba ya está abierta.");
+            return false;
+        }
+        animateGateOpen(world, TEST_GATE_MIN_X, TEST_GATE_MAX_X,
+                TEST_GATE_MIN_Y, TEST_GATE_MAX_Y, TEST_GATE_Z,
+                new Location(world, 140.0D, 93.0D, 192.0D), () -> {
+                    writeMarker(folder.resolve(TEST_OPEN_MARKER),
+                            sender instanceof Player player ? player : null, "template-test-direct-open");
+                    sender.sendMessage(ChatColor.GREEN + "Animación de apertura terminada. Usa ritual reset para restaurar la reja.");
+                });
+        return true;
+    }
+
+    public boolean debugRitualTestReset(CommandSender sender) {
+        World world = resolveTemplateWorld(sender);
+        if (world == null) return false;
+        Path folder = world.getWorldFolder().toPath();
+        Path snapshot = folder.resolve(TEST_GATE_SNAPSHOT);
+        if (!Files.isRegularFile(snapshot)) {
+            sender.sendMessage(ChatColor.RED + "No existe una copia de la reja de prueba para restaurar.");
+            return false;
+        }
+        try {
+            activeGateAnimations.remove(world.getUID());
+            restoreGateSnapshot(world, snapshot);
+            medalRitual.reset(world);
+            Files.deleteIfExists(folder.resolve(TEST_OPEN_MARKER));
+            Files.deleteIfExists(folder.resolve(TEST_ACTIVE_MARKER));
+            Files.deleteIfExists(snapshot);
+            sender.sendMessage(ChatColor.GREEN + "Prueba terminada: la reja y los pedestales regresaron a su estado anterior.");
+            return true;
+        } catch (IOException exception) {
+            sender.sendMessage(ChatColor.RED + "No se pudo restaurar la reja: " + exception.getMessage());
+            return false;
+        }
+    }
+
+    public boolean debugRitualTestStatus(CommandSender sender) {
+        World world = resolveTemplateWorld(sender);
+        if (world == null) return false;
+        Path folder = world.getWorldFolder().toPath();
+        boolean active = Files.isRegularFile(folder.resolve(TEST_ACTIVE_MARKER));
+        boolean open = Files.isRegularFile(folder.resolve(TEST_OPEN_MARKER));
+        boolean snapshot = Files.isRegularFile(folder.resolve(TEST_GATE_SNAPSHOT));
+        sender.sendMessage(ChatColor.LIGHT_PURPLE + "Ritual de plantilla: "
+                + ChatColor.WHITE + "activo=" + active + ", rejaAbierta=" + open
+                + ", respaldo=" + snapshot + ", animando="
+                + activeGateAnimations.contains(world.getUID()));
+        return true;
+    }
+
+    private World resolveTemplateWorld(CommandSender sender) {
+        String template = plugin.getConfig().getString(
+                "template-worlds.overworld.name", "bingo_template_overworld");
+        World world = sender instanceof Player player && player.getWorld().getName().equals(template)
+                ? player.getWorld() : Bukkit.getWorld(template);
+        if (world == null) sender.sendMessage(ChatColor.RED + "La plantilla Overworld no está cargada: " + template);
+        return world;
+    }
+
+    private void saveGateSnapshot(World world, Path file) throws IOException {
+        Properties snapshot = new Properties();
+        snapshot.setProperty("version", "1.48.43");
+        snapshot.setProperty("bounds", TEST_GATE_MIN_X + "," + TEST_GATE_MAX_X + ","
+                + TEST_GATE_MIN_Y + "," + TEST_GATE_MAX_Y + "," + TEST_GATE_Z);
+        for (int x = TEST_GATE_MIN_X; x <= TEST_GATE_MAX_X; x++) {
+            for (int y = TEST_GATE_MIN_Y; y <= TEST_GATE_MAX_Y; y++) {
+                snapshot.setProperty(x + "," + y + "," + TEST_GATE_Z,
+                        world.getBlockAt(x, y, TEST_GATE_Z).getBlockData().getAsString());
+            }
+        }
+        try (var writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+            snapshot.store(writer, "ArlightBingo exact ritual test gate snapshot");
+        }
+    }
+
+    private void restoreGateSnapshot(World world, Path file) throws IOException {
+        Properties snapshot = read(file);
+        for (int x = TEST_GATE_MIN_X; x <= TEST_GATE_MAX_X; x++) {
+            for (int y = TEST_GATE_MIN_Y; y <= TEST_GATE_MAX_Y; y++) {
+                String data = snapshot.getProperty(x + "," + y + "," + TEST_GATE_Z);
+                if (data == null || data.isBlank()) continue;
+                world.getBlockAt(x, y, TEST_GATE_Z).setBlockData(Bukkit.createBlockData(data), false);
+            }
+        }
+    }
+
+    private void animateGateOpen(World world, int minX, int maxX, int minY, int maxY,
+                                 int z, Location effects, Runnable completed) {
+        if (!activeGateAnimations.add(world.getUID())) return;
+        int layers = Math.max(1, maxY - minY + 1);
+        for (int layer = 0; layer < layers; layer++) {
+            final int y = minY + layer;
+            plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+                for (int x = minX; x <= maxX; x++) {
+                    if (!world.getBlockAt(x, y, z).getType().isAir()) {
+                        world.getBlockAt(x, y, z).setType(Material.AIR, false);
+                    }
+                }
+                Location line = new Location(world, (minX + maxX) / 2.0D + 0.5D,
+                        y + 0.5D, z + 0.5D);
+                world.spawnParticle(Particle.ELECTRIC_SPARK, line,
+                        Math.max(12, (maxX - minX + 1) * 2),
+                        Math.max(1.0D, (maxX - minX) / 2.0D), 0.15D, 0.2D, 0.02D);
+                world.playSound(line, Sound.BLOCK_CHAIN_BREAK, 0.75F,
+                        0.75F + layer * 0.06F);
+            }, layer * 5L);
+        }
+        plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
+            activeGateAnimations.remove(world.getUID());
+            world.playSound(effects, Sound.BLOCK_PISTON_EXTEND, 1.0F, 0.65F);
+            world.spawnParticle(Particle.END_ROD, effects.clone().add(0.5D, 1.0D, 0.5D),
+                    90, 4.0D, 2.8D, 0.7D, 0.04D);
+            if (completed != null) completed.run();
+        }, layers * 5L + 4L);
+    }
+
+    private void setRegionAir(World world, int minX, int maxX, int minY, int maxY, int z) {
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                if (!world.getBlockAt(x, y, z).getType().isAir()) {
+                    world.getBlockAt(x, y, z).setType(Material.AIR, false);
+                }
+            }
+        }
+    }
+
     private void writeMarker(Path marker, Player player, String stage) {
         try {
             Files.writeString(marker,
-                    "version=1.48.42\nstage=" + stage + "\nplayer="
+                    "version=1.48.43\nstage=" + stage + "\nplayer="
                             + (player == null ? "system" : player.getUniqueId())
                             + "\ntime=" + System.currentTimeMillis() + "\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
