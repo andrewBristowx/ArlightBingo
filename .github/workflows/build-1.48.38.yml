@@ -7,13 +7,13 @@ on:
       - build/1.48.38-fixed-mine-progressive-infection
     paths:
       - '.github/workflows/build-1.48.38.yml'
-      - '.github/import/14838-fixed-mine-progressive-infection.patch.gz.b64.part*'
+      - '.github/import/14838.patch.chunk*'
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/build-1.48.38.yml'
-      - '.github/import/14838-fixed-mine-progressive-infection.patch.gz.b64.part*'
+      - '.github/import/14838.patch.chunk*'
 
 permissions:
   contents: write
@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .github/import/14838-fixed-mine-progressive-infection.patch.gz.b64.part0* | base64 -d | gzip -d > /tmp/14838.patch
+          cat .github/import/14838.patch.chunk* | base64 -d | gzip -d > /tmp/14838.patch
           if ! grep -q '<version>1.48.38</version>' pom.xml; then
             patch -p1 < /tmp/14838.patch
           fi
