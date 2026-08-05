@@ -54,7 +54,7 @@ final class OverworldIslandLoreDecorator {
     private static final String TEMPLATE_MARKER = "arlight-overworld-template.properties";
     private static final String LEGACY_DECORATION_MARKER = "arlight-overworld-decoration.properties";
     private static final String LORE_MARKER = "arlight-overworld-lore-decoration.properties";
-    private static final String REVISION = "1.48.37-single-accessible-mine-expanded-forest-corruption-1";
+    private static final String REVISION = "1.48.38-fixed-mine-legacy-scan-progressive-moss-biome-1";
     private static final int DEFAULT_BATCH = 1400;
     private static final int PORT_PROTECTION_RADIUS = 220;
 
@@ -100,7 +100,7 @@ final class OverworldIslandLoreDecorator {
             return;
         }
         if (action.equals("status")) {
-            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.37: "
+            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.38: "
                     + ChatColor.WHITE + status(sender));
             return;
         }
@@ -162,9 +162,12 @@ final class OverworldIslandLoreDecorator {
         World world = resolveWorkingWorld(sender);
         if (world == null) return;
         Anchors anchors = loadAnchors(world);
-        MineSite mine = findMineSite(world, anchors);
+        Properties marker = readProperties(world.getWorldFolder().toPath().resolve(LORE_MARKER));
+        MineSite storedMine = readMineSite(marker);
+        List<MineSite> legacyMines = detectLegacyMineSitesRobust(world, anchors, storedMine);
+        MineSite mine = fixedMainMineSite(world, anchors);
 
-        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.37 ===");
+        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.38 ===");
         sender.sendMessage(ChatColor.GRAY + "- categoría=" + ChatColor.WHITE + category);
         sender.sendMessage(ChatColor.GRAY + "- puerto=" + ChatColor.GREEN
                 + "PROTEGIDO: el comando no planifica ni cambia ningún bloque del puerto");
@@ -177,9 +180,11 @@ final class OverworldIslandLoreDecorator {
         sender.sendMessage(ChatColor.GRAY + "- campamentos=" + ChatColor.WHITE
                 + "reconstrucción sobre terrazas y soportes para que ninguno quede flotando");
         sender.sendMessage(ChatColor.GRAY + "- corrupción=" + ChatColor.WHITE
-                + "bioma contaminado continuo en casi toda la mitad opuesta, con raíces, cristales y árboles enfermos");
+                + "limpia junto a la aldea principal, transición creciente y cobertura musgosa total en montaña y zona marrón");
+        sender.sendMessage(ChatColor.GRAY + "- minas antiguas detectables=" + ChatColor.WHITE
+                + legacyMines.size() + " · se restauran antes de construir la nueva");
         if (mine == null) {
-            sender.sendMessage(ChatColor.RED + "- mina=no se encontró todavía una montaña natural segura");
+            sender.sendMessage(ChatColor.RED + "- mina=no se pudo calcular la ubicación fija");
         } else {
             sender.sendMessage(ChatColor.GRAY + "- entrada de la mina=" + ChatColor.WHITE
                     + mine.entranceX() + "," + mine.entranceY() + "," + mine.entranceZ());
@@ -235,19 +240,15 @@ final class OverworldIslandLoreDecorator {
         boolean migrateMine = categories.contains("mine")
                 && !REVISION.equals(existing.getProperty("mineRevision", ""));
         List<MineSite> legacyMines = migrateMine
-                ? detectLegacyMineSites(world, anchors, storedMine) : List.of();
+                ? detectLegacyMineSitesRobust(world, anchors, storedMine) : List.of();
 
         MineSite mine = storedMine;
-        if (categories.contains("mine")) {
-            if (migrateMine) {
-                mine = findMineSite(world, anchors, legacyMines);
-            } else if (mine == null) {
-                mine = findMineSite(world, anchors, List.of());
-            }
+        if (categories.contains("mine") && (migrateMine || mine == null)) {
+            mine = fixedMainMineSite(world, anchors);
         }
         if (categories.contains("mine") && mine == null) {
-            sender.sendMessage(ChatColor.RED + "No se encontró una montaña natural segura y separada "
-                    + "de las minas antiguas. No se realizó ningún cambio.");
+            sender.sendMessage(ChatColor.RED + "No se pudo calcular la ubicación fija de la mina principal. "
+                    + "Las demás categorías sí pueden aplicarse por separado.");
             return;
         }
 
@@ -257,6 +258,7 @@ final class OverworldIslandLoreDecorator {
                 planMineRestoration(world, plan, anchors, legacy);
             }
             existing.setProperty("mineLegacySitesRestoredLastRun", String.valueOf(legacyMines.size()));
+            existing.setProperty("mineLegacyDetector", "dense-signature-scan+stored-marker+fixed-fallbacks");
         }
         if (categories.contains("forests")) planForests(world, plan, anchors);
         if (categories.contains("camps")) planCamps(world, plan, anchors, mine);
@@ -325,11 +327,13 @@ final class OverworldIslandLoreDecorator {
                     + "Revisa la isla y guarda con /bingo template overworld commit.");
         }, 1L, 1L);
 
-        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.37 iniciada: " + activeCategory
+        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.38 iniciada: " + activeCategory
                 + " · " + operations.size() + " operaciones protegidas.");
         if (migrateMine) {
             sender.sendMessage(ChatColor.GRAY + "Minas antiguas detectadas para naturalizar: "
-                    + legacyMines.size() + ". Se generará una sola mina nueva.");
+                    + legacyMines.size() + ". La restauración ya no depende de encontrar otra montaña.");
+            sender.sendMessage(ChatColor.GRAY + "Mina principal fija: " + finalMine.entranceX() + ","
+                    + finalMine.entranceY() + "," + finalMine.entranceZ() + ".");
         }
         sender.sendMessage(ChatColor.GRAY + "El puerto existente no forma parte del plan y no será modificado.");
     }
@@ -444,8 +448,7 @@ final class OverworldIslandLoreDecorator {
         List<MineCandidate> candidates = new ArrayList<>();
         int[] radii = {190, 225, 260, 300, 340, 385, 430, 470, 510};
         int[][] directions = {
-                {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-                {1, 1}, {1, -1}, {-1, 1}, {-1, -1}
+                {-1, -1}, {0, -1}, {-1, 0}
         };
         for (int radius : radii) {
             for (int[] direction : directions) {
@@ -474,6 +477,121 @@ final class OverworldIslandLoreDecorator {
                     || distanceSquared(x, z, site.geodeX(), site.geodeZ()) <= limit) return true;
         }
         return false;
+    }
+
+    private List<MineSite> detectLegacyMineSitesRobust(World world, Anchors anchors, MineSite stored) {
+        List<LegacyMineMatch> matches = new ArrayList<>();
+        if (stored != null) addLegacyMineMatch(matches,
+                new LegacyMineMatch(stored, Math.max(20, mineSignature(world, stored))), 72);
+
+        Anchor dungeon = anchors.dungeon();
+        int[] radii = {190, 225, 260, 300, 340, 385, 430, 470, 510};
+        int[][] directions = {
+                {-1, -1}, {0, -1}, {-1, 0}
+        };
+        for (int radius : radii) {
+            for (int[] direction : directions) {
+                int scale = direction[0] != 0 && direction[1] != 0
+                        ? (int) Math.round(radius / Math.sqrt(2.0D)) : radius;
+                LegacyMineMatch match = searchLegacyMineAround(world,
+                        dungeon.x() + direction[0] * scale,
+                        dungeon.z() + direction[1] * scale, 42);
+                if (match != null) addLegacyMineMatch(matches, match, 72);
+            }
+        }
+
+        // Posiciones deterministas usadas por las revisiones que produjeron las capturas.
+        int[][] fixedOffsets = {
+                {-183, -149}, {-184, -184}, {-240, -240}, {-255, -290},
+                {-272, -272}, {-304, -304}
+        };
+        for (int[] offset : fixedOffsets) {
+            LegacyMineMatch match = searchLegacyMineAround(world,
+                    dungeon.x() + offset[0], dungeon.z() + offset[1], 58);
+            if (match != null) addLegacyMineMatch(matches, match, 78);
+        }
+
+        matches.sort(Comparator.comparingInt(LegacyMineMatch::score).reversed());
+        List<MineSite> result = new ArrayList<>();
+        for (LegacyMineMatch match : matches) {
+            if (!containsNearbyMine(result, match.site(), 78)) result.add(match.site());
+        }
+        return result;
+    }
+
+    private LegacyMineMatch searchLegacyMineAround(World world, int centerX, int centerZ, int radius) {
+        LegacyMineMatch best = null;
+        int baseY = medianSurfaceY(world, centerX, centerZ, Math.max(18, radius / 2), 6) + 1;
+        int[][] headings = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        for (int ox = -radius; ox <= radius; ox += 6) {
+            for (int oz = -radius; oz <= radius; oz += 6) {
+                for (int yOffset = -12; yOffset <= 12; yOffset += 4) {
+                    for (int[] heading : headings) {
+                        MineSite site = buildMineSite(world, new MineCandidate(
+                                centerX + ox, baseY + yOffset, centerZ + oz,
+                                heading[0], heading[1], 0.0D));
+                        if (site == null) continue;
+                        int score = mineSignature(world, site);
+                        if (best == null || score > best.score()) best = new LegacyMineMatch(site, score);
+                    }
+                }
+            }
+        }
+        if (best == null || best.score() < 7) return null;
+
+        LegacyMineMatch refined = best;
+        MineSite seed = best.site();
+        for (int ox = -5; ox <= 5; ox++) {
+            for (int oz = -5; oz <= 5; oz++) {
+                for (int yOffset = -4; yOffset <= 4; yOffset += 2) {
+                    MineSite site = buildMineSite(world, new MineCandidate(
+                            seed.entranceX() + ox, seed.entranceY() + yOffset,
+                            seed.entranceZ() + oz, seed.dx(), seed.dz(), 0.0D));
+                    if (site == null) continue;
+                    int score = mineSignature(world, site);
+                    if (score > refined.score()) refined = new LegacyMineMatch(site, score);
+                }
+            }
+        }
+        return refined.score() >= 9 ? refined : null;
+    }
+
+    private void addLegacyMineMatch(List<LegacyMineMatch> matches,
+                                    LegacyMineMatch candidate, int radius) {
+        long limit = (long) radius * radius;
+        for (int index = 0; index < matches.size(); index++) {
+            LegacyMineMatch existing = matches.get(index);
+            if (distanceSquared(existing.site().entranceX(), existing.site().entranceZ(),
+                    candidate.site().entranceX(), candidate.site().entranceZ()) <= limit) {
+                if (candidate.score() > existing.score()) matches.set(index, candidate);
+                return;
+            }
+        }
+        matches.add(candidate);
+    }
+
+    private MineSite fixedMainMineSite(World world, Anchors anchors) {
+        Anchor dungeon = anchors.dungeon();
+        int entranceX = dungeon.x() - 183;
+        int entranceZ = dungeon.z() - 149;
+        if (isProtectedPort(anchors, entranceX, entranceZ)
+                || distanceSquared(entranceX, entranceZ,
+                anchors.village().x(), anchors.village().z()) < 145L * 145L) {
+            entranceX = dungeon.x() - 225;
+            entranceZ = dungeon.z() - 185;
+        }
+        int entranceY = medianSurfaceY(world, entranceX, entranceZ, 28, 4) + 1;
+        MineSite stored = readMineSite(readProperties(
+                world.getWorldFolder().toPath().resolve(LORE_MARKER)));
+        if (stored != null && distanceSquared(entranceX, entranceZ,
+                stored.entranceX(), stored.entranceZ()) <= 90L * 90L) {
+            entranceY = stored.entranceY();
+        }
+        MineSite site = buildMineSite(world,
+                new MineCandidate(entranceX, entranceY, entranceZ, 0, -1, 9999.0D));
+        if (site != null) return site;
+        return buildMineSite(world,
+                new MineCandidate(entranceX, entranceY, entranceZ, -1, 0, 9998.0D));
     }
 
     private List<MineSite> detectLegacyMineSites(World world, Anchors anchors, MineSite stored) {
@@ -1078,6 +1196,40 @@ final class OverworldIslandLoreDecorator {
                 }
             }
         }
+        planRestoreMineSignatureSweep(world, plan, mine);
+    }
+
+    private void planRestoreMineSignatureSweep(World world, Plan plan, MineSite mine) {
+        int px = -mine.dz();
+        int pz = mine.dx();
+        for (int t = -18; t <= mine.tunnelLength() + 24; t++) {
+            int floor = mine.entranceY() - 2 - Math.max(0, t) / 3;
+            int cx = mine.entranceX() + mine.dx() * t;
+            int cz = mine.entranceZ() + mine.dz() * t;
+            for (int side = -30; side <= 30; side++) {
+                int x = cx + px * side;
+                int z = cz + pz * side;
+                for (int y = floor - 16; y <= floor + 20; y++) {
+                    Material current = world.getBlockAt(x, y, z).getType();
+                    if (isMineSignatureMaterial(current) || isMineUtilityMaterial(current)) {
+                        plan.put(x, y, z, subsurfaceMaterial(y, x, z), Rule.MINE_RESTORE);
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean isMineUtilityMaterial(Material material) {
+        String name = material.name();
+        return material == Material.BARREL || material == Material.CHEST
+                || material == Material.CRAFTING_TABLE || material == Material.SMITHING_TABLE
+                || material == Material.STONECUTTER || material == Material.BLAST_FURNACE
+                || material == Material.ANVIL || material == Material.GRINDSTONE
+                || material == Material.CAULDRON || material == Material.LECTERN
+                || material == Material.CAMPFIRE || material == Material.SOUL_CAMPFIRE
+                || material == Material.LANTERN || material == Material.SOUL_LANTERN
+                || material == Material.CHAIN || name.endsWith("_BED")
+                || name.endsWith("_SIGN");
     }
 
     private void planRestoreMineSurface(World world, Plan plan, Anchors anchors, MineSite mine) {
@@ -2034,21 +2186,37 @@ final class OverworldIslandLoreDecorator {
         Anchor dungeon = anchors.dungeon();
         int vx = dungeon.x() - village.x();
         int vz = dungeon.z() - village.z();
-        double length = Math.max(1.0D, Math.sqrt((double) vx * vx + (double) vz * vz));
-        double ux = vx / length;
-        double uz = vz / length;
-        int radius = 365;
-        for (int ox = -radius; ox <= radius; ox++) {
-            for (int oz = -radius; oz <= radius; oz++) {
-                if (ox * ox + oz * oz > radius * radius) continue;
-                int x = dungeon.x() + ox;
-                int z = dungeon.z() + oz;
+        double axisLength = Math.max(1.0D, Math.sqrt((double) vx * vx + (double) vz * vz));
+        double ux = vx / axisLength;
+        double uz = vz / axisLength;
+
+        int minX = Math.min(village.x(), dungeon.x()) - 340;
+        int maxX = Math.max(village.x(), dungeon.x()) + 340;
+        int minZ = Math.min(village.z(), dungeon.z()) - 510;
+        int maxZ = Math.max(village.z(), dungeon.z()) + 510;
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
                 if (isProtectedPort(anchors, x, z)) continue;
-                if (distanceSquared(x, z, village.x(), village.z()) < 165L * 165L) continue;
+                double distanceFromVillage = Math.sqrt(distanceSquared(
+                        x, z, village.x(), village.z()));
+                if (distanceFromVillage < 150.0D) {
+                    planCleanVillageInfection(world, plan, x, z);
+                    continue;
+                }
+
                 double projection = (x - village.x()) * ux + (z - village.z()) * uz;
-                if (projection < length * 0.44D) continue;
-                int hash = Math.floorMod(x * 73428767 ^ z * 912931, 100);
-                if (hash >= 86) continue;
+                if (projection < axisLength * 0.08D) continue;
+
+                double distanceProgress = clamp01((distanceFromVillage - 150.0D) / 245.0D);
+                double axisProgress = clamp01((projection - axisLength * 0.08D)
+                        / Math.max(1.0D, axisLength * 0.62D));
+                double intensity = smoothStep(Math.max(distanceProgress, axisProgress * 0.90D));
+                int noise = Math.floorMod(x * 73428767 ^ z * 912931, 1000);
+                double boundaryNoise = (noise / 999.0D - 0.5D) * 0.20D;
+                intensity = clamp01(intensity + boundaryNoise);
+                if (intensity < 0.05D) continue;
+
                 int y = surfaceY(world, x, z);
                 Material current = world.getBlockAt(x, y, z).getType();
                 Material above = world.getBlockAt(x, y + 1, z).getType();
@@ -2056,28 +2224,109 @@ final class OverworldIslandLoreDecorator {
                 if (current == Material.SAND || current == Material.RED_SAND
                         || current == Material.CLAY || current == Material.SNOW_BLOCK) continue;
 
-                Material surface = switch (hash % 20) {
-                    case 0, 1 -> Material.MOSSY_COBBLESTONE;
-                    case 2 -> Material.ROOTED_DIRT;
-                    case 3 -> Material.COARSE_DIRT;
-                    case 4 -> Material.VERDANT_FROGLIGHT;
-                    default -> Material.MOSS_BLOCK;
-                };
+                double coverage = 0.10D + intensity * 0.90D;
+                if ((noise % 1000) / 999.0D > coverage) continue;
+                int palette = Math.floorMod(x * 31 + z * 17, 100);
+                Material surface;
+                if (intensity >= 0.78D) {
+                    surface = palette < 74 ? Material.MOSS_BLOCK
+                            : palette < 83 ? Material.ROOTED_DIRT
+                            : palette < 90 ? Material.MOSSY_COBBLESTONE
+                            : palette < 96 ? Material.PODZOL
+                            : Material.COARSE_DIRT;
+                } else if (intensity >= 0.42D) {
+                    surface = palette < 52 ? Material.MOSS_BLOCK
+                            : palette < 70 ? Material.ROOTED_DIRT
+                            : palette < 84 ? Material.PODZOL
+                            : palette < 94 ? Material.COARSE_DIRT
+                            : Material.MOSSY_COBBLESTONE;
+                } else {
+                    surface = palette < 34 ? Material.MOSS_BLOCK
+                            : palette < 57 ? Material.ROOTED_DIRT
+                            : palette < 78 ? Material.PODZOL
+                            : Material.COARSE_DIRT;
+                }
                 plan.put(x, y, z, surface, Rule.NATURAL);
-                if (hash % 7 == 0) plan.put(x, y + 1, z, Material.MOSS_CARPET, Rule.AIR_OR_PLANT);
-                if (hash == 5 || hash == 25 || hash == 45) {
+
+                if (intensity > 0.28D && Math.floorMod(x * 13 + z * 7, 11) == 0) {
+                    plan.put(x, y + 1, z, Material.MOSS_CARPET, Rule.AIR_OR_PLANT);
+                }
+                if (intensity > 0.62D && Math.floorMod(x * 5 - z * 9, 67) == 0) {
                     plan.put(x, y - 1, z,
                             y <= 4 ? Material.DEEPSLATE_EMERALD_ORE : Material.EMERALD_ORE,
                             Rule.NATURAL);
                 }
-                if (hash == 12 && Math.floorMod(x + z, 9) == 0) {
-                    planCrystal(plan, x, y + 1, z, 3 + Math.floorMod(x * 3 + z, 5));
-                }
-                if (hash == 18 && Math.floorMod(x * 11 + z * 7, 23) == 0) {
-                    planCorruptedTree(world, plan, anchors, x, z, random);
+                if (intensity > 0.72D && Math.floorMod(x * 11 + z * 19, 181) == 0) {
+                    planCrystal(plan, x, y + 1, z, 3 + Math.floorMod(x + z, 5));
                 }
             }
         }
+
+        // Bosque infectado por cobertura: la montaña y la zona marrón quedan densas,
+        // mientras la aldea principal conserva un cinturón limpio.
+        for (int x = minX; x <= maxX; x += 11) {
+            for (int z = minZ; z <= maxZ; z += 11) {
+                double distanceFromVillage = Math.sqrt(distanceSquared(
+                        x, z, village.x(), village.z()));
+                if (distanceFromVillage < 170.0D) continue;
+                double projection = (x - village.x()) * ux + (z - village.z()) * uz;
+                if (projection < axisLength * 0.10D) continue;
+                double intensity = smoothStep(Math.max(
+                        clamp01((distanceFromVillage - 165.0D) / 230.0D),
+                        clamp01((projection - axisLength * 0.10D) / (axisLength * 0.58D))));
+                int hash = Math.floorMod(x * 92821 + z * 68917, 1000);
+                int threshold = (int) Math.round(55 + intensity * 315);
+                if (hash >= threshold) continue;
+                planCorruptedTree(world, plan, anchors, x + Math.floorMod(hash, 7) - 3,
+                        z + Math.floorMod(hash / 7, 7) - 3, random);
+                if (intensity > 0.55D && hash % 5 == 0) {
+                    planForestBoulder(world, plan, anchors, x + 4, z - 3, true, random);
+                }
+                if (intensity > 0.45D && hash % 4 == 0) {
+                    planCorruptionRoot(world, plan, anchors, x - 3, z + 3, random);
+                }
+            }
+        }
+    }
+
+    private double clamp01(double value) {
+        return Math.max(0.0D, Math.min(1.0D, value));
+    }
+
+    private double smoothStep(double value) {
+        double clamped = clamp01(value);
+        return clamped * clamped * (3.0D - 2.0D * clamped);
+    }
+
+    private void planCleanVillageInfection(World world, Plan plan, int x, int z) {
+        int y = surfaceY(world, x, z);
+        Material current = world.getBlockAt(x, y, z).getType();
+        Material above = world.getBlockAt(x, y + 1, z).getType();
+        if ((above.isAir() || isPlant(above)) && isOldInfectionSurface(current)) {
+            plan.put(x, y, z, Material.GRASS_BLOCK, Rule.NATURAL);
+        }
+        for (int height = 1; height <= 9; height++) {
+            Material material = world.getBlockAt(x, y + height, z).getType();
+            if (isInfectionDecoration(material)) {
+                plan.put(x, y + height, z, Material.AIR, Rule.INFECTION_CLEANUP);
+            }
+        }
+    }
+
+    private boolean isOldInfectionSurface(Material material) {
+        return material == Material.MOSS_BLOCK || material == Material.ROOTED_DIRT
+                || material == Material.COARSE_DIRT || material == Material.PODZOL
+                || material == Material.MYCELIUM || material == Material.MUD
+                || material == Material.PACKED_MUD;
+    }
+
+    private boolean isInfectionDecoration(Material material) {
+        return material == Material.MOSS_CARPET || material == Material.AMETHYST_BLOCK
+                || material == Material.BUDDING_AMETHYST
+                || material == Material.AMETHYST_CLUSTER
+                || material == Material.EMERALD_BLOCK
+                || material == Material.VERDANT_FROGLIGHT
+                || material == Material.AZALEA || material == Material.FLOWERING_AZALEA;
     }
 
     private void planCorruptionPatch(World world, Plan plan, Anchors anchors,
@@ -2363,6 +2612,7 @@ final class OverworldIslandLoreDecorator {
             case CAMP_REPAIR -> current.isAir() || isPlant(current) || isNatural(current)
                     || isCampDecoration(current);
             case LEAF_PERSISTENCE -> isLeaf(current);
+            case INFECTION_CLEANUP -> isInfectionDecoration(current);
         };
     }
 
@@ -2533,7 +2783,11 @@ final class OverworldIslandLoreDecorator {
             existing.setProperty("mineAccessibilityAudit", "passed");
             existing.setProperty("geodePreservedAsFinalZone", "true");
             existing.setProperty("forestMassesTarget", "8+side-bands");
-            existing.setProperty("corruptionCoverageTarget", "86-percent-opposite-zone");
+            existing.setProperty("corruptionCoverageTarget", "progressive-100-percent-mountain-and-brown-zone");
+            existing.setProperty("villageCleanRadius", "150-blocks-plus-irregular-transition");
+            existing.setProperty("infectionGradient", "clean-near-main-village-to-full-moss-mountains");
+            existing.setProperty("mineFixedEntrance", "true");
+            existing.setProperty("legacyMineRestorationIndependentOfNewSite", "true");
         }
         existing.setProperty("categories", appliedCategoryList(existing));
 
@@ -2545,7 +2799,7 @@ final class OverworldIslandLoreDecorator {
             Files.writeString(marker, text.toString(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException error) {
-            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.37: "
+            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.38: "
                     + error.getMessage());
         }
     }
@@ -2644,7 +2898,8 @@ final class OverworldIslandLoreDecorator {
         MINE,
         MINE_RESTORE,
         CAMP_REPAIR,
-        LEAF_PERSISTENCE
+        LEAF_PERSISTENCE,
+        INFECTION_CLEANUP
     }
 
     private static final class Plan {
@@ -2667,6 +2922,7 @@ final class OverworldIslandLoreDecorator {
     private record Anchors(Anchor village, Anchor dungeon, Anchor harbor) { }
     private record ScoredAnchor(Anchor anchor, double score) { }
     private record MineCandidate(int x, int y, int z, int dx, int dz, double score) { }
+    private record LegacyMineMatch(MineSite site, int score) { }
     private record MineSite(int entranceX, int entranceY, int entranceZ,
                             int dx, int dz, int tunnelLength,
                             int geodeX, int geodeY, int geodeZ,
