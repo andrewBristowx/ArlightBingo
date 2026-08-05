@@ -1,0 +1,20 @@
+1. Conserva ArlightBingo 1.46.0 y 1.47.0 como rollback; instala 1.48.0 solo en el servidor.
+2. Reinicia completamente. No uses /reload.
+3. Regenera únicamente la plantilla Overworld de Bingo.
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48-test1
+   /bingo template overworld status
+4. Espera a que el estado sea READY y ejecuta la auditoría de la plantilla.
+   /bingo template overworld audit
+   /bingo template overworld tp
+5. Revisa que ninguna casa tenga huecos grandes en tejado, frontón, pared o piso.
+6. Comprueba que no existan trigo, zanahorias, remolachas, patatas ni farmland en el pueblo.
+7. Revisa fuente, corrales, granero, patios de trabajo y paleta común de las viviendas.
+8. Recorre a pie pueblo -> residencial -> ciudadela -> arena -> santuario.
+9. Confirma que los caminos no suban a tejados, corten paredes ni terminen enterrados.
+10. Comprueba que la ciudadela y el santuario tengan terreno o cimientos continuos debajo.
+11. Verifica que la arena conserve el diseño aprobado y no aparezca la puerta verde extra.
+12. Libera los tres distritos, abre la puerta real de la ciudadela, entrega las tres piezas
+    en el altar exterior y activa la invocación interior.
+13. Revisa el archivo arlight-overworld-campaign-1.48-report.txt: todas las líneas de
+    auditoría deben indicar cero fallos y un mínimo de 18 luces en el pueblo.

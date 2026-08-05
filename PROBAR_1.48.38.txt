@@ -1,0 +1,15 @@
+PRUEBA DE ARLIGHTBINGO 1.48.38
+
+1. Instalar el JAR y reiniciar; no usar /reload.
+2. Mantener una copia de 1.48.36.
+3. Ejecutar:
+   /bingo template overworld decorate preview all
+   /bingo template overworld decorate upgrade
+   /bingo template overworld decorate status
+4. La previsualización debe mostrar una entrada fija y las minas antiguas detectables.
+5. Verificar que solo quede una entrada de mina y que no quede una entrada tapada.
+6. Recorrer entrada, taller, sala de extracción, descanso, bomba, laboratorio, depósito, ramales y geoda sin romper bloques.
+7. Verificar cinturón limpio alrededor de la aldea principal.
+8. Comprobar que la infección aumente gradualmente y que montaña gris y zona marrón sean verdes/musgosas casi por completo.
+9. Confirmar que puerto, Nether y End no cambiaron.
+10. No ejecutar commit hasta aprobar visualmente.

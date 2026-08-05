@@ -1,0 +1,15 @@
+ArlightBingo 1.48.34 FULL-STRUCTURAL-RECOVERY
+
+- Añadido /bingo template overworld recover para reconstruir de forma aislada las estructuras destruidas del Overworld.
+- Categorías disponibles: all, village, settlements, residential, commercial, military, fortress, citadel, boss y portal.
+- Cada recuperación crea primero un snapshot completo mediante el sistema seguro 1.48.33.
+- La recuperación no regenera la isla ni aplana el relieve general.
+- El puerto, la mina, la geoda, los bosques, los campamentos y la corrupción exterior quedan excluidos.
+- Se reconstruyen edificios, caminos internos, accesos, torres, tejados, chimeneas, iluminación crítica y portones de campaña.
+- Se conserva el bloqueo que impide que el constructor completo 1.48 vuelva a ejecutarse accidentalmente.
+
+Comandos:
+/bingo template overworld recover preview all
+/bingo template overworld recover apply all
+/bingo template overworld recover status
+/bingo template overworld recover cancel

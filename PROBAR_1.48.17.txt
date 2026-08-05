@@ -1,0 +1,13 @@
+PRUEBA ARLIGHTBINGO 1.48.17
+
+1. Apaga el servidor y conserva la 1.48.16 como copia.
+2. Instala solo ArlightBingo 1.48.17 y arranca normalmente.
+3. Para validar una plantilla limpia:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.17-test1
+4. Observa en consola que los intentos indiquen estrategias diferentes:
+   targeted-clearance, supported-segment y widened-corridor.
+5. Comprueba especialmente commercial-citadel y citadel-boss.
+6. Usa /bingo repair overworld preview 96 antes de reparar una región manualmente.
+7. Si una reparación visual empeora la zona, usa /bingo repair overworld rollback.
+8. No regeneres Nether ni End para esta prueba.

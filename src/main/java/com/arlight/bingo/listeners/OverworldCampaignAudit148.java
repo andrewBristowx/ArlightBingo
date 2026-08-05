@@ -1,0 +1,1842 @@
+package com.arlight.bingo.listeners;
+
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.World;
+import org.bukkit.Bukkit;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
+import java.nio.file.Files;
+
+import static com.arlight.bingo.listeners.OverworldCampaignModel146.*;
+
+/** Structural checks that prevent a visually broken 1.48.28 template from becoming READY. */
+final class OverworldCampaignAudit148 {
+    enum Facing {
+        NORTH(0, -1), SOUTH(0, 1), EAST(1, 0), WEST(-1, 0);
+
+        final int dx;
+        final int dz;
+
+        Facing(int dx, int dz) {
+            this.dx = dx;
+            this.dz = dz;
+        }
+    }
+
+    record HouseSpec(String id, int cx, int y, int cz, int hx, int hz,
+                     int height, boolean roofAlongX, Material plaster, Facing front) { }
+
+    record TowerSpec(String id, int cx, int y, int cz, int radius, int height,
+                     Facing front) { }
+
+    record ChimneySpec(String id, int x, int baseY, int topY, int z) { }
+
+    record PlanterSpec(String id, int x, int y, int z, Material flower) { }
+
+    record TerrainSpec(Site site, int flatRadius, int blendRadius) { }
+
+    enum FortificationShape { SQUARE, CIRCLE }
+
+    record FortificationSpec(String id, int cx, int baseY, int cz, int radius,
+                             FortificationShape shape) { }
+
+    record RoadCell(String id, int x, int walkY, int z, Material floor) { }
+
+    private record RoadColumn(int x, int z) { }
+
+    private record RoadNode(RoadCell planned, int actualWalkY) { }
+
+    record Summary(int houses, int towers, int chimneys, int planters, int roadSamples,
+                   int villageLights, int interiorLights, int furnishings, int crops,
+                   int unsupportedLanterns) { }
+
+    static final class Registry {
+        private final List<HouseSpec> houses = new ArrayList<>();
+        private final List<TowerSpec> towers = new ArrayList<>();
+        private final List<ChimneySpec> chimneys = new ArrayList<>();
+        private final List<PlanterSpec> planters = new ArrayList<>();
+        private final List<TerrainSpec> terrain = new ArrayList<>();
+        private final List<FortificationSpec> fortifications = new ArrayList<>();
+        /** Latest physical plan for each column, retained for the non-destructive repair pass. */
+        private final Map<RoadColumn, RoadCell> roadCells = new LinkedHashMap<>();
+        /**
+         * Route membership is independent from the physical-column map. An intersection may
+         * therefore belong to every road that crosses it instead of the last road silently
+         * stealing that cell from all previous routes.
+         */
+        private final Map<RoadColumn, Map<String, RoadCell>> roadMemberships =
+                new LinkedHashMap<>();
+        private final Map<String, LinkedHashMap<RoadColumn, RoadCell>> roadRoutes =
+                new LinkedHashMap<>();
+
+        void registerHouse(HouseSpec candidate) {
+            for (HouseSpec placed : houses) {
+                boolean verticalOverlap = candidate.y <= placed.y + placed.height + 16
+                        && placed.y <= candidate.y + candidate.height + 16;
+                boolean horizontalOverlap = Math.abs(candidate.cx - placed.cx)
+                        <= candidate.hx + placed.hx + 3
+                        && Math.abs(candidate.cz - placed.cz)
+                        <= candidate.hz + placed.hz + 3;
+                if (verticalOverlap && horizontalOverlap) {
+                    throw new IllegalStateException("Edificios superpuestos: "
+                            + placed.id + " y " + candidate.id);
+                }
+            }
+            houses.add(candidate);
+        }
+
+        void registerTower(TowerSpec candidate) {
+            towers.add(candidate);
+        }
+
+        void registerChimney(ChimneySpec candidate) {
+            chimneys.add(candidate);
+        }
+
+        void registerPlanter(PlanterSpec candidate) {
+            planters.add(candidate);
+        }
+
+        void registerTerrain(Site site, int flatRadius, int blendRadius) {
+            terrain.add(new TerrainSpec(site, flatRadius, blendRadius));
+        }
+
+        void registerFortification(FortificationSpec fortification) {
+            fortifications.add(fortification);
+        }
+
+        boolean blocksHouseOrEntrance(int x, int y, int z) {
+            for (HouseSpec house : houses) {
+                if (y < house.y - 2 || y > house.y + house.height + 8) continue;
+                int dx = x - house.cx;
+                int dz = z - house.cz;
+                if (Math.abs(dx) <= house.hx + 2 && Math.abs(dz) <= house.hz + 2) {
+                    return true;
+                }
+                int radius = frontRadius(house);
+                int forward = dx * house.front.dx + dz * house.front.dz;
+                int lateral = Math.abs(dx * house.front.dz - dz * house.front.dx);
+                if (forward >= radius && forward <= radius + 7 && lateral <= 3) {
+                    return true;
+                }
+            }
+            for (TowerSpec tower : towers) {
+                if (y < tower.y - 2 || y > tower.y + tower.height + 5) continue;
+                int dx = x - tower.cx;
+                int dz = z - tower.cz;
+                if (Math.abs(dx) <= tower.radius + 2
+                        && Math.abs(dz) <= tower.radius + 2) return true;
+                int forward = dx * tower.front.dx + dz * tower.front.dz;
+                int lateral = Math.abs(dx * tower.front.dz - dz * tower.front.dx);
+                if (forward >= tower.radius && forward <= tower.radius + 7
+                        && lateral <= 3) return true;
+            }
+            return false;
+        }
+
+        boolean blocksTerrainAudit(int x, int z) {
+            for (HouseSpec house : houses) {
+                if (Math.abs(x - house.cx) <= house.hx + 4
+                        && Math.abs(z - house.cz) <= house.hz + 4) return true;
+            }
+            for (TowerSpec tower : towers) {
+                if (Math.abs(x - tower.cx) <= tower.radius + 9
+                        && Math.abs(z - tower.cz) <= tower.radius + 9) return true;
+            }
+            for (FortificationSpec wall : fortifications) {
+                int dx = Math.abs(x - wall.cx);
+                int dz = Math.abs(z - wall.cz);
+                if (wall.shape == FortificationShape.SQUARE) {
+                    if (dx <= wall.radius + 5 && dz <= wall.radius + 5
+                            && (Math.abs(dx - wall.radius) <= 5
+                            || Math.abs(dz - wall.radius) <= 5)) return true;
+                } else {
+                    double distance = Math.sqrt((double) dx * dx + (double) dz * dz);
+                    if (Math.abs(distance - wall.radius) <= 6.0D) return true;
+                }
+            }
+            if (roadCells.containsKey(new RoadColumn(x, z))) return true;
+            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
+                if (roadCells.containsKey(new RoadColumn(x + dx, z + dz))) return true;
+            }
+            return false;
+        }
+
+        boolean blocksStructureBody(int x, int y, int z) {
+            for (HouseSpec house : houses) {
+                if (y < house.y - 1 || y > house.y + house.height + 7) continue;
+                if (Math.abs(x - house.cx) <= house.hx + 1
+                        && Math.abs(z - house.cz) <= house.hz + 1) return true;
+            }
+            for (TowerSpec tower : towers) {
+                if (y < tower.y - 1 || y > tower.y + tower.height + 4) continue;
+                if (Math.abs(x - tower.cx) <= tower.radius + 1
+                        && Math.abs(z - tower.cz) <= tower.radius + 1) return true;
+            }
+            return false;
+        }
+
+        boolean blocksOtherStructure(String ownerId, int x, int y, int z) {
+            for (HouseSpec house : houses) {
+                if (house.id.equals(ownerId)) continue;
+                if (y < house.y - 1 || y > house.y + house.height + 7) continue;
+                if (Math.abs(x - house.cx) <= house.hx + 1
+                        && Math.abs(z - house.cz) <= house.hz + 1) return true;
+            }
+            for (TowerSpec tower : towers) {
+                if (tower.id.equals(ownerId)) continue;
+                if (y < tower.y - 1 || y > tower.y + tower.height + 4) continue;
+                if (Math.abs(x - tower.cx) <= tower.radius + 1
+                        && Math.abs(z - tower.cz) <= tower.radius + 1) return true;
+            }
+            return false;
+        }
+
+        void registerRoadCell(String id, int x, int walkY, int z, Material floor) {
+            RoadColumn column = new RoadColumn(x, z);
+            Map<String, RoadCell> memberships = roadMemberships.computeIfAbsent(
+                    column, ignored -> new LinkedHashMap<>());
+            RoadCell physical = new RoadCell(id, x, walkY, z, floor);
+            // A later road owns the physical column. Realign every earlier route that crosses
+            // this same column so the audit never keeps an obsolete height beneath the visible
+            // path. This removes the old parallel route layers reported in 1.48.24.
+            for (String routeId : new ArrayList<>(memberships.keySet())) {
+                RoadCell aligned = new RoadCell(routeId, x, walkY, z, floor);
+                memberships.put(routeId, aligned);
+                roadRoutes.computeIfAbsent(routeId, ignored -> new LinkedHashMap<>())
+                        .put(column, aligned);
+            }
+            memberships.put(id, physical);
+            roadRoutes.computeIfAbsent(id, ignored -> new LinkedHashMap<>())
+                    .put(column, physical);
+            roadCells.put(column, physical);
+        }
+
+        void clearRoute(String id) {
+            LinkedHashMap<RoadColumn, RoadCell> removed = roadRoutes.remove(id);
+            if (removed == null) return;
+            for (RoadColumn column : removed.keySet()) {
+                Map<String, RoadCell> memberships = roadMemberships.get(column);
+                if (memberships == null) continue;
+                memberships.remove(id);
+                if (memberships.isEmpty()) {
+                    roadMemberships.remove(column);
+                    roadCells.remove(column);
+                    continue;
+                }
+                RoadCell replacement = null;
+                for (RoadCell candidate : memberships.values()) replacement = candidate;
+                if (replacement != null) roadCells.put(column, replacement);
+            }
+        }
+
+        void reconcileRouteMembershipsToPhysicalPlan() {
+            for (Map.Entry<RoadColumn, RoadCell> entry : roadCells.entrySet()) {
+                RoadColumn column = entry.getKey();
+                RoadCell physical = entry.getValue();
+                Map<String, RoadCell> memberships = roadMemberships.get(column);
+                if (memberships == null) continue;
+                for (String routeId : new ArrayList<>(memberships.keySet())) {
+                    RoadCell aligned = new RoadCell(routeId, physical.x(), physical.walkY(),
+                            physical.z(), physical.floor());
+                    memberships.put(routeId, aligned);
+                    roadRoutes.computeIfAbsent(routeId, ignored -> new LinkedHashMap<>())
+                            .put(column, aligned);
+                }
+            }
+        }
+
+        /**
+         * Replaces the physical plan for a road column and realigns every route already using
+         * that column. Final fortress transitions therefore supersede obsolete heights instead
+         * of leaving two competing route layers in the audit registry.
+         */
+        void registerAuthoritativeRoadCell(String id, int x, int walkY, int z, Material floor) {
+            RoadColumn column = new RoadColumn(x, z);
+            Map<String, RoadCell> memberships = roadMemberships.computeIfAbsent(
+                    column, ignored -> new LinkedHashMap<>());
+            for (String routeId : new ArrayList<>(memberships.keySet())) {
+                RoadCell aligned = new RoadCell(routeId, x, walkY, z, floor);
+                memberships.put(routeId, aligned);
+                roadRoutes.computeIfAbsent(routeId, ignored -> new LinkedHashMap<>())
+                        .put(column, aligned);
+            }
+            RoadCell current = new RoadCell(id, x, walkY, z, floor);
+            memberships.put(id, current);
+            roadRoutes.computeIfAbsent(id, ignored -> new LinkedHashMap<>())
+                    .put(column, current);
+            roadCells.put(column, current);
+        }
+
+        List<HouseSpec> housesSnapshot() { return List.copyOf(houses); }
+        List<TowerSpec> towersSnapshot() { return List.copyOf(towers); }
+        List<ChimneySpec> chimneysSnapshot() { return List.copyOf(chimneys); }
+        List<PlanterSpec> plantersSnapshot() { return List.copyOf(planters); }
+        List<TerrainSpec> terrainSnapshot() { return List.copyOf(terrain); }
+        List<FortificationSpec> fortificationsSnapshot() { return List.copyOf(fortifications); }
+        Map<String, List<RoadCell>> roadRoutesSnapshot() {
+            Map<String, List<RoadCell>> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, LinkedHashMap<RoadColumn, RoadCell>> entry : roadRoutes.entrySet()) {
+                copy.put(entry.getKey(), List.copyOf(entry.getValue().values()));
+            }
+            return copy;
+        }
+
+        boolean hasRoadNearExcept(String excludedId, int x, int z, int radius) {
+            for (int dx = -radius; dx <= radius; dx++) for (int dz = -radius; dz <= radius; dz++) {
+                Map<String, RoadCell> memberships = roadMemberships.get(
+                        new RoadColumn(x + dx, z + dz));
+                if (memberships == null) continue;
+                for (String routeId : memberships.keySet()) {
+                    if (!routeId.equals(excludedId)) return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private record Pos(int x, int y, int z) { }
+
+    private OverworldCampaignAudit148() { }
+
+    static void validatePhase(String phase, List<BlockEdit> edits) {
+        Map<Pos, BlockEdit> finalBlocks = new HashMap<>();
+        for (BlockEdit edit : edits) {
+            if (isCrop(edit.material())) {
+                throw new IllegalStateException("La fase '" + phase
+                        + "' intentó volver a generar cultivos en "
+                        + edit.x() + "," + edit.y() + "," + edit.z());
+            }
+            if (edit.data() != null) {
+                try {
+                    Bukkit.createBlockData(edit.data());
+                } catch (IllegalArgumentException invalid) {
+                    throw new IllegalStateException("Datos de bloque inválidos en la fase '"
+                            + phase + "': " + edit.data(), invalid);
+                }
+            }
+            finalBlocks.put(new Pos(edit.x(), edit.y(), edit.z()), edit);
+        }
+        for (Map.Entry<Pos, BlockEdit> entry : finalBlocks.entrySet()) {
+            Material material = entry.getValue().material();
+            Pos at = entry.getKey();
+            if (isLantern(material)) {
+                BlockEdit below = finalBlocks.get(new Pos(at.x, at.y - 1, at.z));
+                BlockEdit above = finalBlocks.get(new Pos(at.x, at.y + 1, at.z));
+                if (!supportsLantern(below == null ? null : below.material())
+                        && !supportsLantern(above == null ? null : above.material())) {
+                    throw new IllegalStateException("Farol sin soporte en la fase '" + phase
+                            + "': " + at.x + "," + at.y + "," + at.z);
+                }
+            }
+            if (material == Material.LADDER) {
+                BlockEdit support = finalBlocks.get(new Pos(at.x + 1, at.y, at.z));
+                if (entry.getValue().data() == null
+                        || !entry.getValue().data().contains("facing=west")
+                        || support == null || !supportsLantern(support.material())) {
+                    throw new IllegalStateException("Escalera sin respaldo real en la fase '"
+                            + phase + "': " + at.x + "," + at.y + "," + at.z);
+                }
+            }
+        }
+    }
+
+    static Summary auditWorld(World world, Registry registry, Site village,
+                              Site citadel, Site portal, Location outerAltar,
+                              Location ritualGate) {
+        List<String> failures = new ArrayList<>();
+        List<String> roadWarnings = new ArrayList<>();
+        for (HouseSpec house : registry.houses) auditHouse(world, registry, house, failures);
+        for (TowerSpec tower : registry.towers) auditTower(world, tower, failures);
+        for (ChimneySpec chimney : registry.chimneys) auditChimney(world, chimney, failures);
+        for (PlanterSpec planter : registry.planters) auditPlanter(world, planter, failures);
+        for (TerrainSpec terrain : registry.terrain) {
+            auditTerrainBlend(world, registry, terrain, failures);
+        }
+        auditCitadelLevel(world, registry, citadel, failures);
+        auditCitadelSubsurface(world, citadel, failures);
+        for (FortificationSpec fortification : registry.fortifications) {
+            auditFortificationFoundation(world, fortification, failures);
+        }
+        for (Map.Entry<String, LinkedHashMap<RoadColumn, RoadCell>> route
+                : registry.roadRoutes.entrySet()) {
+            List<RoadCell> orderedCells = new ArrayList<>(route.getValue().values());
+            RoadCell broken = disconnectedRoadSample(world, route.getKey(), orderedCells, ritualGate);
+            if (broken == null) continue;
+            Material floor = world.getBlockAt(broken.x, broken.walkY - 1, broken.z).getType();
+            Material passage = world.getBlockAt(broken.x, broken.walkY, broken.z).getType();
+            Material head = world.getBlockAt(broken.x, broken.walkY + 1, broken.z).getType();
+            String roadFailure = "camino cortado en todo el corredor: " + route.getKey()
+                    + " (x=" + broken.x + ", y=" + broken.walkY + ", z=" + broken.z
+                    + ", suelo=" + floor + ", paso=" + passage
+                    + ", cabeza=" + head + ")";
+            // 1.48.28 never accepts a template with a disconnected registered route.
+            // Secondary-route warnings previously allowed visually broken paths to reach READY.
+            failures.add(roadFailure);
+        }
+
+        int crops = countCrops(world, village, village.radius() - 4);
+        if (crops > 0) failures.add("quedaron " + crops + " bloques de cultivo en el pueblo");
+
+        int[] light = auditVillageLights(world, village, failures);
+        if (light[0] < 18) failures.add("iluminación insuficiente en el pueblo: " + light[0]);
+
+        auditRitualApproach(world, registry, outerAltar, ritualGate, failures);
+        auditFountain(world, village, failures);
+        auditBellPavilion(world, village, failures);
+        auditArenaTerraces(world, ritualGate, failures);
+        auditPortalFurnishings(world, portal, failures);
+        auditCriticalPassageLighting(world, citadel, portal, ritualGate, failures);
+        auditArenaFurnishings(world, ritualGate, failures);
+        auditBossGatehouse(world, ritualGate, failures);
+        auditBossColiseumClosure(world, ritualGate, failures);
+
+        if (!roadWarnings.isEmpty()) {
+            // Defensive fallback: all road failures are promoted above, so this must stay empty.
+            failures.addAll(roadWarnings);
+        }
+        if (!failures.isEmpty()) {
+            int limit = Math.min(12, failures.size());
+            throw new IllegalStateException("Auditoría estructural 1.48.28 rechazada: "
+                    + String.join("; ", failures.subList(0, limit)));
+        }
+        int interiorLights = countRegisteredInteriorLights(world, registry);
+        int furnishings = countRegisteredFurnishings(world, registry);
+        return new Summary(registry.houses.size(), registry.towers.size(),
+                registry.chimneys.size(), registry.planters.size(),
+                registry.roadCells.size(), light[0],
+                interiorLights, furnishings, crops, light[1]);
+    }
+
+    private static boolean isCriticalRoad(String id) {
+        // Kept as a named policy hook for diagnostics. In 1.48.28 every registered route
+        // is critical: no disconnected road may be downgraded to a visual-only warning.
+        return id != null && !id.isBlank();
+    }
+
+    /**
+     * Roads are planned before buildings so terrain height never sees roofs. Fortifications,
+     * gates and decoration are intentionally built afterwards, so the registered road cells
+     * are replayed once at the end to keep every declared corridor open at its audited height.
+     */
+    static List<BlockEdit> repairRoadCorridors(World world, Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (RoadCell cell : registry.roadCells.values()) {
+            // 1.48.28 restores village streets too, but never clears a registered building.
+            // This fills grass gaps left by later pads without reopening house or tower walls.
+            if (registry.blocksStructureBody(cell.x, cell.walkY, cell.z)) continue;
+            if (!roadColumnMayBeCleared(world, cell.x, cell.walkY, cell.z)) continue;
+            OverworldCampaignTerrain148.supportedPathCell(out, world,
+                    cell.x, cell.walkY, cell.z, cell.floor);
+            for (int y = cell.walkY; y <= cell.walkY + 3; y++) {
+                out.add(new BlockEdit(cell.x, y, cell.z, Material.AIR));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Final authoritative replay of every planned road cell. Unlike the early conservative
+     * pass, this may remove generated cobblestone/brick that occupies the declared corridor.
+     * Registered house and tower bodies remain protected. This pass must run after all shells.
+     */
+    static List<BlockEdit> restoreAllRoadCorridorsStrict(World world, Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (RoadCell cell : registry.roadCells.values()) {
+            if (registry.blocksStructureBody(cell.x, cell.walkY, cell.z)) continue;
+            OverworldCampaignTerrain148.supportedPathCell(out, world,
+                    cell.x, cell.walkY, cell.z, cell.floor);
+            for (int y = cell.walkY; y <= cell.walkY + 5; y++) {
+                out.add(new BlockEdit(cell.x, y, cell.z, Material.AIR));
+            }
+        }
+        return out;
+    }
+
+    private static boolean roadColumnMayBeCleared(World world, int x, int walkY, int z) {
+        for (int y = walkY; y <= walkY + 2; y++) {
+            Material material = world.getBlockAt(x, y, z).getType();
+            if (material.isAir() || !material.isSolid()) continue;
+            if (isNaturalRoadObstacle(material)) continue;
+            return false;
+        }
+        return true;
+    }
+
+    private static boolean isNaturalRoadObstacle(Material material) {
+        return material == Material.GRASS_BLOCK || material == Material.DIRT
+                || material == Material.COARSE_DIRT || material == Material.ROOTED_DIRT
+                || material == Material.PODZOL || material == Material.MYCELIUM
+                || material == Material.MOSS_BLOCK || material == Material.MUD
+                || material == Material.STONE || material == Material.DEEPSLATE
+                || material == Material.GRANITE || material == Material.DIORITE
+                || material == Material.ANDESITE || material == Material.TUFF
+                || material == Material.SAND || material == Material.RED_SAND
+                || material == Material.GRAVEL || material == Material.CLAY
+                || material == Material.TERRACOTTA || material == Material.SNOW_BLOCK;
+    }
+
+
+    /**
+     * Restores the complete structural envelope of every registered house after all roads,
+     * plazas, yards and decorations have run. Only the perimeter, gables, roof and eaves are
+     * rewritten, so furniture and usable interior space remain untouched.
+     */
+    static List<BlockEdit> repairRegisteredHouseShells(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (HouseSpec house : registry.houses) {
+            for (int x = -house.hx; x <= house.hx; x++) {
+                for (int z = -house.hz; z <= house.hz; z++) {
+                    if (Math.abs(x) != house.hx && Math.abs(z) != house.hz) continue;
+                    for (int yy = 0; yy <= house.height; yy++) {
+                        boolean doorway = houseEntrance(house, x, z) && yy <= 1;
+                        int worldX = house.cx + x;
+                        int worldY = house.y + yy;
+                        int worldZ = house.cz + z;
+                        if (doorway) {
+                            String direction = house.front.name().toLowerCase(java.util.Locale.ROOT);
+                            String half = yy == 0 ? "lower" : "upper";
+                            out.add(new BlockEdit(worldX, worldY, worldZ, Material.SPRUCE_DOOR,
+                                    "minecraft:spruce_door[facing=" + direction
+                                            + ",half=" + half
+                                            + ",hinge=left,open=false,powered=false]"));
+                            continue;
+                        }
+                        boolean xWall = Math.abs(x) == house.hx;
+                        boolean corner = xWall && Math.abs(z) == house.hz;
+                        int alongWall = xWall ? z : x;
+                        int bay = Math.floorMod(alongWall, 5);
+                        boolean frame = corner || yy == 0 || yy == house.height
+                                || yy % 5 == 0 || bay == 0;
+                        boolean window = !frame && yy % 5 >= 2 && yy % 5 <= 3
+                                && (bay == 2 || bay == 3);
+                        if (window) {
+                            String connections = xWall
+                                    ? "north=true,east=false,south=true,west=false"
+                                    : "north=false,east=true,south=false,west=true";
+                            out.add(new BlockEdit(worldX, worldY, worldZ, Material.GLASS_PANE,
+                                    "minecraft:glass_pane[" + connections
+                                            + ",waterlogged=false]"));
+                        } else {
+                            out.add(new BlockEdit(worldX, worldY, worldZ,
+                                    frame ? Material.STRIPPED_DARK_OAK_LOG : house.plaster,
+                                    null));
+                        }
+                    }
+                }
+            }
+            restoreHouseRoof(out, house);
+            restoreHouseEaves(out, house);
+        }
+        return out;
+    }
+
+    private static boolean houseEntrance(HouseSpec house, int x, int z) {
+        return switch (house.front) {
+            case NORTH -> z == -house.hz && x == 0;
+            case SOUTH -> z == house.hz && x == 0;
+            case EAST -> x == house.hx && z == 0;
+            case WEST -> x == -house.hx && z == 0;
+        };
+    }
+
+    private static void restoreHouseRoof(List<BlockEdit> out, HouseSpec house) {
+        int roofY = house.y + house.height + 1;
+        int roofHx = house.hx + 2;
+        int roofHz = house.hz + 2;
+        int layers = house.roofAlongX ? roofHz : roofHx;
+        for (int layer = 0; layer <= layers; layer++) {
+            if (house.roofAlongX) {
+                for (int x = -roofHx; x <= roofHx; x++) {
+                    out.add(new BlockEdit(house.cx + x, roofY + layer,
+                            house.cz - roofHz + layer, Material.DARK_OAK_PLANKS, null));
+                    out.add(new BlockEdit(house.cx + x, roofY + layer,
+                            house.cz + roofHz - layer, Material.DARK_OAK_PLANKS, null));
+                }
+            } else {
+                for (int z = -roofHz; z <= roofHz; z++) {
+                    out.add(new BlockEdit(house.cx - roofHx + layer, roofY + layer,
+                            house.cz + z, Material.DARK_OAK_PLANKS, null));
+                    out.add(new BlockEdit(house.cx + roofHx - layer, roofY + layer,
+                            house.cz + z, Material.DARK_OAK_PLANKS, null));
+                }
+            }
+        }
+        if (house.roofAlongX) {
+            for (int side : new int[]{-house.hx, house.hx}) {
+                for (int z = -house.hz; z <= house.hz; z++) {
+                    int top = roofY + roofHz - Math.abs(z);
+                    for (int y = roofY; y < top; y++) {
+                        Material material = y == roofY || z == 0
+                                || Math.floorMod(y + z, 5) == 0
+                                ? Material.STRIPPED_DARK_OAK_LOG : house.plaster;
+                        out.add(new BlockEdit(house.cx + side, y,
+                                house.cz + z, material, null));
+                    }
+                }
+            }
+            for (int x = -roofHx; x <= roofHx; x++) {
+                out.add(new BlockEdit(house.cx + x, roofY + roofHz,
+                        house.cz, Material.STRIPPED_DARK_OAK_LOG, null));
+            }
+        } else {
+            for (int side : new int[]{-house.hz, house.hz}) {
+                for (int x = -house.hx; x <= house.hx; x++) {
+                    int top = roofY + roofHx - Math.abs(x);
+                    for (int y = roofY; y < top; y++) {
+                        Material material = y == roofY || x == 0
+                                || Math.floorMod(y + x, 5) == 0
+                                ? Material.STRIPPED_DARK_OAK_LOG : house.plaster;
+                        out.add(new BlockEdit(house.cx + x, y,
+                                house.cz + side, material, null));
+                    }
+                }
+            }
+            for (int z = -roofHz; z <= roofHz; z++) {
+                out.add(new BlockEdit(house.cx, roofY + roofHx,
+                        house.cz + z, Material.STRIPPED_DARK_OAK_LOG, null));
+            }
+        }
+    }
+
+    private static void restoreHouseEaves(List<BlockEdit> out, HouseSpec house) {
+        int roofY = house.y + house.height + 1;
+        int roofHx = house.hx + 2;
+        int roofHz = house.hz + 2;
+        if (house.roofAlongX) {
+            for (int x = -roofHx; x <= roofHx; x++) {
+                for (int z : new int[]{-house.hz - 1, house.hz + 1}) {
+                    out.add(new BlockEdit(house.cx + x, roofY - 1,
+                            house.cz + z, Material.DARK_OAK_PLANKS, null));
+                    if (Math.floorMod(x, 4) == 0) {
+                        out.add(new BlockEdit(house.cx + x, roofY - 2,
+                                house.cz + z, Material.STRIPPED_DARK_OAK_LOG, null));
+                    }
+                }
+            }
+        } else {
+            for (int z = -roofHz; z <= roofHz; z++) {
+                for (int x : new int[]{-house.hx - 1, house.hx + 1}) {
+                    out.add(new BlockEdit(house.cx + x, roofY - 1,
+                            house.cz + z, Material.DARK_OAK_PLANKS, null));
+                    if (Math.floorMod(z, 4) == 0) {
+                        out.add(new BlockEdit(house.cx + x, roofY - 2,
+                                house.cz + z, Material.STRIPPED_DARK_OAK_LOG, null));
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Replays every registered private entrance after roads, fortifications and decoration.
+     * Step zero is the real doorway and therefore receives a door instead of AIR; the
+     * remaining cells are the supported outdoor landing. Keeping this separate from the
+     * public-road replay prevents a late road brush from deleting a valid door.
+     */
+    /** Anchors every registered tower for the full twelve-block depth audited later. */
+    static List<BlockEdit> repairRegisteredTowerFoundations(World world, Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (TowerSpec tower : registry.towers) {
+            int hx = tower.radius + 1;
+            int hz = tower.radius + 1;
+            for (int lx = -hx; lx <= hx; lx++) {
+                for (int lz = -hz; lz <= hz; lz++) {
+                    for (int depth = 0; depth < 12; depth++) {
+                        Material material = depth < 2 ? Material.STONE_BRICKS
+                                : depth < 6 ? Material.COBBLESTONE : Material.STONE;
+                        out.add(new BlockEdit(tower.cx + lx, tower.y - 1 - depth,
+                                tower.cz + lz, material));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Restores every tower perimeter after roads, walls and terrain have finished. */
+    static List<BlockEdit> repairRegisteredTowerShells(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (TowerSpec tower : registry.towers) {
+            for (int lx = -tower.radius; lx <= tower.radius; lx++) {
+                for (int lz = -tower.radius; lz <= tower.radius; lz++) {
+                    if (Math.abs(lx) != tower.radius && Math.abs(lz) != tower.radius) continue;
+                    for (int yy = 0; yy <= tower.height; yy++) {
+                        int x = tower.cx + lx;
+                        int z = tower.cz + lz;
+                        boolean doorway = lx == tower.front.dx * tower.radius
+                                && lz == tower.front.dz * tower.radius && yy <= 1;
+                        if (doorway) continue;
+                        boolean window = false;
+                        for (int level = 0; level < tower.height; level += 6) {
+                            int localWindowY = Math.min(tower.height - 1, level + 3);
+                            if (yy == localWindowY || yy == localWindowY + 1) {
+                                window = (lx == 0 && lz == -tower.radius)
+                                        || (lx == -tower.radius && lz == 0)
+                                        || (lx == tower.radius && lz == 0);
+                            }
+                        }
+                        if (window) out.add(new BlockEdit(x, tower.y + yy, z, Material.IRON_BARS));
+                        else out.add(new BlockEdit(x, tower.y + yy, z,
+                                Math.floorMod(lx + lz + yy, 12) == 0
+                                        ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    static List<BlockEdit> repairRegisteredEntrances(World world, Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (HouseSpec house : registry.houses) {
+            replayEntrance(out, world, registry, house.id, house.cx, house.y, house.cz,
+                    frontRadius(house), house.front, 1, 2, Material.COBBLESTONE);
+        }
+        for (TowerSpec tower : registry.towers) {
+            replayEntrance(out, world, registry, tower.id, tower.cx, tower.y, tower.cz,
+                    tower.radius, tower.front, 2, 3, Material.STONE_BRICKS);
+        }
+        return out;
+    }
+
+    /**
+     * Replays the complete vertical route of every registered tower after all other edits.
+     * The arena's west gate shares a dense boundary with roads, the gatehouse and the arena
+     * wall; restoring both the ladder and its backing here makes the final world independent
+     * of which of those structures wrote the same column earlier.
+     */
+    static List<BlockEdit> repairRegisteredVerticalAccess(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (TowerSpec tower : registry.towers) {
+            int localLadderZ = Math.min(2, tower.radius - 2);
+            int ladderX = tower.cx + tower.radius - 1;
+            int ladderZ = tower.cz + localLadderZ;
+            for (int offset = 0; offset < tower.height; offset++) {
+                Material backing = ((tower.radius + localLadderZ + offset) & 11) == 0
+                        ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
+                out.add(new BlockEdit(ladderX + 1, tower.y + offset, ladderZ, backing));
+                out.add(new BlockEdit(ladderX, tower.y + offset, ladderZ, Material.LADDER,
+                        "minecraft:ladder[facing=west,waterlogged=false]"));
+            }
+            for (int level = 6; level < tower.height; level += 6) {
+                // The solid cell immediately west of the shaft is the actual dismount.
+                out.add(new BlockEdit(ladderX - 1, tower.y + level, ladderZ,
+                        Material.DEEPSLATE_TILES));
+                out.add(new BlockEdit(ladderX - 1, tower.y + level + 1, ladderZ,
+                        Material.AIR));
+            }
+        }
+        return out;
+    }
+
+
+    /**
+     * Rebuilds the usable exterior threshold of every tower after fortifications,
+     * furnishings and terrain integration. The first two rows are five blocks wide;
+     * the route then narrows to three blocks. This keeps a real landing in front of the
+     * door without cutting nearby gatehouse walls or sanctuary furniture.
+     */
+    static List<BlockEdit> repairRegisteredTowerLandings(World world, Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (TowerSpec tower : registry.towers) {
+            int sideX = -tower.front.dz;
+            int sideZ = tower.front.dx;
+            for (int step = 1; step <= 5; step++) {
+                int sideRadius = step <= 2 ? 2 : 1;
+                for (int side = -sideRadius; side <= sideRadius; side++) {
+                    int x = tower.cx + tower.front.dx * (tower.radius + step) + sideX * side;
+                    int z = tower.cz + tower.front.dz * (tower.radius + step) + sideZ * side;
+                    Material floor = Math.floorMod(step + side, 7) == 0
+                            ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
+                    OverworldCampaignTerrain148.supportedPathCell(out, world, x, tower.y, z, floor);
+                    for (int yy = 0; yy <= 3; yy++) {
+                        out.add(new BlockEdit(x, tower.y + yy, z, Material.AIR));
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Replays every registered chimney after the complete house shell has been restored.
+     * Roof repair previously overwrote the campfire cap at exactly the same coordinates;
+     * making chimneys the final architectural phase guarantees a continuous flue and cap.
+     */
+    static List<BlockEdit> repairRegisteredChimneys(Registry registry) {
+        List<BlockEdit> out = new ArrayList<>();
+        for (ChimneySpec chimney : registry.chimneys) {
+            out.add(new BlockEdit(chimney.x, chimney.baseY, chimney.z, Material.SMOKER));
+            for (int y = chimney.baseY + 1; y <= chimney.topY; y++) {
+                out.add(new BlockEdit(chimney.x, y, chimney.z, Material.BRICKS));
+            }
+            out.add(new BlockEdit(chimney.x, chimney.topY + 1, chimney.z,
+                    Material.CAMPFIRE));
+        }
+        return out;
+    }
+
+    private static void replayEntrance(List<BlockEdit> out, World world, Registry registry,
+                                       String ownerId, int cx, int y, int cz,
+                                       int radius, Facing front, int landingHalfWidth,
+                                       int clearance, Material floor) {
+        int sideX = -front.dz;
+        int sideZ = front.dx;
+        for (int step = 0; step <= 5; step++) {
+            int sideRadius = step == 0 ? 0 : landingHalfWidth;
+            boolean blocked = false;
+            for (int side = -sideRadius; side <= sideRadius; side++) {
+                int probeX = cx + front.dx * (radius + step) + sideX * side;
+                int probeZ = cz + front.dz * (radius + step) + sideZ * side;
+                if (step > 0 && (registry.blocksOtherStructure(ownerId, probeX, y, probeZ)
+                        || !roadColumnMayBeCleared(world, probeX, y, probeZ))) {
+                    blocked = true;
+                    break;
+                }
+            }
+            if (blocked) break;
+            for (int side = -sideRadius; side <= sideRadius; side++) {
+                int x = cx + front.dx * (radius + step) + sideX * side;
+                int z = cz + front.dz * (radius + step) + sideZ * side;
+                out.add(new BlockEdit(x, y - 1, z,
+                        Math.floorMod(step + side, 7) == 0
+                                ? Material.MOSSY_STONE_BRICKS : floor));
+                if (step > 0) {
+                    for (int yy = 0; yy <= clearance; yy++) {
+                        out.add(new BlockEdit(x, y + yy, z, Material.AIR));
+                    }
+                }
+            }
+        }
+        int doorX = cx + front.dx * radius;
+        int doorZ = cz + front.dz * radius;
+        String direction = front.name().toLowerCase(java.util.Locale.ROOT);
+        out.add(new BlockEdit(doorX, y, doorZ, Material.SPRUCE_DOOR,
+                "minecraft:spruce_door[facing=" + direction
+                        + ",half=lower,hinge=left,open=false,powered=false]"));
+        out.add(new BlockEdit(doorX, y + 1, doorZ, Material.SPRUCE_DOOR,
+                "minecraft:spruce_door[facing=" + direction
+                        + ",half=upper,hinge=left,open=false,powered=false]"));
+    }
+
+    private static void auditHouse(World world, Registry registry, HouseSpec house, List<String> failures) {
+        int roofY = house.y + house.height + 1;
+        int roofHx = house.hx + 2;
+        int roofHz = house.hz + 2;
+        if (house.roofAlongX) {
+            for (int z = -roofHz; z <= roofHz; z++) {
+                int expectedY = roofY + roofHz - Math.abs(z);
+                for (int x = -roofHx; x <= roofHx; x++) {
+                    if (!solidCover(world.getBlockAt(house.cx + x, expectedY,
+                            house.cz + z).getType())) {
+                        failures.add("tejado abierto en " + house.id);
+                        return;
+                    }
+                }
+            }
+            for (int side : new int[]{-house.hx, house.hx}) {
+                for (int z = -house.hz; z <= house.hz; z++) {
+                    int top = roofY + roofHz - Math.abs(z);
+                    for (int y = roofY; y < top; y++) {
+                        if (!solidCover(world.getBlockAt(house.cx + side, y,
+                                house.cz + z).getType())) {
+                            failures.add("frontón abierto en " + house.id);
+                            return;
+                        }
+                    }
+                }
+            }
+        } else {
+            for (int x = -roofHx; x <= roofHx; x++) {
+                int expectedY = roofY + roofHx - Math.abs(x);
+                for (int z = -roofHz; z <= roofHz; z++) {
+                    if (!solidCover(world.getBlockAt(house.cx + x, expectedY,
+                            house.cz + z).getType())) {
+                        failures.add("tejado abierto en " + house.id);
+                        return;
+                    }
+                }
+            }
+            for (int side : new int[]{-house.hz, house.hz}) {
+                for (int x = -house.hx; x <= house.hx; x++) {
+                    int top = roofY + roofHx - Math.abs(x);
+                    for (int y = roofY; y < top; y++) {
+                        if (!solidCover(world.getBlockAt(house.cx + x, y,
+                                house.cz + side).getType())) {
+                            failures.add("frontón abierto en " + house.id);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        int radius = frontRadius(house);
+        int doorX = house.cx + house.front.dx * radius;
+        int doorZ = house.cz + house.front.dz * radius;
+        if (world.getBlockAt(doorX, house.y, doorZ).getType() != Material.SPRUCE_DOOR
+                || world.getBlockAt(doorX, house.y + 1, doorZ).getType()
+                != Material.SPRUCE_DOOR) {
+            failures.add("puerta ausente o incompleta en " + house.id);
+            return;
+        }
+        for (int x = -house.hx; x <= house.hx; x++) {
+            for (int z = -house.hz; z <= house.hz; z++) {
+                if (Math.abs(x) != house.hx && Math.abs(z) != house.hz) continue;
+                for (int yy = 0; yy <= house.height; yy++) {
+                    Material type = world.getBlockAt(house.cx + x, house.y + yy,
+                            house.cz + z).getType();
+                    if (!wallCover(type)) {
+                        failures.add("pared abierta en " + house.id);
+                        return;
+                    }
+                    if (type == Material.GLASS_PANE) {
+                        String state = world.getBlockAt(house.cx + x, house.y + yy,
+                                house.cz + z).getBlockData().getAsString();
+                        boolean xWall = Math.abs(x) == house.hx;
+                        boolean connected = xWall
+                                ? state.contains("north=true") && state.contains("south=true")
+                                : state.contains("east=true") && state.contains("west=true");
+                        if (!connected) {
+                            failures.add("panel de cristal desconectado en " + house.id);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        int failuresBeforeFoundation = failures.size();
+        auditRectangularFoundation(world, house.id, house.cx, house.y - 1, house.cz,
+                house.hx + 1, house.hz + 1, failures);
+        if (failures.size() > failuresBeforeFoundation) return;
+
+        int floors = Math.max(1, house.height / 5);
+        if (floors > 1) {
+            int ladderX = house.cx + house.hx - 1;
+            int ladderZ = house.cz + Math.min(2, house.hz - 2);
+            for (int y = house.y; y <= house.y + (floors - 1) * 5 + 1; y++) {
+                if (world.getBlockAt(ladderX, y, ladderZ).getType() != Material.LADDER
+                        || !world.getBlockAt(ladderX + 1, y, ladderZ).getType().isSolid()) {
+                    failures.add("escalera cortada o sin respaldo en " + house.id);
+                    return;
+                }
+            }
+            for (int floor = 1; floor < floors; floor++) {
+                if (!world.getBlockAt(ladderX - 1, house.y + floor * 5,
+                        ladderZ).getType().isSolid()) {
+                    failures.add("escalera sin desembarco en " + house.id);
+                    return;
+                }
+                int floorY = house.y + floor * 5;
+                for (int x = -house.hx + 1; x <= house.hx - 1; x++) {
+                    for (int z = -house.hz + 1; z <= house.hz - 1; z++) {
+                        boolean shaft = house.cx + x == ladderX
+                                && house.cz + z == ladderZ;
+                        if (!shaft && !world.getBlockAt(house.cx + x, floorY,
+                                house.cz + z).getType().isSolid()) {
+                            failures.add("piso intermedio abierto en " + house.id);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        int houseLights = countHouseLights(world, house);
+        if (houseLights < floors * 4) {
+            failures.add("interior oscuro en " + house.id + ": " + houseLights + " luces");
+            return;
+        }
+        int furnishings = countHouseFurnishings(world, house);
+        int furnishingTarget = floors * (12 + Math.max(0, (house.hx * house.hz - 35) / 12));
+        if (furnishings < furnishingTarget) {
+            failures.add("interior sin mobiliario suficiente en " + house.id
+                    + ": " + furnishings + "/" + furnishingTarget + " piezas");
+            return;
+        }
+        int eaveRoofY = house.y + house.height + 1;
+        int eaveX = house.roofAlongX ? house.cx : house.cx + house.hx + 1;
+        int eaveZ = house.roofAlongX ? house.cz + house.hz + 1 : house.cz;
+        if (world.getBlockAt(eaveX, eaveRoofY - 1, eaveZ).getType().isAir()) {
+            failures.add("hueco bajo alero en " + house.id);
+            return;
+        }
+
+        String pathId = "house-path-" + house.id;
+        boolean connected = false;
+        for (int step = 0; step <= 8; step++) {
+            int x = house.cx + house.front.dx * (frontRadius(house) + step);
+            int z = house.cz + house.front.dz * (frontRadius(house) + step);
+            if (!world.getBlockAt(x, house.y - 1, z).getType().isSolid()
+                    || blocksPassage(world.getBlockAt(x, house.y, z).getType())
+                    || blocksPassage(world.getBlockAt(x, house.y + 1, z).getType())) {
+                failures.add("entrada bloqueada o camino incompleto en " + house.id);
+                return;
+            }
+            if (step >= 4 && registry.hasRoadNearExcept(pathId, x, z, 2)) {
+                connected = true;
+                break;
+            }
+        }
+        if (!connected) failures.add("camino de casa sin conectar: " + house.id);
+    }
+
+    private static void auditTower(World world, TowerSpec tower, List<String> failures) {
+        int failuresBeforeFoundation = failures.size();
+        auditRectangularFoundation(world, tower.id, tower.cx, tower.y - 1, tower.cz,
+                tower.radius + 1, tower.radius + 1, failures);
+        if (failures.size() > failuresBeforeFoundation) return;
+        int doorX = tower.cx + tower.front.dx * tower.radius;
+        int doorZ = tower.cz + tower.front.dz * tower.radius;
+        if (world.getBlockAt(doorX, tower.y, doorZ).getType() != Material.SPRUCE_DOOR
+                || world.getBlockAt(doorX, tower.y + 1, doorZ).getType()
+                != Material.SPRUCE_DOOR) {
+            failures.add("torre sin puerta real: " + tower.id);
+            return;
+        }
+        int missingWallBlocks = 0;
+        for (int lx = -tower.radius; lx <= tower.radius; lx++) {
+            for (int lz = -tower.radius; lz <= tower.radius; lz++) {
+                if (Math.abs(lx) != tower.radius && Math.abs(lz) != tower.radius) continue;
+                for (int yy = 0; yy <= tower.height; yy++) {
+                    boolean doorway = lx == tower.front.dx * tower.radius
+                            && lz == tower.front.dz * tower.radius && yy <= 1;
+                    if (doorway) continue;
+                    Material wall = world.getBlockAt(tower.cx + lx, tower.y + yy,
+                            tower.cz + lz).getType();
+                    if (!wall.isSolid() && wall != Material.IRON_BARS) missingWallBlocks++;
+                }
+            }
+        }
+        if (missingWallBlocks > 2) {
+            failures.add("muro de torre roto: " + tower.id
+                    + " (huecos=" + missingWallBlocks + ")");
+            return;
+        }
+        int sideX = -tower.front.dz;
+        int sideZ = tower.front.dx;
+        // Step zero is the already-validated closed door. Only the outdoor
+        // landing must be empty; treating the door as AIR rejected every valid tower.
+        for (int step = 1; step <= 5; step++) {
+            int sideRadius = step <= 2 ? 2 : 1;
+            for (int side = -sideRadius; side <= sideRadius; side++) {
+                int x = tower.cx + tower.front.dx * (tower.radius + step) + sideX * side;
+                int z = tower.cz + tower.front.dz * (tower.radius + step) + sideZ * side;
+                Material floor = world.getBlockAt(x, tower.y - 1, z).getType();
+                Material feet = world.getBlockAt(x, tower.y, z).getType();
+                Material head = world.getBlockAt(x, tower.y + 1, z).getType();
+                if (!floor.isSolid() || blocksPassage(feet) || blocksPassage(head)) {
+                    failures.add("entrada de torre enterrada o sin descansillo: " + tower.id
+                            + " (paso=" + step + ", lado=" + side
+                            + ", suelo=" + floor + ", pies=" + feet
+                            + ", cabeza=" + head + ")");
+                    return;
+                }
+            }
+        }
+        int ladderZ = tower.cz + Math.min(2, tower.radius - 2);
+        for (int y = tower.y; y < tower.y + tower.height; y++) {
+            Material ladder = world.getBlockAt(tower.cx + tower.radius - 1,
+                    y, ladderZ).getType();
+            Material backing = world.getBlockAt(tower.cx + tower.radius,
+                    y, ladderZ).getType();
+            if (ladder != Material.LADDER || !backing.isSolid()) {
+                failures.add("torre inaccesible por escalera: " + tower.id
+                        + " (y=" + y + ", escalera=" + ladder
+                        + ", respaldo=" + backing + ")");
+                return;
+            }
+        }
+        for (int level = 6; level < tower.height; level += 6) {
+            int ladderX = tower.cx + tower.radius - 1;
+            boolean centralFloor = world.getBlockAt(tower.cx,
+                    tower.y + level, tower.cz).getType().isSolid();
+            boolean dismount = world.getBlockAt(ladderX - 1,
+                    tower.y + level, ladderZ).getType().isSolid()
+                    && !world.getBlockAt(ladderX - 1,
+                    tower.y + level + 1, ladderZ).getType().isSolid();
+            if (!centralFloor || !dismount) {
+                failures.add("torre sin piso intermedio: " + tower.id);
+                return;
+            }
+        }
+        int lights = 0;
+        for (int level = 0; level < tower.height; level += 6) {
+            int lightY = tower.y + Math.min(tower.height - 1, level + 3);
+            for (int side : new int[]{-1, 1}) {
+                if (world.getBlockAt(tower.cx + side * Math.max(1, tower.radius / 2),
+                        lightY, tower.cz).getType() == Material.LIGHT) lights++;
+            }
+        }
+        if (lights < Math.max(2, ((tower.height + 5) / 6) * 2)) {
+            failures.add("torre oscura: " + tower.id);
+        }
+    }
+
+    private static void auditChimney(World world, ChimneySpec chimney,
+                                     List<String> failures) {
+        if (world.getBlockAt(chimney.x, chimney.baseY, chimney.z).getType()
+                != Material.SMOKER) {
+            failures.add("chimenea sin hogar apoyado en " + chimney.id);
+            return;
+        }
+        for (int y = chimney.baseY + 1; y <= chimney.topY; y++) {
+            if (world.getBlockAt(chimney.x, y, chimney.z).getType()
+                    != Material.BRICKS) {
+                failures.add("chimenea cortada o flotante en " + chimney.id);
+                return;
+            }
+        }
+        Material cap = world.getBlockAt(chimney.x, chimney.topY + 1, chimney.z).getType();
+        if (cap != Material.CAMPFIRE) {
+            failures.add("chimenea sin remate en " + chimney.id
+                    + " (esperado=CAMPFIRE, encontrado=" + cap + ")");
+        }
+    }
+
+    private static void auditPlanter(World world, PlanterSpec planter,
+                                     List<String> failures) {
+        Material flower = world.getBlockAt(planter.x, planter.y, planter.z).getType();
+        Material support = world.getBlockAt(planter.x, planter.y - 1, planter.z).getType();
+        if (flower != planter.flower) {
+            failures.add("maceta ausente o reemplazada en " + planter.id);
+            return;
+        }
+        if (support != Material.SPRUCE_PLANKS || !support.isSolid()) {
+            failures.add("maceta flotante en " + planter.id
+                    + " (soporte=" + support + ")");
+        }
+    }
+
+    private static void auditTerrainBlend(World world, Registry registry, TerrainSpec spec,
+                                          List<String> failures) {
+        Site site = spec.site;
+        if (site.style() == Style.BOSS || site.style() == Style.CITADEL) return;
+        for (int degree = 0; degree < 360; degree += 15) {
+            double angle = Math.toRadians(degree);
+            Integer previous = null;
+            int auditEnd = site.style() == Style.BOSS
+                    ? spec.blendRadius + 2 : spec.blendRadius + 18;
+            for (int radius = Math.max(1, spec.flatRadius - 2);
+                 radius <= auditEnd; radius++) {
+                int x = site.x() + (int) Math.round(Math.cos(angle) * radius);
+                int z = site.z() + (int) Math.round(Math.sin(angle) * radius);
+                if (registry.blocksTerrainAudit(x, z)) {
+                    previous = null;
+                    continue;
+                }
+                int current = OverworldCampaignTerrain148.terrainY(world, x, z);
+                if (previous != null && Math.abs(current - previous) > 7) {
+                    failures.add("corte abrupto del terreno en " + site.id());
+                    return;
+                }
+                previous = current;
+            }
+        }
+    }
+
+    private static void auditCitadelLevel(World world, Registry registry, Site citadel,
+                                           List<String> failures) {
+        int target = citadel.baseY();
+        int checked = 0;
+        int wrong = 0;
+        for (int dx = -48; dx <= 48; dx += 4) {
+            for (int dz = -48; dz <= 48; dz += 4) {
+                int x = citadel.x() + dx;
+                int z = citadel.z() + dz;
+                if (registry.blocksTerrainAudit(x, z)
+                        || registry.blocksStructureBody(x, target + 1, z)) continue;
+                int top = OverworldCampaignTerrain148.terrainY(world, x, z);
+                Material material = world.getBlockAt(x, top, z).getType();
+                if (!OverworldCampaignTerrain148.isTerrainLike(material)) continue;
+                checked++;
+                if (Math.abs(top - target) > 1) wrong++;
+            }
+        }
+        if (checked >= 12 && wrong > Math.max(2, checked / 12)) {
+            failures.add("terreno interior de la fortaleza sin nivelar"
+                    + " (columnas=" + wrong + "/" + checked + ")");
+        }
+    }
+
+    private static void auditCitadelSubsurface(World world, Site citadel,
+                                                  List<String> failures) {
+        int floorY = citadel.baseY();
+        for (int dx = -52; dx <= 52; dx += 4) {
+            for (int dz = -52; dz <= 52; dz += 4) {
+                int x = citadel.x() + dx;
+                int z = citadel.z() + dz;
+                Material floor = world.getBlockAt(x, floorY, z).getType();
+                if (!floor.isSolid()) continue;
+                for (int depth = 1; depth <= 4; depth++) {
+                    Material below = world.getBlockAt(x, floorY - depth, z).getType();
+                    if (!below.isSolid() || below == Material.WATER || below == Material.LAVA) {
+                        failures.add("vacío bajo el piso interior de la ciudadela"
+                                + " (x=" + x + ", y=" + (floorY - depth) + ", z=" + z + ")");
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private static void auditBossGatehouse(World world, Location ritualGate,
+                                            List<String> failures) {
+        int cx = ritualGate.getBlockX();
+        int y = ritualGate.getBlockY();
+        int cz = ritualGate.getBlockZ();
+        int gateZ = OverworldCampaignArchitecture148.bossRitualGatePlaneZ(ritualGate);
+        boolean gateOpen = Files.isRegularFile(world.getWorldFolder().toPath().resolve(
+                OverworldCampaignLandscape148.GATE_OPEN_MARKER));
+
+        for (int sampleZ : new int[]{cz - 2, cz + 6}) {
+            for (int x = -OverworldCampaignArchitecture148.BOSS_GATE_CLEAR_HALF_WIDTH;
+                 x <= OverworldCampaignArchitecture148.BOSS_GATE_CLEAR_HALF_WIDTH; x++) {
+                for (int yy = 0; yy <= 4; yy++) {
+                    if (world.getBlockAt(cx + x, y + yy, sampleZ).getType().isSolid()) {
+                        failures.add("túnel de la puerta del boss bloqueado");
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (gateOpen) {
+            for (int x = -OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HALF_WIDTH;
+                 x <= OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HALF_WIDTH; x++) {
+                for (int yy = 0; yy < OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HEIGHT; yy++) {
+                    if (!world.getBlockAt(cx + x, y + yy, gateZ).getType().isAir()) {
+                        failures.add("puerta ritual marcada como abierta pero todavía bloqueada");
+                        return;
+                    }
+                }
+            }
+        } else {
+            int bars = 0;
+            for (int x = -OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HALF_WIDTH;
+                 x <= OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HALF_WIDTH; x++) {
+                for (int yy = 0; yy < OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HEIGHT; yy++) {
+                    if (world.getBlockAt(cx + x, y + yy, gateZ).getType() == Material.IRON_BARS) bars++;
+                }
+            }
+            int expected = (OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HALF_WIDTH * 2 + 1)
+                    * OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HEIGHT;
+            if (bars < expected) {
+                failures.add("portón ritual de barras ausente o incompleto (barras="
+                        + bars + "/" + expected + ")");
+                return;
+            }
+        }
+
+        int elevatedBars = 0;
+        for (int x = -6; x <= 6; x++) for (int yy = 10; yy <= 14; yy++) {
+            if (world.getBlockAt(cx + x, y + yy, cz + 2).getType() == Material.IRON_BARS) elevatedBars++;
+        }
+        if (elevatedBars < 20) {
+            failures.add("portón elevado del boss incompleto");
+            return;
+        }
+        for (int side : new int[]{-1, 1}) {
+            int facadeX = cx + side * 22;
+            for (int sampleZ : new int[]{-2, 2, 6}) {
+                for (int yy : new int[]{2, 6, 10, 14}) {
+                    if (!world.getBlockAt(facadeX, y + yy, cz + sampleZ).getType().isSolid()) {
+                        failures.add("muro lateral roto en la entrada del boss");
+                        return;
+                    }
+                }
+            }
+        }
+        for (int side : new int[]{-1, 1}) {
+            for (int offset : new int[]{24, 32, 40, 47}) {
+                int curveZ = cz + (int) Math.round(50.0D
+                        - Math.sqrt(Math.max(0.0D, 2500.0D - offset * offset)));
+                if (!world.getBlockAt(cx + side * offset, y + 4, curveZ).getType().isSolid()) {
+                    failures.add("muralla rota junto a la puerta del boss");
+                    return;
+                }
+            }
+        }
+    }
+
+    private static void auditBossColiseumClosure(World world, Location ritualGate,
+                                                   List<String> failures) {
+        int cx = ritualGate.getBlockX();
+        int y = ritualGate.getBlockY();
+        int cz = ritualGate.getBlockZ() + 50;
+        int missing = 0;
+        int checked = 0;
+        for (int degree = 0; degree < 360; degree += 2) {
+            double angle = Math.toRadians(degree);
+            int x = cx + (int) Math.round(Math.cos(angle) * 51);
+            int z = cz + (int) Math.round(Math.sin(angle) * 51);
+            boolean gate = z <= cz - 47
+                    && Math.abs(x - cx)
+                    <= OverworldCampaignArchitecture148.BOSS_GATE_CLEAR_HALF_WIDTH + 1;
+            if (gate) continue;
+            checked++;
+            boolean solid = false;
+            for (int yy = 0; yy < 9; yy++) {
+                if (world.getBlockAt(x, y + yy, z).getType().isSolid()) {
+                    solid = true;
+                    break;
+                }
+            }
+            if (!solid) missing++;
+        }
+        if (checked > 0 && missing > 2) {
+            failures.add("coliseo del boss sin cerrar (huecos=" + missing
+                    + "/" + checked + ")");
+        }
+    }
+
+    private static int countHouseLights(World world, HouseSpec house) {
+        int lights = 0;
+        int floors = Math.max(1, house.height / 5);
+        int lightX = Math.max(2, house.hx / 2);
+        int lightZ = Math.max(2, house.hz / 2);
+        for (int floor = 0; floor < floors; floor++) {
+            int y = house.y + (floor + 1) * 5 - 2;
+            for (int sx : new int[]{-1, 1}) for (int sz : new int[]{-1, 1}) {
+                if (world.getBlockAt(house.cx + sx * lightX, y,
+                        house.cz + sz * lightZ).getType() == Material.LIGHT) lights++;
+            }
+        }
+        return lights;
+    }
+
+    private static int countHouseFurnishings(World world, HouseSpec house) {
+        int found = 0;
+        for (int x = -house.hx + 1; x <= house.hx - 1; x++) {
+            for (int z = -house.hz + 1; z <= house.hz - 1; z++) {
+                for (int y = house.y; y < house.y + house.height; y++) {
+                    Material material = world.getBlockAt(house.cx + x, y,
+                            house.cz + z).getType();
+                    if (isFurnishing(material)) found++;
+                }
+            }
+        }
+        return found;
+    }
+
+    private static int countRegisteredFurnishings(World world, Registry registry) {
+        int furnishings = 0;
+        for (HouseSpec house : registry.houses) furnishings += countHouseFurnishings(world, house);
+        return furnishings;
+    }
+
+    private static boolean isFurnishing(Material material) {
+        String name = material.name();
+        return name.endsWith("_BED") || name.endsWith("_CARPET")
+                || name.endsWith("_PRESSURE_PLATE") || material == Material.BARREL
+                || material == Material.CHEST || material == Material.ENDER_CHEST
+                || material == Material.BOOKSHELF || material == Material.LECTERN
+                || material == Material.CRAFTING_TABLE || material == Material.CARTOGRAPHY_TABLE
+                || material == Material.FLETCHING_TABLE || material == Material.LOOM
+                || material == Material.SMITHING_TABLE || material == Material.GRINDSTONE
+                || material == Material.STONECUTTER || material == Material.FURNACE
+                || material == Material.BLAST_FURNACE || material == Material.SMOKER
+                || material == Material.ANVIL || material == Material.CHIPPED_ANVIL
+                || material == Material.DAMAGED_ANVIL || material == Material.CAULDRON
+                || material == Material.WATER_CAULDRON || material == Material.CAKE
+                || material == Material.FLOWER_POT || material == Material.COMPOSTER
+                || material == Material.HAY_BLOCK || material == Material.TARGET
+                || material.name().endsWith("_SLAB");
+    }
+
+    private static int countRegisteredInteriorLights(World world, Registry registry) {
+        int lights = 0;
+        for (HouseSpec house : registry.houses) lights += countHouseLights(world, house);
+        for (TowerSpec tower : registry.towers) {
+            for (int level = 0; level < tower.height; level += 6) {
+                int y = tower.y + Math.min(tower.height - 1, level + 3);
+                for (int side : new int[]{-1, 1}) {
+                    if (world.getBlockAt(tower.cx + side * Math.max(1, tower.radius / 2),
+                            y, tower.cz).getType() == Material.LIGHT) lights++;
+                }
+            }
+        }
+        return lights;
+    }
+
+    /**
+     * Audits a road as a corridor instead of requiring every decorative edge cell to be AIR.
+     * The first and last registered regions are the real endpoints; no bounding-box axis is
+     * inferred, so curved, diagonal and L-shaped roads remain valid. A lamp, bench or wall may
+     * occupy one lane as long as another lane stays continuously connected end to end.
+     */
+    private static RoadCell disconnectedRoadSample(World world, String routeId,
+                                                     List<RoadCell> route, Location ritualGate) {
+        if (route.isEmpty()) return null;
+        Map<RoadColumn, RoadNode> nodes = new HashMap<>();
+        boolean gateOpen = Files.isRegularFile(world.getWorldFolder().toPath().resolve(
+                OverworldCampaignLandscape148.GATE_OPEN_MARKER));
+        int gatePlaneZ = OverworldCampaignArchitecture148.bossRitualGatePlaneZ(ritualGate);
+        for (RoadCell cell : route) {
+            int actualWalkY = resolveRoadWalkY(world, cell.x, cell.walkY, cell.z);
+            if (actualWalkY == Integer.MIN_VALUE && !gateOpen
+                    && ("boss-north-approach".equals(routeId)
+                    || "boss-north-monumental-stairs".equals(routeId))
+                    && cell.z == gatePlaneZ
+                    && Math.abs(cell.x - ritualGate.getBlockX())
+                    <= OverworldCampaignArchitecture148.BOSS_RITUAL_GATE_HALF_WIDTH
+                    && world.getBlockAt(cell.x, cell.walkY, cell.z).getType()
+                    == Material.IRON_BARS
+                    && isSafeRoadFloor(world.getBlockAt(
+                    cell.x, cell.walkY - 1, cell.z).getType())) {
+                actualWalkY = cell.walkY;
+            }
+            if (actualWalkY != Integer.MIN_VALUE) {
+                nodes.put(new RoadColumn(cell.x, cell.z), new RoadNode(cell, actualWalkY));
+            }
+        }
+        if (nodes.isEmpty()) return route.get(route.size() / 2);
+
+        RoadCell plannedStart = route.get(0);
+        RoadCell plannedEnd = route.get(route.size() - 1);
+        int endpointSpan = Math.max(Math.abs(plannedEnd.x - plannedStart.x),
+                Math.abs(plannedEnd.z - plannedStart.z));
+        int endpointTolerance = Math.max(1, Math.min(8, endpointSpan / 4));
+        Set<RoadColumn> startRegion = endpointRegion(nodes, plannedStart, endpointTolerance);
+        Set<RoadColumn> endRegion = endpointRegion(nodes, plannedEnd, endpointTolerance);
+        if (startRegion.isEmpty()) return nearestBlockedSample(route, nodes, plannedStart);
+        if (endRegion.isEmpty()) return nearestBlockedSample(route, nodes, plannedEnd);
+
+        Set<RoadColumn> visited = new HashSet<>();
+        ArrayDeque<RoadColumn> pending = new ArrayDeque<>();
+        for (RoadColumn start : startRegion) {
+            if (visited.add(start)) pending.addLast(start);
+        }
+        while (!pending.isEmpty()) {
+            RoadColumn currentColumn = pending.removeFirst();
+            if (endRegion.contains(currentColumn)) return null;
+            RoadNode current = nodes.get(currentColumn);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    RoadColumn nextColumn = new RoadColumn(currentColumn.x + dx,
+                            currentColumn.z + dz);
+                    RoadNode next = nodes.get(nextColumn);
+                    if (next == null || visited.contains(nextColumn)) continue;
+                    if (Math.abs(current.actualWalkY - next.actualWalkY) > 1) continue;
+                    visited.add(nextColumn);
+                    pending.addLast(nextColumn);
+                }
+            }
+        }
+        return frontierBlockedSample(route, nodes, visited, plannedEnd);
+    }
+
+    private static Set<RoadColumn> endpointRegion(Map<RoadColumn, RoadNode> nodes,
+                                                   RoadCell endpoint, int tolerance) {
+        Set<RoadColumn> region = new HashSet<>();
+        for (RoadColumn column : nodes.keySet()) {
+            if (Math.max(Math.abs(column.x - endpoint.x), Math.abs(column.z - endpoint.z))
+                    <= tolerance) region.add(column);
+        }
+        return region;
+    }
+
+    private static RoadCell nearestBlockedSample(List<RoadCell> route,
+                                                  Map<RoadColumn, RoadNode> nodes,
+                                                  RoadCell target) {
+        RoadCell best = target;
+        int bestDistance = Integer.MAX_VALUE;
+        for (RoadCell cell : route) {
+            if (nodes.containsKey(new RoadColumn(cell.x, cell.z))) continue;
+            int distance = Math.max(Math.abs(cell.x - target.x), Math.abs(cell.z - target.z));
+            if (distance < bestDistance) {
+                best = cell;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    private static RoadCell frontierBlockedSample(List<RoadCell> route,
+                                                   Map<RoadColumn, RoadNode> nodes,
+                                                   Set<RoadColumn> visited,
+                                                   RoadCell target) {
+        RoadCell best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (RoadCell cell : route) {
+            RoadColumn column = new RoadColumn(cell.x, cell.z);
+            if (nodes.containsKey(column) || visited.contains(column)) continue;
+            int distance = Math.max(Math.abs(cell.x - target.x), Math.abs(cell.z - target.z));
+            if (distance < bestDistance) {
+                best = cell;
+                bestDistance = distance;
+            }
+        }
+        return best == null ? route.get(route.size() / 2) : best;
+    }
+
+    private static int resolveRoadWalkY(World world, int x, int plannedWalkY, int z) {
+        // Exact-height validation is required in 1.48.28. The old ±4 search could accept a
+        // natural ledge above or below the designed route and report a false continuous road.
+        Material floor = world.getBlockAt(x, plannedWalkY - 1, z).getType();
+        Material feet = world.getBlockAt(x, plannedWalkY, z).getType();
+        Material head = world.getBlockAt(x, plannedWalkY + 1, z).getType();
+        if (isSafeRoadFloor(floor)
+                && isPassableRoadSpace(feet)
+                && isPassableRoadSpace(head)) return plannedWalkY;
+        return Integer.MIN_VALUE;
+    }
+
+    private static boolean isPassableRoadSpace(Material material) {
+        if (material == Material.WATER || material == Material.LAVA
+                || material == Material.POWDER_SNOW || material == Material.COBWEB
+                || material == Material.FIRE || material == Material.SOUL_FIRE) return false;
+        String name = material.name();
+        if (name.endsWith("_DOOR") || name.endsWith("_FENCE_GATE")) return true;
+        return !material.isSolid();
+    }
+
+    private static boolean isSafeRoadFloor(Material material) {
+        if (!material.isSolid() || material == Material.WATER || material == Material.LAVA
+                || material == Material.POWDER_SNOW || material == Material.CACTUS
+                || material == Material.MAGMA_BLOCK || material == Material.CAMPFIRE
+                || material == Material.SOUL_CAMPFIRE || material == Material.FIRE
+                || material == Material.SOUL_FIRE || material == Material.COBWEB
+                || material == Material.LANTERN || material == Material.SOUL_LANTERN
+                || material == Material.CHAIN || material == Material.IRON_BARS
+                || material == Material.GLASS_PANE) return false;
+        String name = material.name();
+        return !name.endsWith("_FENCE") && !name.endsWith("_FENCE_GATE")
+                && !name.endsWith("_WALL") && !name.endsWith("_DOOR")
+                && !name.endsWith("_TRAPDOOR") && !name.endsWith("_BUTTON")
+                && !name.endsWith("_PRESSURE_PLATE") && !name.endsWith("_SIGN")
+                && !name.endsWith("_HANGING_SIGN");
+    }
+
+    private static boolean blocksPassage(Material material) {
+        return material.isSolid() && material != Material.SPRUCE_DOOR;
+    }
+
+    private static int countCrops(World world, Site site, int radius) {
+        int found = 0;
+        for (int x = -radius; x <= radius; x++) for (int z = -radius; z <= radius; z++) {
+            if (x * x + z * z > radius * radius) continue;
+            for (int y = site.baseY() - 4; y <= site.baseY() + 12; y++) {
+                if (isCrop(world.getBlockAt(site.x() + x, y, site.z() + z).getType())) found++;
+            }
+        }
+        return found;
+    }
+
+    private static void auditPortalFurnishings(World world, Site portal,
+                                                List<String> failures) {
+        int reservedLecterns = 0;
+        int braziers = 0;
+        int containers = 0;
+        int portalLights = 0;
+        for (int x = -14; x <= 14; x++) for (int z = -11; z <= 11; z++) {
+            for (int y = portal.baseY(); y <= portal.baseY() + 10; y++) {
+                Material type = world.getBlockAt(portal.x() + x, y, portal.z() + z).getType();
+                if (Math.abs(x) <= 6 && Math.abs(z) <= 4 && type == Material.LECTERN) {
+                    reservedLecterns++;
+                }
+                if (type == Material.SOUL_CAMPFIRE) braziers++;
+                if (type == Material.CHEST || type == Material.ENDER_CHEST) containers++;
+                if (Math.abs(x) <= 8 && Math.abs(z) <= 5 && type == Material.LIGHT) portalLights++;
+            }
+        }
+        if (reservedLecterns > 0) {
+            failures.add("zona reservada del portal contiene atriles: " + reservedLecterns);
+        }
+        if (braziers < 4 || containers < 3 || portalLights < 3) {
+            failures.add("santuario del portal incompleto: braseros=" + braziers
+                    + ", contenedores=" + containers + ", luces=" + portalLights);
+        }
+    }
+
+    private static void auditCriticalPassageLighting(World world, Site citadel, Site portal,
+                                                       Location ritualGate,
+                                                       List<String> failures) {
+        int citadelY = citadel.baseY() + 1;
+        int[][] gates = {
+                {citadel.x(), citadel.z() - 55},
+                {citadel.x(), citadel.z() + 55},
+                {citadel.x() - 55, citadel.z() + 10},
+                {citadel.x() + 55, citadel.z() + 10}
+        };
+        int illuminatedGates = 0;
+        for (int[] gate : gates) {
+            int lights = 0;
+            for (int x = gate[0] - 5; x <= gate[0] + 5; x++) {
+                for (int z = gate[1] - 5; z <= gate[1] + 5; z++) {
+                    for (int y = citadelY + 2; y <= citadelY + 7; y++) {
+                        if (world.getBlockAt(x, y, z).getType() == Material.LIGHT) lights++;
+                    }
+                }
+            }
+            if (lights >= 2) illuminatedGates++;
+        }
+        if (illuminatedGates < 4) {
+            failures.add("accesos de la ciudadela oscuros: " + illuminatedGates + "/4 iluminados");
+        }
+
+        int bossLights = 0;
+        int gateX = ritualGate.getBlockX();
+        int gateZ = ritualGate.getBlockZ();
+        int gateY = ritualGate.getBlockY();
+        for (int x = gateX - 6; x <= gateX + 6; x++) {
+            for (int z = gateZ - 26; z <= gateZ + 14; z++) {
+                for (int y = gateY - 8; y <= gateY + 8; y++) {
+                    if (world.getBlockAt(x, y, z).getType() == Material.LIGHT) bossLights++;
+                }
+            }
+        }
+        if (bossLights < 5) {
+            failures.add("pasaje de la puerta del boss oscuro: luces=" + bossLights);
+        }
+    }
+
+    private static void auditArenaFurnishings(World world, Location ritualGate,
+                                               List<String> failures) {
+        int cx = ritualGate.getBlockX();
+        int cz = ritualGate.getBlockZ() + 50;
+        int y0 = ritualGate.getBlockY() - 1;
+        int braziers = 0;
+        int supplies = 0;
+        for (int x = -35; x <= 35; x++) for (int z = -35; z <= 35; z++) {
+            for (int y = y0; y <= y0 + 5; y++) {
+                Material type = world.getBlockAt(cx + x, y, cz + z).getType();
+                if (type == Material.SOUL_CAMPFIRE) braziers++;
+                if (type == Material.BARREL || type == Material.CHEST
+                        || type == Material.GRINDSTONE) supplies++;
+            }
+        }
+        if (braziers < 6 || supplies < 8) {
+            failures.add("arena sin utilería ceremonial completa: braseros="
+                    + braziers + ", suministros=" + supplies);
+        }
+    }
+
+    private static int[] auditVillageLights(World world, Site site, List<String> failures) {
+        int lights = 0;
+        int unsupported = 0;
+        int radius = site.radius() - 5;
+        for (int x = -radius; x <= radius; x++) for (int z = -radius; z <= radius; z++) {
+            if (x * x + z * z > radius * radius) continue;
+            for (int y = site.baseY() - 3; y <= site.baseY() + 32; y++) {
+                Material type = world.getBlockAt(site.x() + x, y, site.z() + z).getType();
+                if (!isLantern(type) && type != Material.SEA_LANTERN) continue;
+                lights++;
+                Material below = world.getBlockAt(site.x() + x, y - 1, site.z() + z).getType();
+                Material above = world.getBlockAt(site.x() + x, y + 1, site.z() + z).getType();
+                if (!supportsLantern(below) && !supportsLantern(above)) unsupported++;
+            }
+        }
+        if (unsupported > 0) failures.add("faroles sin soporte en el pueblo: " + unsupported);
+        return new int[]{lights, unsupported};
+    }
+
+    private static void auditRectangularFoundation(World world, String id, int cx, int topY,
+                                                   int cz, int hx, int hz,
+                                                   List<String> failures) {
+        for (int x = -hx; x <= hx; x += 2) {
+            if (!supportedDepth(world, cx + x, topY, cz - hz, 12)
+                    || !supportedDepth(world, cx + x, topY, cz + hz, 12)) {
+                failures.add("cimiento de edificio flotante en " + id);
+                return;
+            }
+        }
+        for (int z = -hz; z <= hz; z += 2) {
+            if (!supportedDepth(world, cx - hx, topY, cz + z, 12)
+                    || !supportedDepth(world, cx + hx, topY, cz + z, 12)) {
+                failures.add("cimiento de edificio flotante en " + id);
+                return;
+            }
+        }
+        if (!supportedDepth(world, cx, topY, cz, 12)) {
+            failures.add("cimiento de edificio flotante en " + id);
+        }
+    }
+
+    private static void auditFortificationFoundation(World world, FortificationSpec wall,
+                                                      List<String> failures) {
+        if (wall.shape == FortificationShape.SQUARE) {
+            for (int offset = -wall.radius; offset <= wall.radius; offset++) {
+                if (!supportedDepth(world, wall.cx + offset, wall.baseY - 1,
+                        wall.cz - wall.radius, OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)
+                        || !supportedDepth(world, wall.cx + offset, wall.baseY - 1,
+                        wall.cz + wall.radius, OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)
+                        || !supportedDepth(world, wall.cx - wall.radius, wall.baseY - 1,
+                        wall.cz + offset, OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)
+                        || !supportedDepth(world, wall.cx + wall.radius, wall.baseY - 1,
+                        wall.cz + offset, OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)) {
+                    failures.add("cimiento de muralla flotante en " + wall.id
+                            + " (offset=" + offset + ")");
+                    return;
+                }
+            }
+            return;
+        }
+        for (int degree = 0; degree < 360; degree += 2) {
+            double angle = Math.toRadians(degree);
+            int x = wall.cx + (int) Math.round(Math.cos(angle) * wall.radius);
+            int z = wall.cz + (int) Math.round(Math.sin(angle) * wall.radius);
+            if (!supportedDepth(world, x, wall.baseY - 1, z,
+                    OverworldCampaignTerrain148.WALL_FOUNDATION_DEPTH)) {
+                failures.add("cimiento de muralla flotante en " + wall.id
+                        + " (x=" + x + ", z=" + z + ")");
+                return;
+            }
+        }
+    }
+
+    private static boolean supportedDepth(World world, int x, int topY, int z, int depth) {
+        for (int y = topY; y > topY - depth; y--) {
+            Material type = world.getBlockAt(x, y, z).getType();
+            if (!type.isSolid() || type == Material.WATER || type == Material.LAVA) return false;
+        }
+        return true;
+    }
+
+    private static void auditRitualApproach(World world, Registry registry,
+                                            Location altar, Location gate,
+                                            List<String> failures) {
+        LinkedHashMap<RoadColumn, RoadCell> approach =
+                registry.roadRoutes.get("boss-north-approach");
+        if (approach == null || approach.isEmpty()) {
+            failures.add("entrada ritual sin ruta registrada");
+            return;
+        }
+        if (!hasPassableRouteCellNear(world, approach.values(), altar, 4)) {
+            failures.add("entrada ritual interrumpida junto al altar exterior (x="
+                    + altar.getBlockX() + ", y=" + altar.getBlockY()
+                    + ", z=" + altar.getBlockZ() + ")");
+        } else if (!hasPassableRouteCellNear(world, approach.values(), gate, 4)) {
+            failures.add("entrada ritual interrumpida junto a la puerta (x="
+                    + gate.getBlockX() + ", y=" + gate.getBlockY()
+                    + ", z=" + gate.getBlockZ() + ")");
+        }
+    }
+
+    private static boolean hasPassableRouteCellNear(World world,
+                                                     Iterable<RoadCell> route,
+                                                     Location anchor, int radius) {
+        for (RoadCell cell : route) {
+            if (Math.max(Math.abs(cell.x - anchor.getBlockX()),
+                    Math.abs(cell.z - anchor.getBlockZ())) > radius) continue;
+            if (resolveRoadWalkY(world, cell.x, cell.walkY, cell.z)
+                    != Integer.MIN_VALUE) return true;
+        }
+        return false;
+    }
+
+    private static void auditFountain(World world, Site village, List<String> failures) {
+        int y = village.baseY() + 3;
+        int water = 0;
+        for (int x = -5; x <= 5; x++) for (int z = -5; z <= 5; z++) {
+            Material type = world.getBlockAt(village.x() + x, y, village.z() + z).getType();
+            if (type == Material.WATER) {
+                if (Math.max(Math.abs(x), Math.abs(z)) > 3) {
+                    failures.add("agua de la fuente fuera del vaso");
+                    return;
+                }
+                water++;
+            }
+        }
+        if (water < 20) failures.add("fuente incompleta o vacía");
+    }
+
+    private static void auditBellPavilion(World world, Site village,
+                                          List<String> failures) {
+        int y = village.baseY() + 3;
+        int bellX = village.x() + 11;
+        if (world.getBlockAt(bellX, y + 2, village.z()).getType() != Material.BELL) {
+            failures.add("campana ausente en el pabellón del pueblo");
+            return;
+        }
+        for (int chainY = y + 3; chainY <= y + 8; chainY++) {
+            if (world.getBlockAt(bellX, chainY, village.z()).getType() != Material.CHAIN) {
+                failures.add("campana sin cadena continua en el pabellón del pueblo");
+                return;
+            }
+        }
+        for (int[] point : new int[][]{{-3,-3},{3,-3},{-3,3},{3,3}}) {
+            for (int supportY = y + 1; supportY <= y + 5; supportY++) {
+                if (world.getBlockAt(bellX + point[0], supportY,
+                        village.z() + point[1]).getType() != Material.SPRUCE_FENCE) {
+                    failures.add("pabellón de campana sin soporte continuo");
+                    return;
+                }
+            }
+        }
+        if (world.getBlockAt(bellX, y + 9, village.z()).getType()
+                != Material.DARK_OAK_SLAB) {
+            failures.add("pabellón de campana sin remate de tejado");
+        }
+    }
+
+    private static void auditArenaTerraces(World world, Location ritualGate,
+                                           List<String> failures) {
+        int cx = ritualGate.getBlockX();
+        int y = ritualGate.getBlockY();
+        int cz = ritualGate.getBlockZ() + 50;
+        for (int[] sample : new int[][]{
+                {35, 0, 0}, {-35, 0, 0}, {0, 35, 0},
+                {36, 15, 1}, {-36, 15, 1}, {15, 36, 1},
+                {43, 0, 2}, {-43, 0, 2}, {0, 43, 2}}) {
+            int x = cx + sample[0];
+            int z = cz + sample[1];
+            int topY = y + sample[2];
+            if (!world.getBlockAt(x, topY, z).getType().isSolid()
+                    || world.getBlockAt(x, topY + 1, z).getType().isSolid()) {
+                failures.add("gradas cortadas o sin espacio en la arena");
+                return;
+            }
+        }
+        int aisleZ = cz - 35;
+        if (!world.getBlockAt(cx, y - 1, aisleZ).getType().isSolid()
+                || world.getBlockAt(cx, y, aisleZ).getType().isSolid()
+                || world.getBlockAt(cx, y + 1, aisleZ).getType().isSolid()) {
+            failures.add("gradas bloquean el pasillo ceremonial norte");
+        }
+    }
+
+    private static int frontRadius(HouseSpec house) {
+        return house.front == Facing.NORTH || house.front == Facing.SOUTH
+                ? house.hz : house.hx;
+    }
+
+    private static boolean supportsLantern(Material material) {
+        return material != null && !material.isAir()
+                && material != Material.WATER && material != Material.LAVA;
+    }
+
+    private static boolean solidCover(Material material) {
+        return wallCover(material);
+    }
+
+    private static boolean wallCover(Material material) {
+        return material != null && (material.isSolid()
+                || material == Material.GLASS_PANE || material == Material.IRON_BARS
+                || material == Material.SPRUCE_DOOR);
+    }
+
+    private static boolean isLantern(Material material) {
+        return material == Material.LANTERN || material == Material.SOUL_LANTERN;
+    }
+
+    private static boolean isCrop(Material material) {
+        return material == Material.FARMLAND || material == Material.WHEAT
+                || material == Material.CARROTS || material == Material.POTATOES
+                || material == Material.BEETROOTS || material == Material.MELON_STEM
+                || material == Material.ATTACHED_MELON_STEM
+                || material == Material.PUMPKIN_STEM
+                || material == Material.ATTACHED_PUMPKIN_STEM
+                || material == Material.SWEET_BERRY_BUSH;
+    }
+}

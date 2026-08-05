@@ -1,0 +1,26 @@
+ArlightBingo 1.45.0 - SEPARATED SETTLEMENT CAMPAIGN
+====================================================
+
+- Reorganiza el Overworld en macrozonas separadas y legibles.
+- Conserva el pueblo inicial, pero reconstruye por completo las tres zonas hostiles.
+- Cada asentamiento recibe identidad propia:
+  * Aldea de los Tejados: residencial y agrícola.
+  * Mercado de la Calzada: comercial, con puestos y almacenes.
+  * Bastión de las Tres Torres: militar y fortificado.
+- Elimina edificios, casas y tejados que invadían la arena del jefe.
+- Reserva una arena circular exclusiva para el Guardián de la Superficie.
+- Adapta cada zona al relieve mediante terrazas, cimientos, relleno y transición natural.
+- Crea seis rutas principales con puentes, apoyos, iluminación y pendiente máxima de un bloque.
+- Coloca los cuatro spawners esperados por la progresión en cada asentamiento.
+- Coloca un pedestal de recompensa en la posición esperada por la campaña.
+- Mantiene la secuencia de liberación: residencial -> comercial -> militar.
+- Las tres recompensas se convierten en piezas reales del ritual.
+- Tras liberar los distritos se abre el sello exterior de la ciudadela, pero la arena
+  conserva un segundo sello interior.
+- El jugador debe llevar al altar el Emblema del Hogar, el Emblema del Comercio y
+  el Núcleo Esmeralda. Solo entonces se abre la arena para combatir al jefe.
+- El portal al Nether continúa apareciendo únicamente después de derrotar al jefe.
+- Genera marcadores y un informe 1.45.0 dentro de la carpeta de la plantilla.
+- La construcción se ejecuta por fases y lotes para evitar bloquear el servidor.
+- Una versión anterior no se modifica automáticamente: solo se procesa una plantilla
+  creada durante la ejecución actual o una construcción 1.45.0 interrumpida.
