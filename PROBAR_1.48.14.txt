@@ -1,0 +1,16 @@
+PRUEBA DE ARLIGHTBINGO 1.48.14
+
+1. Apaga el servidor y sustituye el JAR anterior.
+2. Regenera únicamente Overworld:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.14-test1
+3. Espera READY y ejecuta:
+   /bingo template overworld status
+   /bingo template overworld audit
+   /bingo template overworld tp
+4. Revisa las coordenadas antiguamente reportadas y especialmente:
+   - cruces de local-street-*;
+   - boss-portal-north-rim;
+   - boss-north-approach entre el altar exterior y la puerta ritual.
+5. Confirma que viviendas, puertas, tejados y murallas no fueron cortados.
+6. No regeneres Nether ni End durante esta prueba.

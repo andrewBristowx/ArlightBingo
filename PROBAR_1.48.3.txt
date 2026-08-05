@@ -1,0 +1,32 @@
+PRUEBA DE SERVIDOR - ARLIGHTBINGO 1.48.3
+
+1. Apagar completamente el servidor. No usar /reload.
+2. Retirar ArlightBingo 1.48.2 de plugins e instalar solo 1.48.3.
+3. Conservar 1.48.2 y 1.48.1 fuera de plugins como rollback. Junto con 1.48.3
+   forman las tres revisiones más recientes.
+4. Encender y ejecutar:
+
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.3-test1
+   /bingo template overworld status
+
+5. Esperar READY. Si aparece FAILED, copiar el error completo; no reiniciar para
+   intentar ocultarlo.
+6. Ejecutar:
+
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+7. Revisar visualmente:
+
+   - Todas las casas tienen puerta, paredes laterales y dintel cerrados.
+   - Ningún farol, valla o poste ocupa una entrada o el centro de un camino.
+   - Las escaleras atraviesan cada piso por un solo hueco y tienen desembarco.
+   - Casas y torres se unen al terreno sin plataformas flotantes rectangulares.
+   - No aparecen agujas verdes/froglight dispersas al cargar chunks.
+   - La ciudadela y el bastión apoyan sus cuatro lados cuadrados.
+   - La puerta norte de la ciudadela está abierta, nivelada y conectada.
+   - La arena mantiene su muro circular, su acceso y sus torres apoyadas.
+   - El pueblo no presenta hoyos pequeños repetitivos en la transición del relieve.
+
+8. No regenerar Nether ni End para esta prueba.
