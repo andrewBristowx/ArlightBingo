@@ -61,6 +61,20 @@ public final class OverworldIslandGenerator extends ChunkGenerator {
         return data;
     }
 
+    /** Returns the deterministic surface height used by the clean island generator. */
+    public int surfaceYAt(int x, int z) {
+        return column(x, z).surfaceY();
+    }
+
+    /** Returns the exact base terrain material for one generated column position. */
+    public Material terrainMaterialAt(int x, int y, int z, int minY) {
+        return terrainMaterial(x, y, z, column(x, z), minY);
+    }
+
+    public int seaLevel() {
+        return seaLevel;
+    }
+
     @Override public boolean shouldGenerateNoise() { return false; }
     @Override public boolean shouldGenerateSurface() { return false; }
     @Override public boolean shouldGenerateBedrock() { return false; }

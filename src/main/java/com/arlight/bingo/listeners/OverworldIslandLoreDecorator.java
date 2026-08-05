@@ -1,6 +1,7 @@
 package com.arlight.bingo.listeners;
 
 import com.arlight.bingo.BingoPlugin;
+import com.arlight.bingo.template.OverworldIslandGenerator;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.HeightMap;
@@ -54,7 +55,7 @@ final class OverworldIslandLoreDecorator {
     private static final String TEMPLATE_MARKER = "arlight-overworld-template.properties";
     private static final String LEGACY_DECORATION_MARKER = "arlight-overworld-decoration.properties";
     private static final String LORE_MARKER = "arlight-overworld-lore-decoration.properties";
-    private static final String REVISION = "1.48.40-no-automatic-legacy-scan-terrain-blend-1";
+    private static final String REVISION = "1.48.41-organic-mine-deterministic-recovery-1";
     private static final int DEFAULT_BATCH = 1400;
     private static final int PORT_PROTECTION_RADIUS = 220;
 
@@ -100,7 +101,7 @@ final class OverworldIslandLoreDecorator {
             return;
         }
         if (action.equals("status")) {
-            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.40: "
+            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.41: "
                     + ChatColor.WHITE + status(sender));
             return;
         }
@@ -167,7 +168,7 @@ final class OverworldIslandLoreDecorator {
         List<MineSite> legacyMines = detectLegacyMineSitesRobust(world, anchors, storedMine);
         MineSite mine = fixedMainMineSite(world, anchors);
 
-        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.40 ===");
+        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.41 ===");
         sender.sendMessage(ChatColor.GRAY + "- categoría=" + ChatColor.WHITE + category);
         sender.sendMessage(ChatColor.GRAY + "- puerto=" + ChatColor.GREEN
                 + "PROTEGIDO: el comando no planifica ni cambia ningún bloque del puerto");
@@ -258,7 +259,7 @@ final class OverworldIslandLoreDecorator {
                 planMineRestoration(world, restorationPlan, anchors, legacy);
             }
             existing.setProperty("mineLegacySitesRestoredLastRun", String.valueOf(legacyMines.size()));
-            existing.setProperty("mineLegacyDetector", "disabled-1.48.40-no-structure-scanning");
+            existing.setProperty("mineLegacyDetector", "stored-marker-only-1.48.41");
         }
 
         Plan decorationPlan = new Plan();
@@ -348,7 +349,7 @@ final class OverworldIslandLoreDecorator {
                     + "Revisa la isla y guarda con /bingo template overworld commit.");
         }, 1L, 1L);
 
-        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.40 iniciada: " + activeCategory
+        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.41 iniciada: " + activeCategory
                 + " · " + operations.size() + " operaciones protegidas.");
         if (migrateMine) {
             sender.sendMessage(ChatColor.GRAY + "Minas antiguas detectadas para naturalizar: "
@@ -510,12 +511,10 @@ final class OverworldIslandLoreDecorator {
     }
 
     private List<MineSite> detectLegacyMineSitesRobust(World world, Anchors anchors, MineSite stored) {
-        // 1.48.40: queda prohibido buscar minas antiguas por materiales o proximidad.
-        // El barrido 1.48.39 confundió castillos, torres y patios con galerías y dañó
-        // la campaña. Una reanudación normal nunca naturaliza estructuras existentes.
-        // La mina nueva se genera en el sitio fijo después de la auditoría, sin limpiar
-        // automáticamente ningún volumen anterior.
-        return List.of();
+        // 1.48.41: no se escanea la isla. Únicamente se migra la mina registrada
+        // en el marcador de la revisión, cuya posición es autoritativa y no puede
+        // confundirse con castillos, torres o patios.
+        return stored == null ? List.of() : List.of(stored);
     }
 
     private LegacyMineMatch searchLegacyMineAround(World world, int centerX, int centerZ, int radius) {
@@ -1279,40 +1278,39 @@ final class OverworldIslandLoreDecorator {
         int pz = mine.dx();
         int campX = mine.entranceX() - mine.dx() * 12 + px * 16;
         int campZ = mine.entranceZ() - mine.dz() * 12 + pz * 16;
-        restoreSurfaceDisc(world, plan, anchors, mine.entranceX(), mine.entranceZ(), 25);
-        restoreSurfaceDisc(world, plan, anchors, campX, campZ, 30);
+        restoreSurfaceDisc(world, plan, anchors, mine.entranceX(), mine.entranceZ(), 28);
+        restoreSurfaceDisc(world, plan, anchors, campX, campZ, 32);
     }
 
     private void restoreSurfaceDisc(World world, Plan plan, Anchors anchors,
                                     int cx, int cz, int radius) {
-        int east = surfaceY(world, cx + radius + 8, cz);
-        int west = surfaceY(world, cx - radius - 8, cz);
-        int south = surfaceY(world, cx, cz + radius + 8);
-        int north = surfaceY(world, cx, cz - radius - 8);
-        int median = medianSurfaceY(world, cx, cz, radius + 12, 6);
+        long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        int islandRadius = Math.max(420, plugin.getConfig().getInt(
+                "template-worlds.overworld.island.land-radius", 500));
+        int seaLevel = plugin.getConfig().getInt(
+                "template-worlds.overworld.island.sea-level", 62);
+        OverworldIslandGenerator generator = new OverworldIslandGenerator(seed, islandRadius, seaLevel);
         for (int ox = -radius; ox <= radius; ox++) {
             for (int oz = -radius; oz <= radius; oz++) {
-                double normalized = (ox * ox + oz * oz) / (double) (radius * radius);
-                if (normalized > 1.0D) continue;
+                if (ox * ox + oz * oz > radius * radius) continue;
                 int x = cx + ox;
                 int z = cz + oz;
                 if (isProtectedPort(anchors, x, z)) continue;
-                double sx = ox / (double) Math.max(1, radius);
-                double sz = oz / (double) Math.max(1, radius);
-                int target = (int) Math.round(median + (east - west) * sx * 0.28D
-                        + (south - north) * sz * 0.28D);
-                target += Math.floorMod(x * 19 + z * 31, 7) == 0 ? 1 : 0;
-                target = Math.max(median - 5, Math.min(median + 5, target));
+                int expected = generator.surfaceYAt(x, z);
                 int currentTop = surfaceY(world, x, z);
-                for (int y = target + 1; y <= Math.min(currentTop + 10, target + 18); y++) {
+                int clearTop = Math.min(world.getMaxHeight() - 2,
+                        Math.max(currentTop + 14, expected + 18));
+                for (int y = expected + 1; y <= clearTop; y++) {
                     if (isMineRestorable(world.getBlockAt(x, y, z).getType())) {
-                        plan.put(x, y, z, Material.AIR, Rule.MINE_RESTORE);
+                        plan.put(x, y, z, y <= seaLevel ? Material.WATER : Material.AIR,
+                                Rule.MINE_RESTORE);
                     }
                 }
-                for (int y = target - 10; y <= target; y++) {
-                    Material material = y == target ? Material.GRASS_BLOCK
-                            : (y >= target - 3 ? Material.DIRT : subsurfaceMaterial(y, x, z));
-                    plan.put(x, y, z, material, Rule.MINE_RESTORE);
+                for (int y = Math.max(world.getMinHeight() + 1, expected - 18);
+                     y <= expected; y++) {
+                    plan.put(x, y, z,
+                            generator.terrainMaterialAt(x, y, z, world.getMinHeight()),
+                            Rule.MINE_RESTORE);
                 }
             }
         }
@@ -1397,7 +1395,6 @@ final class OverworldIslandLoreDecorator {
         planBranchTunnel(plan, mine, 94, -1, 38, true);
         planBranchTunnel(plan, mine, 112, 1, 30, true);
         planMineConnections(plan, mine);
-        planAccessibleServiceLoop(plan, mine);
         planFinalGeodeApproach(plan, mine, preserveExistingGeode);
         if (!preserveExistingGeode) {
             planGeode(plan, mine);
@@ -1465,113 +1462,145 @@ final class OverworldIslandLoreDecorator {
                 "Mina Umbraverde", "Acceso clausurado", "Veta 7", "No bajar solo"));
     }
 
+    private MinePathPoint minePathPoint(MineSite mine, int rawT) {
+        int t = Math.max(0, Math.min(mine.tunnelLength(), rawT));
+        int px = -mine.dz();
+        int pz = mine.dx();
+        double lateralWave = Math.sin(t * 0.115D) * 4.8D
+                + Math.sin(t * 0.047D) * 3.2D
+                + Math.sin(t * 0.021D) * 1.7D;
+        int lateral = (int) Math.round(lateralWave);
+        int floor = mine.entranceY() - 2 - t / 4
+                - (int) Math.round((1.0D - Math.cos(t * 0.085D)) * 0.75D);
+        int x = mine.entranceX() + mine.dx() * t + px * lateral;
+        int z = mine.entranceZ() + mine.dz() * t + pz * lateral;
+        return new MinePathPoint(x, floor, z, lateral);
+    }
+
     private void planMainTunnel(Plan plan, MineSite mine) {
         int px = -mine.dz();
         int pz = mine.dx();
         for (int t = 0; t <= mine.tunnelLength(); t++) {
-            int x = mine.entranceX() + mine.dx() * t;
-            int z = mine.entranceZ() + mine.dz() * t;
-            int floor = mine.entranceY() - 2 - t / 3;
-            for (int side = -3; side <= 3; side++) {
-                for (int height = 1; height <= 6; height++) {
-                    int bx = x + px * side;
-                    int bz = z + pz * side;
-                    boolean rounded = Math.abs(side) == 3 && height >= 5;
-                    if (!rounded) plan.put(bx, floor + height, bz, Material.AIR, Rule.MINE);
+            MinePathPoint point = minePathPoint(mine, t);
+            int width = 2 + (Math.floorMod(t * 17, 19) < 5 ? 1 : 0);
+            int height = 4 + (Math.floorMod(t * 13, 23) < 8 ? 1 : 0);
+            for (int side = -width; side <= width; side++) {
+                int x = point.x() + px * side;
+                int z = point.z() + pz * side;
+                Material floor = Math.floorMod(t + side * 3, 17) == 0
+                        ? Material.MOSSY_COBBLESTONE
+                        : (Math.floorMod(t + side, 5) == 0
+                        ? Material.COBBLED_DEEPSLATE : Material.ANDESITE);
+                plan.put(x, point.floor(), z, floor, Rule.MINE);
+                plan.put(x, point.floor() - 1, z,
+                        Math.floorMod(t + side, 11) == 0 ? Material.TUFF : Material.DEEPSLATE,
+                        Rule.MINE);
+                for (int h = 1; h <= height; h++) {
+                    boolean roughShoulder = Math.abs(side) == width && h >= height
+                            && Math.floorMod(t + side, 3) != 0;
+                    if (!roughShoulder) plan.put(x, point.floor() + h, z, Material.AIR, Rule.MINE);
                 }
-                Material floorMaterial = Math.floorMod(t + side, 11) == 0
-                        ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_ANDESITE;
-                plan.put(x + px * side, floor, z + pz * side, floorMaterial, Rule.MINE);
-                plan.put(x + px * side, floor - 1, z + pz * side,
-                        Material.COBBLED_DEEPSLATE, Rule.MINE);
             }
-            plan.put(x, floor + 1, z, Material.RAIL, Rule.MINE);
-
-            if (t % 7 == 0) {
-                for (int side : new int[]{-3, 3}) {
-                    for (int height = 1; height <= 5; height++) {
-                        plan.put(x + px * side, floor + height, z + pz * side,
-                                Material.SPRUCE_LOG, Rule.MINE);
+            if (t > 4 && t < mine.tunnelLength() - 8 && Math.floorMod(t, 6) != 0) {
+                plan.put(point.x(), point.floor() + 1, point.z(), Material.RAIL, Rule.MINE);
+            }
+            if (t % 9 == 2) {
+                int supportWidth = Math.min(3, width);
+                for (int side : new int[]{-supportWidth, supportWidth}) {
+                    int x = point.x() + px * side;
+                    int z = point.z() + pz * side;
+                    for (int h = 1; h <= height; h++) {
+                        plan.put(x, point.floor() + h, z,
+                                Math.floorMod(t, 18) == 2 ? Material.DARK_OAK_LOG : Material.SPRUCE_LOG,
+                                Rule.MINE);
                     }
                 }
-                for (int side = -3; side <= 3; side++) {
-                    plan.put(x + px * side, floor + 6, z + pz * side,
-                            Material.SPRUCE_LOG, Rule.MINE);
+                for (int side = -supportWidth; side <= supportWidth; side++) {
+                    plan.put(point.x() + px * side, point.floor() + height,
+                            point.z() + pz * side, Material.SPRUCE_LOG, Rule.MINE);
                 }
-                if (t % 14 == 0) {
-                    plan.put(x + px * 2, floor + 6, z + pz * 2,
-                            Material.CHAIN, Rule.MINE);
-                    plan.put(x + px * 2, floor + 5, z + pz * 2,
-                            Material.LANTERN, Rule.MINE);
+                if (t % 18 == 2) {
+                    plan.put(point.x() + px * (supportWidth - 1), point.floor() + height - 1,
+                            point.z() + pz * (supportWidth - 1), Material.LANTERN, Rule.MINE);
                 }
             }
-            if (t % 19 == 0 && t > 8) {
-                plan.put(x + px * 2, floor + 1, z + pz * 2,
-                        Material.BARREL, Rule.MINE);
+            if (t % 21 == 11) {
+                int alcoveSide = Math.floorMod(t / 7, 2) == 0 ? -1 : 1;
+                for (int depth = 1; depth <= 5; depth++) {
+                    int ax = point.x() + px * alcoveSide * (width + depth);
+                    int az = point.z() + pz * alcoveSide * (width + depth);
+                    plan.put(ax, point.floor(), az, Material.COBBLESTONE, Rule.MINE);
+                    for (int h = 1; h <= 4; h++) plan.put(ax, point.floor() + h, az, Material.AIR, Rule.MINE);
+                }
             }
         }
     }
 
     private void planBranchTunnel(Plan plan, MineSite mine, int start,
                                   int sideDirection, int length, boolean infected) {
+        MinePathPoint origin = minePathPoint(mine, start);
         int branchDx = -mine.dz() * sideDirection;
         int branchDz = mine.dx() * sideDirection;
-        int originX = mine.entranceX() + mine.dx() * start;
-        int originZ = mine.entranceZ() + mine.dz() * start;
-        int floor = mine.entranceY() - 2 - start / 3;
-        int px = -branchDz;
-        int pz = branchDx;
+        int crossDx = mine.dx();
+        int crossDz = mine.dz();
         for (int t = 0; t <= length; t++) {
-            int x = originX + branchDx * t;
-            int z = originZ + branchDz * t;
-            int localFloor = floor - t / 12;
-            for (int side = -2; side <= 2; side++) {
-                plan.put(x + px * side, localFloor, z + pz * side,
-                        infected && Math.floorMod(t + side, 7) == 0
+            int wobble = (int) Math.round(Math.sin(t * 0.24D + start) * 2.4D
+                    + Math.sin(t * 0.071D) * 1.8D);
+            int x = origin.x() + branchDx * t + crossDx * wobble;
+            int z = origin.z() + branchDz * t + crossDz * wobble;
+            int floor = origin.floor() - t / 11 + (int) Math.round(Math.sin(t * 0.17D));
+            int width = 2 + (t % 17 == 8 ? 1 : 0);
+            for (int side = -width; side <= width; side++) {
+                int bx = x + crossDx * side;
+                int bz = z + crossDz * side;
+                plan.put(bx, floor, bz,
+                        infected && Math.floorMod(t + side, 6) == 0
                                 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE,
                         Rule.MINE);
-                for (int h = 1; h <= 4; h++) {
-                    plan.put(x + px * side, localFloor + h, z + pz * side,
-                            Material.AIR, Rule.MINE);
+                plan.put(bx, floor - 1, bz, Material.DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= 4 + (t % 13 == 0 ? 1 : 0); h++) {
+                    plan.put(bx, floor + h, bz, Material.AIR, Rule.MINE);
                 }
             }
-            if (t % 8 == 0) {
-                for (int side : new int[]{-2, 2}) {
-                    for (int h = 1; h <= 4; h++) {
-                        plan.put(x + px * side, localFloor + h, z + pz * side,
-                                Material.DARK_OAK_LOG, Rule.MINE);
-                    }
-                }
-                for (int side = -2; side <= 2; side++) {
-                    plan.put(x + px * side, localFloor + 5, z + pz * side,
-                            Material.DARK_OAK_LOG, Rule.MINE);
+            if (t % 10 == 3) {
+                for (int side : new int[]{-width, width}) {
+                    int bx = x + crossDx * side;
+                    int bz = z + crossDz * side;
+                    for (int h = 1; h <= 4; h++) plan.put(bx, floor + h, bz, Material.DARK_OAK_LOG, Rule.MINE);
                 }
             }
-            if (infected && t % 11 == 5) {
-                planCrystal(plan, x + px, localFloor + 1, z + pz, 2 + t % 3);
+            if (infected && t % 9 == 4) {
+                planCrystal(plan, x + crossDx * width, floor + 1, z + crossDz * width,
+                        2 + Math.floorMod(t, 3));
             }
         }
-        int endX = originX + branchDx * length;
-        int endZ = originZ + branchDz * length;
-        int endFloor = floor - length / 12;
-        for (int ox = -3; ox <= 3; ox++) {
-            for (int oz = -3; oz <= 3; oz++) {
+        int t = length;
+        int wobble = (int) Math.round(Math.sin(t * 0.24D + start) * 2.4D
+                + Math.sin(t * 0.071D) * 1.8D);
+        int endX = origin.x() + branchDx * t + crossDx * wobble;
+        int endZ = origin.z() + branchDz * t + crossDz * wobble;
+        int endFloor = origin.floor() - t / 11 + (int) Math.round(Math.sin(t * 0.17D));
+        for (int ox = -4; ox <= 4; ox++) {
+            for (int oz = -4; oz <= 4; oz++) {
+                double n = ox * ox / 16.0D + oz * oz / 16.0D;
+                if (n > 1.15D) continue;
+                plan.put(endX + ox, endFloor, endZ + oz,
+                        n > 0.78D ? Material.COBBLED_DEEPSLATE : Material.ANDESITE, Rule.MINE);
                 for (int h = 1; h <= 5; h++) {
-                    if (Math.abs(ox) + Math.abs(oz) + h % 2 < 7) {
-                        plan.put(endX + ox, endFloor + h, endZ + oz,
-                                Material.AIR, Rule.MINE);
-                    }
+                    if (n < 0.92D || h < 4) plan.put(endX + ox, endFloor + h, endZ + oz,
+                            Material.AIR, Rule.MINE);
                 }
             }
         }
         planOreVein(plan, endX, endFloor + 2, endZ,
-                infected ? Material.EMERALD_ORE : Material.IRON_ORE, 14);
+                infected ? Material.EMERALD_ORE : Material.IRON_ORE, 16);
     }
 
     private void planExtractionHall(Plan plan, MineSite mine, int at) {
-        int cx = mine.entranceX() + mine.dx() * at;
-        int cz = mine.entranceZ() + mine.dz() * at;
-        int floor = mine.entranceY() - 2 - at / 3;
+        MinePathPoint path = minePathPoint(mine, at);
+        int cx = path.x();
+        int cz = path.z();
+        int floor = path.floor();
         int px = -mine.dz();
         int pz = mine.dx();
         for (int forward = -12; forward <= 13; forward++) {
@@ -1614,9 +1643,10 @@ final class OverworldIslandLoreDecorator {
     private void planMinersRest(Plan plan, MineSite mine, int at) {
         int px = -mine.dz();
         int pz = mine.dx();
-        int cx = mine.entranceX() + mine.dx() * at + px * 10;
-        int cz = mine.entranceZ() + mine.dz() * at + pz * 10;
-        int floor = mine.entranceY() - 2 - at / 3;
+        MinePathPoint path = minePathPoint(mine, at);
+        int cx = path.x() + px * 10;
+        int cz = path.z() + pz * 10;
+        int floor = path.floor();
         planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 8, 7, 6,
                 Material.STONE_BRICKS, Material.SPRUCE_PLANKS);
         for (int i = -5; i <= 5; i += 5) {
@@ -1630,9 +1660,10 @@ final class OverworldIslandLoreDecorator {
     private void planMineWorkshop(Plan plan, MineSite mine, int at, int sideOffset) {
         int px = -mine.dz();
         int pz = mine.dx();
-        int cx = mine.entranceX() + mine.dx() * at + px * sideOffset;
-        int cz = mine.entranceZ() + mine.dz() * at + pz * sideOffset;
-        int floor = mine.entranceY() - 2 - at / 3;
+        MinePathPoint path = minePathPoint(mine, at);
+        int cx = path.x() + px * sideOffset;
+        int cz = path.z() + pz * sideOffset;
+        int floor = path.floor();
         planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 9, 8, 7,
                 Material.STONE_BRICKS, Material.POLISHED_ANDESITE);
         int[][] stations = {{-5, -5}, {-5, 0}, {-5, 5}, {5, -5}, {5, 0}, {5, 5}};
@@ -1655,9 +1686,10 @@ final class OverworldIslandLoreDecorator {
     private void planPumpStation(Plan plan, MineSite mine, int at, int sideOffset) {
         int px = -mine.dz();
         int pz = mine.dx();
-        int cx = mine.entranceX() + mine.dx() * at + px * sideOffset;
-        int cz = mine.entranceZ() + mine.dz() * at + pz * sideOffset;
-        int floor = mine.entranceY() - 2 - at / 3;
+        MinePathPoint path = minePathPoint(mine, at);
+        int cx = path.x() + px * sideOffset;
+        int cz = path.z() + pz * sideOffset;
+        int floor = path.floor();
         planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 8, 8, 8,
                 Material.DEEPSLATE_BRICKS, Material.COBBLED_DEEPSLATE);
         for (int forward = -5; forward <= 5; forward += 5) {
@@ -1681,9 +1713,10 @@ final class OverworldIslandLoreDecorator {
     private void planQuarantineLab(Plan plan, MineSite mine, int at, int sideOffset) {
         int px = -mine.dz();
         int pz = mine.dx();
-        int cx = mine.entranceX() + mine.dx() * at + px * sideOffset;
-        int cz = mine.entranceZ() + mine.dz() * at + pz * sideOffset;
-        int floor = mine.entranceY() - 2 - at / 3;
+        MinePathPoint path = minePathPoint(mine, at);
+        int cx = path.x() + px * sideOffset;
+        int cz = path.z() + pz * sideOffset;
+        int floor = path.floor();
         planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 10, 8, 7,
                 Material.POLISHED_DEEPSLATE, Material.DEEPSLATE_TILES);
         for (int side = -5; side <= 5; side += 5) {
@@ -1709,9 +1742,10 @@ final class OverworldIslandLoreDecorator {
     private void planOreDepot(Plan plan, MineSite mine, int at, int sideOffset) {
         int px = -mine.dz();
         int pz = mine.dx();
-        int cx = mine.entranceX() + mine.dx() * at + px * sideOffset;
-        int cz = mine.entranceZ() + mine.dz() * at + pz * sideOffset;
-        int floor = mine.entranceY() - 2 - at / 3;
+        MinePathPoint path = minePathPoint(mine, at);
+        int cx = path.x() + px * sideOffset;
+        int cz = path.z() + pz * sideOffset;
+        int floor = path.floor();
         planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 9, 7, 6,
                 Material.DEEPSLATE_BRICKS, Material.POLISHED_DEEPSLATE);
         for (int forward = -6; forward <= 6; forward += 3) {
@@ -1733,9 +1767,10 @@ final class OverworldIslandLoreDecorator {
     private void planCollapsedGallery(Plan plan, MineSite mine, int at) {
         int px = -mine.dz();
         int pz = mine.dx();
-        int cx = mine.entranceX() + mine.dx() * at - px * 11;
-        int cz = mine.entranceZ() + mine.dz() * at - pz * 11;
-        int floor = mine.entranceY() - 2 - at / 3;
+        MinePathPoint path = minePathPoint(mine, at);
+        int cx = path.x() - px * 11;
+        int cz = path.z() - pz * 11;
+        int floor = path.floor();
         planRectangularRoom(plan, cx, floor, cz, mine.dx(), mine.dz(), 10, 9, 7,
                 Material.DEEPSLATE_BRICKS, Material.POLISHED_DEEPSLATE);
         Random random = new Random(148322222L);
@@ -1759,27 +1794,19 @@ final class OverworldIslandLoreDecorator {
         planSideConnector(plan, mine, 79, 16, 2, 6);
         planSideConnector(plan, mine, 88, -11, 2, 6);
         planSideConnector(plan, mine, 108, 14, 2, 6);
+        planMainAxisOpening(plan, mine, 55, 14, 3, 7);
 
-        // El gran salón cruza el eje principal; esta pasada final abre las dos paredes
-        // que antes podían volver a cerrarlo al construir la sala.
-        planMainAxisOpening(plan, mine, 55, 15, 4, 8);
-
-        // El derrumbe queda como ambientación en los laterales, pero conserva un pasillo
-        // central completamente transitable hasta la veta infectada.
+        MinePathPoint collapsed = minePathPoint(mine, 88);
         int px = -mine.dz();
         int pz = mine.dx();
-        int centerX = mine.entranceX() + mine.dx() * 88 - px * 11;
-        int centerZ = mine.entranceZ() + mine.dz() * 88 - pz * 11;
-        int floor = mine.entranceY() - 2 - 88 / 3;
-        for (int forward = -9; forward <= 9; forward++) {
+        int centerX = collapsed.x() - px * 11;
+        int centerZ = collapsed.z() - pz * 11;
+        for (int forward = -8; forward <= 8; forward++) {
             for (int side = -2; side <= 2; side++) {
                 int x = centerX + mine.dx() * forward + px * side;
                 int z = centerZ + mine.dz() * forward + pz * side;
-                plan.put(x, floor, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                plan.put(x, floor - 1, z, Material.DEEPSLATE, Rule.MINE);
-                for (int h = 1; h <= 6; h++) {
-                    plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
-                }
+                plan.put(x, collapsed.floor(), z, Material.COBBLED_DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= 5; h++) plan.put(x, collapsed.floor() + h, z, Material.AIR, Rule.MINE);
             }
         }
     }
@@ -1788,35 +1815,30 @@ final class OverworldIslandLoreDecorator {
                                    int halfWidth, int height) {
         int px = -mine.dz();
         int pz = mine.dx();
+        MinePathPoint origin = minePathPoint(mine, at);
         int direction = Integer.signum(targetSide);
         int distance = Math.abs(targetSide);
-        int originX = mine.entranceX() + mine.dx() * at;
-        int originZ = mine.entranceZ() + mine.dz() * at;
-        int floor = mine.entranceY() - 2 - at / 3;
         for (int step = 0; step <= distance; step++) {
-            int centerX = originX + px * direction * step;
-            int centerZ = originZ + pz * direction * step;
+            int bend = (int) Math.round(Math.sin(step * 0.31D + at) * 1.5D);
+            int centerX = origin.x() + px * direction * step + mine.dx() * bend;
+            int centerZ = origin.z() + pz * direction * step + mine.dz() * bend;
+            int floor = origin.floor() - step / 14;
             for (int width = -halfWidth; width <= halfWidth; width++) {
                 int x = centerX + mine.dx() * width;
                 int z = centerZ + mine.dz() * width;
                 plan.put(x, floor, z,
-                        Math.floorMod(step + width, 9) == 0
-                                ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_ANDESITE,
+                        Math.floorMod(step + width, 7) == 0
+                                ? Material.MOSSY_COBBLESTONE : Material.ANDESITE,
                         Rule.MINE);
-                plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                for (int h = 1; h <= height; h++) {
-                    plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
-                }
+                plan.put(x, floor - 1, z, Material.DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= height; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
             }
-            if (step > 0 && step % 6 == 0) {
+            if (step > 0 && step % 7 == 0) {
                 for (int width : new int[]{-halfWidth, halfWidth}) {
                     int x = centerX + mine.dx() * width;
                     int z = centerZ + mine.dz() * width;
-                    for (int h = 1; h <= height; h++) {
-                        plan.put(x, floor + h, z, Material.SPRUCE_LOG, Rule.MINE);
-                    }
+                    for (int h = 1; h <= height - 1; h++) plan.put(x, floor + h, z, Material.SPRUCE_LOG, Rule.MINE);
                 }
-                plan.put(centerX, floor + height - 1, centerZ, Material.LANTERN, Rule.MINE);
             }
         }
     }
@@ -1825,157 +1847,72 @@ final class OverworldIslandLoreDecorator {
                                      int halfWidth, int height) {
         int px = -mine.dz();
         int pz = mine.dx();
-        int centerX = mine.entranceX() + mine.dx() * at;
-        int centerZ = mine.entranceZ() + mine.dz() * at;
-        int floor = mine.entranceY() - 2 - at / 3;
-        for (int forward = -halfLength; forward <= halfLength; forward++) {
+        for (int offset = -halfLength; offset <= halfLength; offset++) {
+            MinePathPoint point = minePathPoint(mine, at + offset);
             for (int side = -halfWidth; side <= halfWidth; side++) {
-                int x = centerX + mine.dx() * forward + px * side;
-                int z = centerZ + mine.dz() * forward + pz * side;
-                plan.put(x, floor, z, Material.DEEPSLATE_TILES, Rule.MINE);
-                plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                for (int h = 1; h <= height; h++) {
-                    plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
-                }
+                int x = point.x() + px * side;
+                int z = point.z() + pz * side;
+                plan.put(x, point.floor(), z, Material.ANDESITE, Rule.MINE);
+                plan.put(x, point.floor() - 1, z, Material.DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= height; h++) plan.put(x, point.floor() + h, z, Material.AIR, Rule.MINE);
             }
-            plan.put(centerX + mine.dx() * forward, floor + 1,
-                    centerZ + mine.dz() * forward, Material.RAIL, Rule.MINE);
         }
     }
 
     private void planAccessibleServiceLoop(Plan plan, MineSite mine) {
-        int px = -mine.dz();
-        int pz = mine.dx();
-        int[] stations = {14, 18, 34, 47, 55, 68, 70, 79, 88, 94, 108, 112, 120};
-        for (int sideLane : new int[]{-23, 23}) {
-            for (int t = 14; t <= 120; t++) {
-                int floor = mine.entranceY() - 2 - t / 3;
-                int centerX = mine.entranceX() + mine.dx() * t + px * sideLane;
-                int centerZ = mine.entranceZ() + mine.dz() * t + pz * sideLane;
-                for (int width = -2; width <= 2; width++) {
-                    int x = centerX + px * width;
-                    int z = centerZ + pz * width;
-                    plan.put(x, floor, z,
-                            Math.floorMod(t + width, 13) == 0
-                                    ? Material.MOSSY_STONE_BRICKS : Material.DEEPSLATE_TILES,
-                            Rule.MINE);
-                    plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                    for (int h = 1; h <= 6; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
-                }
-                if (t % 12 == 0) {
-                    plan.put(centerX, floor + 5, centerZ, Material.SOUL_LANTERN, Rule.MINE);
-                }
-            }
-        }
-        for (int station : stations) {
-            int floor = mine.entranceY() - 2 - station / 3;
-            int centerX = mine.entranceX() + mine.dx() * station;
-            int centerZ = mine.entranceZ() + mine.dz() * station;
-            for (int side = -23; side <= 23; side++) {
-                int x = centerX + px * side;
-                int z = centerZ + pz * side;
-                for (int width = -2; width <= 2; width++) {
-                    int bx = x + mine.dx() * width;
-                    int bz = z + mine.dz() * width;
-                    plan.put(bx, floor, bz, Material.POLISHED_ANDESITE, Rule.MINE);
-                    plan.put(bx, floor - 1, bz, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                    for (int h = 1; h <= 6; h++) plan.put(bx, floor + h, bz, Material.AIR, Rule.MINE);
-                }
-            }
-        }
+        // Retirado en 1.48.41: las dos autopistas paralelas hacían que la mina
+        // pareciera una cuadrícula. La accesibilidad se garantiza mediante el eje
+        // curvo y conectores orgánicos hacia cada cámara.
     }
 
     private void planFinalAccessibilitySpine(Plan plan, MineSite mine) {
         int px = -mine.dz();
         int pz = mine.dx();
-
-        // Eje principal continuo, tres bloques de ancho y cuatro de alto.
         for (int t = 0; t <= mine.tunnelLength(); t++) {
-            int floor = mine.entranceY() - 2 - t / 3;
-            int centerX = mine.entranceX() + mine.dx() * t;
-            int centerZ = mine.entranceZ() + mine.dz() * t;
+            MinePathPoint point = minePathPoint(mine, t);
             for (int side = -1; side <= 1; side++) {
-                int x = centerX + px * side;
-                int z = centerZ + pz * side;
-                plan.put(x, floor, z, Material.POLISHED_ANDESITE, Rule.MINE);
-                plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                for (int h = 1; h <= 4; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
+                int x = point.x() + px * side;
+                int z = point.z() + pz * side;
+                plan.put(x, point.floor(), z,
+                        Math.floorMod(t + side, 9) == 0 ? Material.MOSSY_COBBLESTONE : Material.ANDESITE,
+                        Rule.MINE);
+                plan.put(x, point.floor() - 1, z, Material.DEEPSLATE, Rule.MINE);
+                for (int h = 1; h <= 4; h++) plan.put(x, point.floor() + h, z, Material.AIR, Rule.MINE);
             }
         }
-
-        // Dos galerías de servicio paralelas.
-        for (int lane : new int[]{-23, 23}) {
-            for (int t = 14; t <= 120; t++) {
-                int floor = mine.entranceY() - 2 - t / 3;
-                int centerX = mine.entranceX() + mine.dx() * t + px * lane;
-                int centerZ = mine.entranceZ() + mine.dz() * t + pz * lane;
-                for (int side = -1; side <= 1; side++) {
-                    int x = centerX + px * side;
-                    int z = centerZ + pz * side;
-                    plan.put(x, floor, z, Material.DEEPSLATE_TILES, Rule.MINE);
-                    plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                    for (int h = 1; h <= 4; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
-                }
-            }
-        }
-
-        // Cruces frecuentes entre las tres galerías.
-        int[] stations = {14, 18, 34, 47, 55, 68, 70, 79, 88, 94, 108, 112, 120};
-        for (int station : stations) {
-            int floor = mine.entranceY() - 2 - station / 3;
-            int centerX = mine.entranceX() + mine.dx() * station;
-            int centerZ = mine.entranceZ() + mine.dz() * station;
-            for (int offset = -23; offset <= 23; offset++) {
-                int crossX = centerX + px * offset;
-                int crossZ = centerZ + pz * offset;
-                for (int width = -1; width <= 1; width++) {
-                    int x = crossX + mine.dx() * width;
-                    int z = crossZ + mine.dz() * width;
-                    plan.put(x, floor, z, Material.POLISHED_ANDESITE, Rule.MINE);
-                    plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                    for (int h = 1; h <= 4; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
-                }
-            }
-        }
-
-        // Corredor final que atraviesa el marco y entra realmente en la geoda.
         int projection = Math.abs((mine.geodeX() - mine.entranceX()) * mine.dx()
                 + (mine.geodeZ() - mine.entranceZ()) * mine.dz());
-        int gate = Math.max(0, projection - 20);
-        int end = Math.max(gate, projection - 6);
-        for (int t = gate; t <= end; t++) {
-            int centerX = mine.entranceX() + mine.dx() * t;
-            int centerZ = mine.entranceZ() + mine.dz() * t;
+        int start = Math.max(96, projection - 32);
+        MinePathPoint from = minePathPoint(mine, start);
+        int gateX = mine.geodeX() - mine.dx() * 19;
+        int gateZ = mine.geodeZ() - mine.dz() * 19;
+        int steps = Math.max(18, Math.abs(gateX - from.x()) + Math.abs(gateZ - from.z()));
+        for (int step = 0; step <= steps; step++) {
+            double progress = step / (double) steps;
+            int centerX = (int) Math.round(from.x() + (gateX - from.x()) * progress
+                    + px * Math.sin(progress * Math.PI) * 3.0D);
+            int centerZ = (int) Math.round(from.z() + (gateZ - from.z()) * progress
+                    + pz * Math.sin(progress * Math.PI) * 3.0D);
+            int floor = (int) Math.round(from.floor() + (mine.bossY() - from.floor()) * progress);
             for (int side = -2; side <= 2; side++) {
                 int x = centerX + px * side;
                 int z = centerZ + pz * side;
-                plan.put(x, mine.bossY(), z, Material.POLISHED_DEEPSLATE, Rule.MINE);
-                plan.put(x, mine.bossY() - 1, z, Material.DEEPSLATE_BRICKS, Rule.MINE);
-                for (int h = 1; h <= 5; h++) plan.put(x, mine.bossY() + h, z, Material.AIR, Rule.MINE);
+                plan.put(x, floor, z, Material.POLISHED_DEEPSLATE, Rule.MINE);
+                plan.put(x, floor - 1, z, Material.DEEPSLATE_BRICKS, Rule.MINE);
+                for (int h = 1; h <= 5; h++) plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
             }
         }
     }
 
     private boolean validateAccessibleMinePlan(Plan plan, MineSite mine) {
-        int px = -mine.dz();
-        int pz = mine.dx();
-        int[] stations = {0, 18, 34, 47, 55, 68, 70, 79, 88, 94, 108, 112, 120};
+        int[] stations = {0, 10, 18, 28, 34, 47, 55, 68, 70, 79, 88, 94, 108, 112, 120, 132};
         for (int station : stations) {
-            int floor = mine.entranceY() - 2 - station / 3;
-            int x = mine.entranceX() + mine.dx() * station;
-            int z = mine.entranceZ() + mine.dz() * station;
-            if (!plannedWalkableNear(plan, x, floor, z, 2, 1)) return false;
-            if (station >= 14 && !plannedWalkableNear(plan,
-                    x + px * 23, floor, z + pz * 23, 2, 1)) return false;
-            if (station >= 14 && !plannedWalkableNear(plan,
-                    x - px * 23, floor, z - pz * 23, 2, 1)) return false;
+            MinePathPoint point = minePathPoint(mine, station);
+            if (!plannedWalkableNear(plan, point.x(), point.floor(), point.z(), 3, 2)) return false;
         }
-        int projection = Math.abs((mine.geodeX() - mine.entranceX()) * mine.dx()
-                + (mine.geodeZ() - mine.entranceZ()) * mine.dz());
-        int gate = Math.max(0, projection - 18);
-        int gateX = mine.entranceX() + mine.dx() * gate;
-        int gateZ = mine.entranceZ() + mine.dz() * gate;
-        return plannedWalkableNear(plan, gateX, mine.bossY(), gateZ, 4, 2);
+        int gateX = mine.geodeX() - mine.dx() * 19;
+        int gateZ = mine.geodeZ() - mine.dz() * 19;
+        return plannedWalkableNear(plan, gateX, mine.bossY(), gateZ, 5, 3);
     }
 
     private boolean plannedWalkableNear(Plan plan, int x, int floor, int z,
@@ -2000,38 +1937,35 @@ final class OverworldIslandLoreDecorator {
     }
 
     private void planFinalGeodeApproach(Plan plan, MineSite mine, boolean preserveExistingGeode) {
-        int projection = Math.abs((mine.geodeX() - mine.entranceX()) * mine.dx()
-                + (mine.geodeZ() - mine.entranceZ()) * mine.dz());
-        int start = Math.max(96, Math.min(mine.tunnelLength(), projection - 30));
-        int end = Math.max(start + 1, projection - 18);
-        int startFloor = mine.entranceY() - 2 - start / 3;
-        int targetFloor = mine.bossY();
         int px = -mine.dz();
         int pz = mine.dx();
-        for (int t = start; t <= end; t++) {
-            double progress = (t - start) / (double) Math.max(1, end - start);
-            int floor = (int) Math.round(startFloor + (targetFloor - startFloor) * progress);
-            int x = mine.entranceX() + mine.dx() * t;
-            int z = mine.entranceZ() + mine.dz() * t;
-            for (int side = -4; side <= 4; side++) {
+        int start = 108;
+        MinePathPoint from = minePathPoint(mine, start);
+        int gateX = mine.geodeX() - mine.dx() * 19;
+        int gateZ = mine.geodeZ() - mine.dz() * 19;
+        int steps = Math.max(24, Math.abs(gateX - from.x()) + Math.abs(gateZ - from.z()));
+        for (int step = 0; step <= steps; step++) {
+            double progress = step / (double) steps;
+            double curve = Math.sin(progress * Math.PI) * 4.0D;
+            int x = (int) Math.round(from.x() + (gateX - from.x()) * progress + px * curve);
+            int z = (int) Math.round(from.z() + (gateZ - from.z()) * progress + pz * curve);
+            int floor = (int) Math.round(from.floor() + (mine.bossY() - from.floor()) * progress);
+            int width = step < steps / 2 ? 3 : 4;
+            for (int side = -width; side <= width; side++) {
                 int bx = x + px * side;
                 int bz = z + pz * side;
                 plan.put(bx, floor, bz,
-                        Math.floorMod(t + side, 11) == 0
+                        Math.floorMod(step + side, 11) == 0
                                 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_DEEPSLATE,
                         Rule.MINE);
                 plan.put(bx, floor - 1, bz, Material.DEEPSLATE_BRICKS, Rule.MINE);
-                plan.put(bx, floor - 2, bz, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                for (int h = 1; h <= 8; h++) {
-                    plan.put(bx, floor + h, bz, Material.AIR, Rule.MINE);
-                }
+                for (int h = 1; h <= 7; h++) plan.put(bx, floor + h, bz, Material.AIR, Rule.MINE);
             }
-            if ((t - start) % 7 == 0) {
-                plan.put(x + px * 3, floor + 6, z + pz * 3, Material.SOUL_LANTERN, Rule.MINE);
-            }
+            if (step % 8 == 3) plan.put(x + px * (width - 1), floor + 6,
+                    z + pz * (width - 1), Material.SOUL_LANTERN, Rule.MINE);
         }
-
-        // Pasarela final desde el umbral hasta el corazón de la geoda.
+        int projection = Math.abs((mine.geodeX() - mine.entranceX()) * mine.dx()
+                + (mine.geodeZ() - mine.entranceZ()) * mine.dz());
         int gateDistance = Math.max(0, projection - 19);
         int walkwayEnd = preserveExistingGeode ? Math.max(gateDistance, projection - 7) : projection;
         for (int t = gateDistance; t <= walkwayEnd; t++) {
@@ -2040,16 +1974,11 @@ final class OverworldIslandLoreDecorator {
             for (int side = -5; side <= 5; side++) {
                 int bx = x + px * side;
                 int bz = z + pz * side;
-                plan.put(bx, targetFloor, bz,
+                plan.put(bx, mine.bossY(), bz,
                         Math.abs(side) == 5 ? Material.DEEPSLATE_BRICKS : Material.POLISHED_DEEPSLATE,
                         Rule.MINE);
-                plan.put(bx, targetFloor - 1, bz, Material.DEEPSLATE_BRICKS, Rule.MINE);
-                for (int h = 1; h <= 9; h++) {
-                    plan.put(bx, targetFloor + h, bz, Material.AIR, Rule.MINE);
-                }
-                if (Math.abs(side) == 5 && t % 4 == 0) {
-                    plan.put(bx, targetFloor + 1, bz, Material.IRON_BARS, Rule.MINE);
-                }
+                plan.put(bx, mine.bossY() - 1, bz, Material.DEEPSLATE_BRICKS, Rule.MINE);
+                for (int h = 1; h <= 8; h++) plan.put(bx, mine.bossY() + h, bz, Material.AIR, Rule.MINE);
             }
         }
     }
@@ -2079,21 +2008,43 @@ final class OverworldIslandLoreDecorator {
                                      int height, Material wall, Material floorMaterial) {
         int px = -dz;
         int pz = dx;
-        for (int forward = -halfForward; forward <= halfForward; forward++) {
-            for (int side = -halfSide; side <= halfSide; side++) {
+        for (int forward = -halfForward - 2; forward <= halfForward + 2; forward++) {
+            for (int side = -halfSide - 2; side <= halfSide + 2; side++) {
+                double f = forward / (double) Math.max(1, halfForward);
+                double s = side / (double) Math.max(1, halfSide);
+                double jitter = (Math.floorMod(cx * 31 + cz * 17 + forward * 13 + side * 7, 11) - 5) * 0.012D;
+                double normalized = f * f + s * s + jitter;
+                if (normalized > 1.18D) continue;
                 int x = cx + dx * forward + px * side;
                 int z = cz + dz * forward + pz * side;
-                plan.put(x, floor, z, floorMaterial, Rule.MINE);
-                plan.put(x, floor - 1, z, Material.COBBLED_DEEPSLATE, Rule.MINE);
-                for (int h = 1; h <= height; h++) {
-                    boolean edge = Math.abs(forward) == halfForward || Math.abs(side) == halfSide;
-                    plan.put(x, floor + h, z, edge ? wall : Material.AIR, Rule.MINE);
-                }
-                plan.put(x, floor + height + 1, z, wall, Rule.MINE);
-                if (Math.floorMod(forward, 5) == 0 && Math.floorMod(side, 5) == 0) {
-                    for (int depth = 2; depth <= 8; depth++) {
-                        plan.put(x, floor - depth, z, Material.DEEPSLATE_BRICKS, Rule.MINE);
+                boolean rim = normalized > 0.82D;
+                Material floorBlock = Math.floorMod(forward * 5 + side * 7, 13) == 0
+                        ? Material.MOSSY_COBBLESTONE : floorMaterial;
+                plan.put(x, floor, z, floorBlock, Rule.MINE);
+                plan.put(x, floor - 1, z, Material.DEEPSLATE, Rule.MINE);
+                int localHeight = height - (int) Math.max(0, Math.round(normalized * 2.0D));
+                localHeight = Math.max(4, localHeight);
+                for (int h = 1; h <= localHeight; h++) {
+                    if (rim && h >= 2 && Math.floorMod(forward + side + h, 4) != 0) {
+                        plan.put(x, floor + h, z,
+                                Math.floorMod(forward * 3 + side * 5 + h, 7) == 0
+                                        ? wall : Material.DEEPSLATE,
+                                Rule.MINE);
+                    } else {
+                        plan.put(x, floor + h, z, Material.AIR, Rule.MINE);
                     }
+                }
+                if (!rim && Math.floorMod(forward * 11 + side * 19, 23) == 0) {
+                    plan.put(x, floor + localHeight, z, Material.TUFF, Rule.MINE);
+                }
+            }
+        }
+        for (int forward = -halfForward + 2; forward <= halfForward - 2; forward += 7) {
+            for (int side : new int[]{-Math.max(2, halfSide - 2), Math.max(2, halfSide - 2)}) {
+                int x = cx + dx * forward + px * side;
+                int z = cz + dz * forward + pz * side;
+                for (int h = 1; h <= Math.max(4, height - 2); h++) {
+                    plan.put(x, floor + h, z, Material.SPRUCE_LOG, Rule.MINE);
                 }
             }
         }
@@ -2248,10 +2199,9 @@ final class OverworldIslandLoreDecorator {
     private Anchor tunnelPoint(MineSite mine, int t, int side) {
         int px = -mine.dz();
         int pz = mine.dx();
-        int x = mine.entranceX() + mine.dx() * t + px * side;
-        int z = mine.entranceZ() + mine.dz() * t + pz * side;
-        int y = mine.entranceY() - 1 - t / 3;
-        return new Anchor(x, y, z);
+        MinePathPoint point = minePathPoint(mine, t);
+        return new Anchor(point.x() + px * side, point.floor() + 1,
+                point.z() + pz * side);
     }
 
     private void addDiary(Plan plan, Anchor anchor, String title,
@@ -2929,7 +2879,7 @@ final class OverworldIslandLoreDecorator {
             Files.writeString(marker, text.toString(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException error) {
-            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.40: "
+            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.41: "
                     + error.getMessage());
         }
     }
@@ -3057,4 +3007,6 @@ final class OverworldIslandLoreDecorator {
                             int dx, int dz, int tunnelLength,
                             int geodeX, int geodeY, int geodeZ,
                             int bossX, int bossY, int bossZ) { }
+    private record MinePathPoint(int x, int floor, int z, int lateral) { }
+
 }

@@ -1,6 +1,7 @@
 package com.arlight.bingo.listeners;
 
 import com.arlight.bingo.BingoPlugin;
+import com.arlight.bingo.template.OverworldIslandGenerator;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.HeightMap;
@@ -27,24 +28,26 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 
 /**
- * Reparador regional, manual y reversible para cicatrices de terreno producidas por
- * la restauración defectuosa de minas 1.48.39. Nunca escanea toda la isla: el admin
- * debe colocarse sobre la zona dañada y elegir el radio. Conserva columnas que
- * contienen arquitectura y crea un snapshot completo antes de aplicar cambios.
+ * Restauración determinista de cicatrices del Overworld.
+ *
+ * <p>1.48.41 deja de adivinar pendientes mediante planos. La forma limpia de la isla
+ * se reconstruye con el mismo generador y seed que creó la plantilla. Esto elimina
+ * discos verdes, terrazas rectas y cubos sin deformar el borde sano. Las zonas con
+ * arquitectura tienen políticas explícitas y nunca se detectan como minas.</p>
  */
 final class OverworldTerrainBlendCommands {
 
     private static final String TEMPLATE_MARKER = "arlight-overworld-template.properties";
+    private static final String LORE_MARKER = "arlight-overworld-lore-decoration.properties";
     private static final String LEGACY_DECORATION_MARKER = "arlight-overworld-decoration.properties";
-    private static final String REVISION = "1.48.40-player-centered-terrain-blend-1";
+    private static final String REVISION = "1.48.41-deterministic-zone-recovery-1";
     private static final DateTimeFormatter SNAPSHOT_TIME =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
     private static final int DEFAULT_RADIUS = 72;
     private static final int MIN_RADIUS = 16;
-    private static final int MAX_RADIUS = 128;
+    private static final int MAX_RADIUS = 140;
 
     private final BingoPlugin plugin;
     private BukkitTask waitTask;
@@ -64,8 +67,7 @@ final class OverworldTerrainBlendCommands {
                 && args[0].equalsIgnoreCase("bingo")
                 && args[1].equalsIgnoreCase("template")
                 && args[2].equalsIgnoreCase("overworld")
-                && (args[3].equalsIgnoreCase("terrain")
-                || args[3].equalsIgnoreCase("terreno"));
+                && (args[3].equalsIgnoreCase("terrain") || args[3].equalsIgnoreCase("terreno"));
     }
 
     void execute(CommandSender sender, String rawCommand) {
@@ -76,7 +78,7 @@ final class OverworldTerrainBlendCommands {
         String[] args = tokenize(rawCommand);
         String action = args.length >= 5 ? args[4].toLowerCase(Locale.ROOT) : "help";
         if (action.equals("status")) {
-            sender.sendMessage(ChatColor.AQUA + "Reparación regional 1.48.40: "
+            sender.sendMessage(ChatColor.AQUA + "Restauración determinista 1.48.41: "
                     + ChatColor.WHITE + status());
             return;
         }
@@ -85,17 +87,19 @@ final class OverworldTerrainBlendCommands {
             return;
         }
         if (!(sender instanceof Player player)) {
-            sender.sendMessage(ChatColor.RED + "Debes ejecutar este comando dentro de la zona dañada.");
+            sender.sendMessage(ChatColor.RED + "La previsualización y aplicación deben ejecutarse dentro de la revisión de trabajo.");
             return;
         }
-        int radius = parseRadius(sender, args.length >= 6 ? args[5] : null);
-        if (radius < 0) return;
+        World world = resolveTemplateWorld(player);
+        if (world == null) return;
+        Selection selection = parseSelection(player, world, args.length >= 6 ? args[5] : null);
+        if (selection == null) return;
         if (action.equals("preview")) {
-            preview(player, radius);
+            preview(player, world, selection);
             return;
         }
-        if (action.equals("apply") || action.equals("blend") || action.equals("repair")) {
-            start(player, radius);
+        if (action.equals("apply") || action.equals("restore") || action.equals("repair")) {
+            start(player, world, selection);
             return;
         }
         sendUsage(sender);
@@ -107,68 +111,64 @@ final class OverworldTerrainBlendCommands {
         String[] args = clean.isBlank() ? new String[0] : clean.split("\\s+");
         boolean trailing = buffer != null && buffer.endsWith(" ");
         int logical = trailing ? args.length + 1 : args.length;
-        if (logical == 5 && args.length >= 4
-                && (args[3].equalsIgnoreCase("terrain") || args[3].equalsIgnoreCase("terreno"))) {
+        if (logical == 5) {
             String prefix = trailing ? "" : args[4];
             return filter(List.of("preview", "apply", "status", "cancel"), prefix);
         }
         if (logical == 6 && args.length >= 5
                 && (args[4].equalsIgnoreCase("preview") || args[4].equalsIgnoreCase("apply"))) {
             String prefix = trailing ? "" : args[5];
-            return filter(List.of("48", "64", "72", "96", "112", "128"), prefix);
+            return filter(List.of("citadel", "coast", "mine-surface", "all-damage",
+                    "48", "64", "72", "96", "112", "128"), prefix);
         }
         return List.of();
     }
 
     void onWorldUnload(World world) {
-        // El snapshot descarga y vuelve a cargar la plantilla deliberadamente.
+        // Los snapshots descargan y recargan deliberadamente la plantilla.
     }
 
-    private void preview(Player player, int radius) {
-        World world = resolveTemplateWorld(player);
-        if (world == null) return;
-        Center center = new Center(player.getLocation().getBlockX(), player.getLocation().getBlockZ());
-        TerrainPlan plan = plan(world, center, radius);
+    private void preview(Player player, World world, Selection selection) {
+        TerrainPlan plan = plan(world, selection);
         if (!plan.valid()) {
             player.sendMessage(ChatColor.RED + plan.message());
             return;
         }
-        player.sendMessage(ChatColor.AQUA + "=== Previsualización terreno Overworld 1.48.40 ===");
-        player.sendMessage(ChatColor.GRAY + "- centro=" + ChatColor.WHITE
-                + center.x() + ", " + center.z());
-        player.sendMessage(ChatColor.GRAY + "- radio=" + ChatColor.WHITE + radius);
-        player.sendMessage(ChatColor.GRAY + "- columnas reparables=" + ChatColor.WHITE
-                + plan.changedColumns());
-        player.sendMessage(ChatColor.GRAY + "- columnas protegidas por arquitectura="
+        player.sendMessage(ChatColor.AQUA + "=== Restauración determinista Overworld 1.48.41 ===");
+        player.sendMessage(ChatColor.GRAY + "- selección=" + ChatColor.WHITE + selection.label());
+        player.sendMessage(ChatColor.GRAY + "- zonas=" + ChatColor.WHITE + selection.zones().size());
+        player.sendMessage(ChatColor.GRAY + "- columnas restauradas=" + ChatColor.WHITE + plan.changedColumns());
+        player.sendMessage(ChatColor.GRAY + "- columnas de arquitectura conservadas="
                 + ChatColor.WHITE + plan.protectedColumns());
         player.sendMessage(ChatColor.GRAY + "- operaciones=" + ChatColor.WHITE + plan.edits().size());
         player.sendMessage(ChatColor.GREEN + "- método=" + ChatColor.WHITE
-                + "pendiente calculada desde el borde, transición radial y decoración musgosa");
-        player.sendMessage(ChatColor.GREEN + "- protegido=" + ChatColor.WHITE
-                + "puerto, cofres, muros, casas, torres, caminos construidos y mobiliario");
-        player.sendMessage(ChatColor.YELLOW + "Aplicar desde este mismo punto con: "
-                + ChatColor.WHITE + "/bingo template overworld terrain apply " + radius);
+                + "misma seed, fórmula de isla, costa, cuevas y materiales de la plantilla limpia");
+        if (selection.rebuildCitadel()) {
+            player.sendMessage(ChatColor.GOLD + "- ciudadela=" + ChatColor.WHITE
+                    + "se limpiará el volumen dañado y se reconstruirá automáticamente al terminar");
+        }
+        player.sendMessage(ChatColor.YELLOW + "Aplicar con: " + ChatColor.WHITE
+                + "/bingo template overworld terrain apply " + selection.token());
     }
 
-    private void start(Player player, int radius) {
+    private void start(Player player, World world, Selection selection) {
         if (busy()) {
-            player.sendMessage(ChatColor.YELLOW + "Ya hay una reparación activa: " + status());
+            player.sendMessage(ChatColor.YELLOW + "Ya hay una restauración activa: " + status());
             return;
         }
-        World world = resolveTemplateWorld(player);
-        if (world == null) return;
-        Center center = new Center(player.getLocation().getBlockX(), player.getLocation().getBlockZ());
-        TerrainPlan preview = plan(world, center, radius);
-        if (!preview.valid()) {
-            player.sendMessage(ChatColor.RED + preview.message());
+        TerrainPlan preview = plan(world, selection);
+        if (!preview.valid() || preview.edits().isEmpty()) {
+            player.sendMessage(ChatColor.RED + (preview.message().isBlank()
+                    ? "No se encontraron bloques que restaurar." : preview.message()));
             return;
         }
-        String snapshot = "pre-terrain-blend-" + SNAPSHOT_TIME.format(Instant.now());
+        String snapshot = "pre-deterministic-repair-" + SNAPSHOT_TIME.format(Instant.now());
         String worldName = world.getName();
         Path expected = plugin.getDataFolder().toPath().resolve("template-snapshots")
                 .resolve("overworld").resolve(snapshot);
         detail = "esperando snapshot " + snapshot;
-        player.sendMessage(ChatColor.YELLOW + "Creando snapshot completo antes de reparar el terreno...");
+        player.sendMessage(ChatColor.YELLOW + "Creando snapshot completo antes de restaurar "
+                + selection.label() + "...");
         Bukkit.dispatchCommand(Bukkit.getConsoleSender(),
                 "bingo template overworld snapshot create " + snapshot);
 
@@ -181,7 +181,7 @@ final class OverworldTerrainBlendCommands {
                 BukkitTask finished = waitTask;
                 waitTask = null;
                 if (finished != null) finished.cancel();
-                startApply(player, reloaded, center, radius, snapshot);
+                startApply(player, reloaded, selection, snapshot);
                 return;
             }
             if (waited[0] < 300) return;
@@ -193,12 +193,12 @@ final class OverworldTerrainBlendCommands {
         }, 20L, 20L);
     }
 
-    private void startApply(Player player, World world, Center center, int radius, String snapshot) {
-        TerrainPlan plan = plan(world, center, radius);
+    private void startApply(Player player, World world, Selection selection, String snapshot) {
+        TerrainPlan plan = plan(world, selection);
         if (!plan.valid() || plan.edits().isEmpty()) {
             detail = "sin operaciones";
             player.sendMessage(ChatColor.RED + (plan.message().isBlank()
-                    ? "No se encontraron columnas reparables." : plan.message()));
+                    ? "No se encontraron bloques que restaurar." : plan.message()));
             return;
         }
         List<Edit> edits = plan.edits();
@@ -207,10 +207,9 @@ final class OverworldTerrainBlendCommands {
         changed = 0;
         detail = "aplicando 0/" + total;
         int perTick = Math.max(300, plugin.getConfig().getInt(
-                "template-worlds.overworld.terrain-blend.blocks-per-tick", 1200));
+                "template-worlds.overworld.terrain-blend.blocks-per-tick", 1400));
         long maxNanos = Math.max(2L, plugin.getConfig().getLong(
-                "template-worlds.overworld.terrain-blend.max-millis-per-tick", 6L))
-                * 1_000_000L;
+                "template-worlds.overworld.terrain-blend.max-millis-per-tick", 7L)) * 1_000_000L;
 
         applyTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             long deadline = System.nanoTime() + maxNanos;
@@ -224,202 +223,182 @@ final class OverworldTerrainBlendCommands {
             BukkitTask finished = applyTask;
             applyTask = null;
             if (finished != null) finished.cancel();
-            writeMarker(world, center, radius, snapshot, plan, changed);
+            writeMarker(world, selection, snapshot, plan, changed);
             world.save();
             Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "save-all flush");
             detail = "completa · " + changed + " bloques cambiados";
-            player.sendMessage(ChatColor.GREEN + "Terreno reparado y redecorado en radio " + radius + ".");
-            player.sendMessage(ChatColor.YELLOW + "Revisa el borde completo antes de reparar otra zona.");
+            player.sendMessage(ChatColor.GREEN + "Restauración determinista terminada: "
+                    + selection.label() + ".");
+            if (selection.rebuildCitadel()) {
+                player.sendMessage(ChatColor.YELLOW + "La base quedó limpia. Iniciando reconstrucción exacta de la ciudadela...");
+                Bukkit.getScheduler().runTaskLater(plugin, () -> Bukkit.dispatchCommand(
+                        Bukkit.getConsoleSender(), "bingo template overworld recover apply citadel"), 40L);
+            } else {
+                player.sendMessage(ChatColor.YELLOW + "Revisa toda la transición antes de aplicar otra zona.");
+            }
         }, 1L, 1L);
         player.sendMessage(ChatColor.GREEN + "Snapshot confirmado: " + snapshot + ".");
-        player.sendMessage(ChatColor.GREEN + "Reparación regional iniciada: "
-                + total + " operaciones protegidas.");
+        player.sendMessage(ChatColor.GREEN + "Restauración iniciada con " + total + " operaciones.");
     }
 
-    private TerrainPlan plan(World world, Center center, int radius) {
-        if (isProtectedHarbor(world, center.x(), center.z(), radius)) {
-            return TerrainPlan.invalid("La zona seleccionada entra en el puerto protegido.");
-        }
-        List<Sample> samples = boundarySamples(world, center, radius);
-        if (samples.size() < 14) {
-            return TerrainPlan.invalid("No hay suficiente borde natural para calcular una pendiente segura.");
-        }
-        Plane plane = fitPlane(samples);
-        if (plane == null) {
-            return TerrainPlan.invalid("No se pudo calcular la pendiente del terreno.");
-        }
-
+    private TerrainPlan plan(World world, Selection selection) {
+        long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        int islandRadius = Math.max(420, plugin.getConfig().getInt(
+                "template-worlds.overworld.island.land-radius", 500));
+        int seaLevel = plugin.getConfig().getInt(
+                "template-worlds.overworld.island.sea-level", 62);
+        OverworldIslandGenerator generator = new OverworldIslandGenerator(seed, islandRadius, seaLevel);
         LinkedHashMap<Long, Edit> edits = new LinkedHashMap<>();
-        List<GroundPoint> decoration = new ArrayList<>();
-        int protectedColumns = 0;
         int changedColumns = 0;
-        int radiusSq = radius * radius;
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
-                int distSq = dx * dx + dz * dz;
-                if (distSq > radiusSq) continue;
-                int x = center.x() + dx;
-                int z = center.z() + dz;
-                int top = terrainSurfaceY(world, x, z);
-                if (columnContainsArchitecture(world, x, z, top)) {
-                    protectedColumns++;
-                    continue;
-                }
-                double distance = Math.sqrt(distSq);
-                double radial = Math.max(0.0D, 1.0D - distance / Math.max(1.0D, radius));
-                double strength = Math.pow(radial, 1.35D) * 0.94D;
-                if (strength < 0.025D) continue;
-                double noise = terrainNoise(x, z) * Math.min(2.2D, 0.6D + radial * 1.7D);
-                int expected = (int) Math.round(plane.yAt(x, z) + noise);
-                int delta = expected - top;
-                delta = Math.max(-52, Math.min(42, delta));
-                int target = (int) Math.round(top + delta * strength);
-                if (Math.abs(target - top) <= 1 && !looksLikeDamageSurface(world, x, top, z)) continue;
-                target = Math.max(world.getMinHeight() + 8,
-                        Math.min(world.getMaxHeight() - 24, target));
+        int protectedColumns = 0;
 
-                int clearTop = Math.min(world.getMaxHeight() - 2, Math.max(top + 14, target + 12));
-                for (int y = target + 1; y <= clearTop; y++) {
-                    Material current = world.getBlockAt(x, y, z).getType();
-                    if (isTerrainRepairable(current)) put(edits, new Edit(x, y, z, Material.AIR));
+        for (Zone zone : selection.zones()) {
+            if (isProtectedHarbor(world, zone.centerX(), zone.centerZ(), zone.radius())) {
+                return TerrainPlan.invalid("La zona " + zone.name() + " entra en el puerto protegido.");
+            }
+            int radiusSq = zone.radius() * zone.radius();
+            int feather = Math.max(6, Math.min(12, zone.radius() / 8));
+            for (int dx = -zone.radius(); dx <= zone.radius(); dx++) {
+                for (int dz = -zone.radius(); dz <= zone.radius(); dz++) {
+                    int distSq = dx * dx + dz * dz;
+                    if (distSq > radiusSq) continue;
+                    int x = zone.centerX() + dx;
+                    int z = zone.centerZ() + dz;
+                    double distance = Math.sqrt(distSq);
+                    double strength = distance <= zone.radius() - feather ? 1.0D
+                            : smooth01((zone.radius() - distance) / Math.max(1.0D, feather));
+                    if (strength <= 0.01D) continue;
+
+                    int currentTop = terrainSurfaceY(world, x, z);
+                    int expected = generator.surfaceYAt(x, z);
+                    int target = strength >= 0.999D ? expected
+                            : (int) Math.round(currentTop + (expected - currentTop) * strength);
+                    target = Math.max(world.getMinHeight() + 2,
+                            Math.min(world.getMaxHeight() - 20, target));
+                    boolean architecture = columnContainsArchitecture(world, x, z, currentTop);
+                    boolean clearStructure = zone.clearStructures()
+                            && distance <= zone.structureClearRadius();
+                    if (architecture && !clearStructure) protectedColumns++;
+
+                    int clearTop = Math.min(world.getMaxHeight() - 2,
+                            Math.max(currentTop + 18, target + 24));
+                    for (int y = target + 1; y <= clearTop; y++) {
+                        Material current = world.getBlockAt(x, y, z).getType();
+                        if (shouldClear(zone.policy(), current, architecture, clearStructure)) {
+                            put(edits, new Edit(x, y, z, Material.AIR));
+                        }
+                    }
+
+                    int fillFrom = Math.max(world.getMinHeight() + 1,
+                            Math.min(currentTop, target) - 20);
+                    for (int y = fillFrom; y <= target; y++) {
+                        if (architecture && !clearStructure && y >= currentTop - 2) continue;
+                        Material material = target == expected
+                                ? generator.terrainMaterialAt(x, y, z, world.getMinHeight())
+                                : featherMaterial(generator, x, y, z, target, expected, world.getMinHeight());
+                        put(edits, new Edit(x, y, z, material));
+                    }
+                    if (target < generator.seaLevel()) {
+                        for (int y = target + 1; y <= generator.seaLevel(); y++) {
+                            if (!architecture || clearStructure) {
+                                put(edits, new Edit(x, y, z, Material.WATER));
+                            }
+                        }
+                    }
+                    changedColumns++;
                 }
-                int fillFrom = Math.max(world.getMinHeight() + 1, Math.min(top, target) - 12);
-                for (int y = fillFrom; y <= target; y++) {
-                    Material material;
-                    if (y == target) material = infectedTop(x, z);
-                    else if (y >= target - 3) material = Material.DIRT;
-                    else material = subsurfaceMaterial(y, x, z);
-                    put(edits, new Edit(x, y, z, material));
-                }
-                decoration.add(new GroundPoint(x, target, z, radial));
-                changedColumns++;
             }
         }
-        planDecoration(world, edits, decoration);
         return new TerrainPlan(true, "", new ArrayList<>(edits.values()),
-                changedColumns, protectedColumns, samples.size());
+                changedColumns, protectedColumns);
     }
 
-    private void planDecoration(World world, LinkedHashMap<Long, Edit> edits,
-                                List<GroundPoint> points) {
-        for (GroundPoint point : points) {
-            if (point.radial() < 0.18D) continue;
-            int hash = stableHash(point.x(), point.z());
-            int above = point.y() + 1;
-            if (Math.floorMod(hash, 23) == 0) {
-                put(edits, new Edit(point.x(), above, point.z(), Material.MOSS_CARPET));
-            } else if (Math.floorMod(hash, 79) == 0) {
-                put(edits, new Edit(point.x(), above, point.z(),
-                        Math.floorMod(hash, 2) == 0 ? Material.AZALEA : Material.FLOWERING_AZALEA));
-            } else if (Math.floorMod(hash, 101) == 0) {
-                put(edits, new Edit(point.x(), above, point.z(), Material.FERN));
+    private Material featherMaterial(OverworldIslandGenerator generator, int x, int y, int z,
+                                     int target, int expected, int minY) {
+        int depth = target - y;
+        Material expectedTop = generator.terrainMaterialAt(x, expected, z, minY);
+        if (depth == 0) return expectedTop == Material.STONE ? Material.MOSS_BLOCK : expectedTop;
+        if (depth <= 3) return expectedTop == Material.SAND ? Material.SANDSTONE : Material.DIRT;
+        return y < 0 ? Material.DEEPSLATE : Material.STONE;
+    }
+
+    private boolean shouldClear(Policy policy, Material material,
+                                boolean architectureColumn, boolean clearStructure) {
+        if (material == Material.BEDROCK) return false;
+        if (clearStructure) return true;
+        if (architectureColumn && policy == Policy.PRESERVE_ARCHITECTURE) return false;
+        if (policy == Policy.CLEAR_GENERATED_VOLUME) {
+            return isTerrainRepairable(material) || isMineGeneratedMaterial(material);
+        }
+        return isTerrainRepairable(material);
+    }
+
+    private Selection parseSelection(Player player, World world, String raw) {
+        String token = raw == null || raw.isBlank() ? String.valueOf(DEFAULT_RADIUS)
+                : raw.toLowerCase(Locale.ROOT);
+        if (token.equals("citadel") || token.equals("ciudadela") || token.equals("castle")) {
+            int x = plugin.getConfig().getInt(
+                    "template-worlds.overworld.campaign-layout-1-48.citadel-x", 140);
+            int z = plugin.getConfig().getInt(
+                    "template-worlds.overworld.campaign-layout-1-48.citadel-z", 30);
+            Zone zone = new Zone("ciudadela", x, z, 100,
+                    Policy.CLEAR_GENERATED_VOLUME, true, 82);
+            return new Selection("citadel", "ciudadela y base deformada", List.of(zone), true);
+        }
+        if (token.equals("coast") || token.equals("costa")) {
+            Zone zone = new Zone("cicatriz costera", 50, -317, 98,
+                    Policy.CLEAR_GENERATED_VOLUME, false, 0);
+            return new Selection("coast", "cicatriz costera", List.of(zone), false);
+        }
+        if (token.equals("mine-surface") || token.equals("mina") || token.equals("mine")) {
+            Center center = storedMineCenter(world);
+            Zone zone = new Zone("superficie de mina", center.x(), center.z(), 82,
+                    Policy.CLEAR_GENERATED_VOLUME, false, 0);
+            return new Selection("mine-surface", "superficie y entrada de mina", List.of(zone), false);
+        }
+        if (token.equals("all-damage") || token.equals("todo") || token.equals("all")) {
+            int citadelX = plugin.getConfig().getInt(
+                    "template-worlds.overworld.campaign-layout-1-48.citadel-x", 140);
+            int citadelZ = plugin.getConfig().getInt(
+                    "template-worlds.overworld.campaign-layout-1-48.citadel-z", 30);
+            Center mine = storedMineCenter(world);
+            List<Zone> zones = List.of(
+                    new Zone("ciudadela", citadelX, citadelZ, 100,
+                            Policy.CLEAR_GENERATED_VOLUME, true, 82),
+                    new Zone("cicatriz costera", 50, -317, 98,
+                            Policy.CLEAR_GENERATED_VOLUME, false, 0),
+                    new Zone("superficie de mina", mine.x(), mine.z(), 82,
+                            Policy.CLEAR_GENERATED_VOLUME, false, 0));
+            return new Selection("all-damage", "todas las cicatrices conocidas", zones, true);
+        }
+        try {
+            int radius = Integer.parseInt(token);
+            if (radius < MIN_RADIUS || radius > MAX_RADIUS) {
+                player.sendMessage(ChatColor.RED + "El radio debe estar entre "
+                        + MIN_RADIUS + " y " + MAX_RADIUS + ".");
+                return null;
             }
-            if (point.radial() > 0.35D && Math.floorMod(hash, 157) == 0) {
-                planMossRock(edits, point, hash);
-            }
-            if (point.radial() > 0.42D && Math.floorMod(hash, 263) == 0) {
-                planCrystal(edits, point, hash);
-            }
-            if (point.radial() > 0.48D && Math.floorMod(hash, 337) == 0
-                    && clearTreeColumn(world, point.x(), point.y(), point.z())) {
-                planSmallTree(edits, point, hash);
-            }
+            Center center = new Center(player.getLocation().getBlockX(), player.getLocation().getBlockZ());
+            Zone zone = new Zone("zona manual", center.x(), center.z(), radius,
+                    Policy.PRESERVE_ARCHITECTURE, false, 0);
+            return new Selection(String.valueOf(radius), "zona manual en "
+                    + center.x() + "," + center.z(), List.of(zone), false);
+        } catch (NumberFormatException error) {
+            player.sendMessage(ChatColor.RED + "Usa un radio o una zona: citadel, coast, mine-surface, all-damage.");
+            return null;
         }
     }
 
-    private void planMossRock(LinkedHashMap<Long, Edit> edits, GroundPoint point, int hash) {
-        int height = 1 + Math.floorMod(hash >>> 3, 3);
-        for (int h = 1; h <= height; h++) {
-            put(edits, new Edit(point.x(), point.y() + h, point.z(),
-                    h == height ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE));
-        }
-        if (height >= 2) {
-            put(edits, new Edit(point.x() + 1, point.y() + 1, point.z(), Material.MOSSY_COBBLESTONE));
-        }
-    }
-
-    private void planCrystal(LinkedHashMap<Long, Edit> edits, GroundPoint point, int hash) {
-        int height = 2 + Math.floorMod(hash >>> 4, 4);
-        for (int h = 1; h <= height; h++) {
-            Material material = h == height ? Material.AMETHYST_BLOCK
-                    : (h % 3 == 0 ? Material.BUDDING_AMETHYST : Material.AMETHYST_BLOCK);
-            put(edits, new Edit(point.x(), point.y() + h, point.z(), material));
-        }
-    }
-
-    private void planSmallTree(LinkedHashMap<Long, Edit> edits, GroundPoint point, int hash) {
-        int height = 5 + Math.floorMod(hash >>> 5, 4);
-        for (int h = 1; h <= height; h++) {
-            put(edits, new Edit(point.x(), point.y() + h, point.z(), Material.DARK_OAK_LOG));
-        }
-        int crownY = point.y() + height;
-        for (int ox = -2; ox <= 2; ox++) {
-            for (int oz = -2; oz <= 2; oz++) {
-                for (int oy = -1; oy <= 2; oy++) {
-                    if (Math.abs(ox) + Math.abs(oz) + Math.max(0, oy) > 5) continue;
-                    if (ox == 0 && oz == 0 && oy <= 0) continue;
-                    Material leaves = Math.floorMod(hash + ox * 17 + oz * 31 + oy * 13, 7) == 0
-                            ? Material.FLOWERING_AZALEA_LEAVES : Material.AZALEA_LEAVES;
-                    put(edits, new Edit(point.x() + ox, crownY + oy, point.z() + oz, leaves));
-                }
+    private Center storedMineCenter(World world) {
+        Properties marker = readProperties(world.getWorldFolder().toPath().resolve(LORE_MARKER));
+        String raw = marker.getProperty("mineEntrance", "237,0,-149");
+        String[] parts = raw.split(",");
+        try {
+            if (parts.length >= 3) {
+                return new Center(Integer.parseInt(parts[0].trim()), Integer.parseInt(parts[2].trim()));
             }
-        }
-    }
-
-    private List<Sample> boundarySamples(World world, Center center, int radius) {
-        List<Sample> samples = new ArrayList<>();
-        int ring = radius + 8;
-        for (int degrees = 0; degrees < 360; degrees += 8) {
-            double angle = Math.toRadians(degrees);
-            int x = center.x() + (int) Math.round(Math.cos(angle) * ring);
-            int z = center.z() + (int) Math.round(Math.sin(angle) * ring);
-            int y = terrainSurfaceY(world, x, z);
-            if (columnContainsArchitecture(world, x, z, y)) continue;
-            samples.add(new Sample(x, z, y));
-        }
-        return samples;
-    }
-
-    private Plane fitPlane(List<Sample> samples) {
-        double sX = 0, sZ = 0, sY = 0, sXX = 0, sZZ = 0, sXZ = 0, sXY = 0, sZY = 0;
-        for (Sample sample : samples) {
-            double x = sample.x();
-            double z = sample.z();
-            double y = sample.y();
-            sX += x;
-            sZ += z;
-            sY += y;
-            sXX += x * x;
-            sZZ += z * z;
-            sXZ += x * z;
-            sXY += x * y;
-            sZY += z * y;
-        }
-        double[][] matrix = {
-                {sXX, sXZ, sX, sXY},
-                {sXZ, sZZ, sZ, sZY},
-                {sX, sZ, samples.size(), sY}
-        };
-        for (int pivot = 0; pivot < 3; pivot++) {
-            int best = pivot;
-            for (int row = pivot + 1; row < 3; row++) {
-                if (Math.abs(matrix[row][pivot]) > Math.abs(matrix[best][pivot])) best = row;
-            }
-            if (Math.abs(matrix[best][pivot]) < 1.0E-8D) return null;
-            double[] swap = matrix[pivot];
-            matrix[pivot] = matrix[best];
-            matrix[best] = swap;
-            double divisor = matrix[pivot][pivot];
-            for (int col = pivot; col < 4; col++) matrix[pivot][col] /= divisor;
-            for (int row = 0; row < 3; row++) {
-                if (row == pivot) continue;
-                double factor = matrix[row][pivot];
-                for (int col = pivot; col < 4; col++) {
-                    matrix[row][col] -= factor * matrix[pivot][col];
-                }
-            }
-        }
-        return new Plane(matrix[0][3], matrix[1][3], matrix[2][3]);
+        } catch (NumberFormatException ignored) { }
+        return new Center(237, -149);
     }
 
     private int terrainSurfaceY(World world, int x, int z) {
@@ -434,12 +413,11 @@ final class OverworldTerrainBlendCommands {
     }
 
     private boolean columnContainsArchitecture(World world, int x, int z, int top) {
-        int min = Math.max(world.getMinHeight(), top - 18);
-        int max = Math.min(world.getMaxHeight() - 1, top + 18);
+        int min = Math.max(world.getMinHeight(), top - 24);
+        int max = Math.min(world.getMaxHeight() - 1, top + 28);
         int architecture = 0;
         for (int y = min; y <= max; y++) {
-            Material material = world.getBlockAt(x, y, z).getType();
-            if (isArchitectureMaterial(material)) architecture++;
+            if (isArchitectureMaterial(world.getBlockAt(x, y, z).getType())) architecture++;
             if (architecture >= 2) return true;
         }
         return false;
@@ -461,24 +439,24 @@ final class OverworldTerrainBlendCommands {
                 || material == Material.STONECUTTER || material == Material.BLAST_FURNACE
                 || material == Material.ANVIL || material == Material.GRINDSTONE
                 || material == Material.CAULDRON || material == Material.LANTERN
-                || material == Material.SOUL_LANTERN || material == Material.CHAIN
-                || material == Material.RAIL || material == Material.POWERED_RAIL
-                || material == Material.DETECTOR_RAIL || material == Material.ACTIVATOR_RAIL;
+                || material == Material.SOUL_LANTERN || material == Material.CHAIN;
     }
 
-    private boolean looksLikeDamageSurface(World world, int x, int y, int z) {
-        Material top = world.getBlockAt(x, y, z).getType();
-        if (!(top == Material.GRASS_BLOCK || top == Material.STONE
-                || top == Material.ANDESITE || top == Material.DIORITE
-                || top == Material.GRANITE || top == Material.COBBLESTONE
-                || top == Material.COBBLED_DEEPSLATE || top == Material.MOSS_BLOCK)) return false;
-        int same = 0;
-        for (int ox = -2; ox <= 2; ox++) {
-            for (int oz = -2; oz <= 2; oz++) {
-                if (terrainSurfaceY(world, x + ox, z + oz) == y) same++;
-            }
-        }
-        return same >= 20;
+    private boolean isMineGeneratedMaterial(Material material) {
+        String name = material.name();
+        return material == Material.RAIL || material == Material.POWERED_RAIL
+                || material == Material.DETECTOR_RAIL || material == Material.ACTIVATOR_RAIL
+                || material == Material.SPRUCE_LOG || material == Material.DARK_OAK_LOG
+                || material == Material.POLISHED_ANDESITE || material == Material.POLISHED_DEEPSLATE
+                || material == Material.DEEPSLATE_BRICKS || material == Material.DEEPSLATE_TILES
+                || material == Material.MOSSY_STONE_BRICKS || material == Material.SMOOTH_BASALT
+                || material == Material.AMETHYST_BLOCK || material == Material.BUDDING_AMETHYST
+                || material == Material.AMETHYST_CLUSTER || material == Material.LARGE_AMETHYST_BUD
+                || material == Material.MEDIUM_AMETHYST_BUD || material == Material.SMALL_AMETHYST_BUD
+                || material == Material.EMERALD_BLOCK || material == Material.CHAIN
+                || material == Material.LANTERN || material == Material.SOUL_LANTERN
+                || material == Material.BARREL || material == Material.CHEST
+                || material == Material.LECTERN || name.endsWith("_SIGN");
     }
 
     private boolean isTerrainRepairable(Material material) {
@@ -486,12 +464,7 @@ final class OverworldTerrainBlendCommands {
         return material.isAir() || isPlant(material) || isNatural(material)
                 || name.endsWith("_LOG") || name.endsWith("_WOOD")
                 || name.endsWith("_LEAVES") || name.endsWith("_ORE")
-                || material == Material.WATER || material == Material.LAVA
-                || material == Material.RAIL || material == Material.POWERED_RAIL
-                || material == Material.DETECTOR_RAIL || material == Material.ACTIVATOR_RAIL
-                || material == Material.BARREL || material == Material.CHEST
-                || material == Material.CRAFTING_TABLE || material == Material.LANTERN
-                || material == Material.SOUL_LANTERN || material == Material.CHAIN;
+                || material == Material.WATER || material == Material.LAVA;
     }
 
     private boolean isNatural(Material material) {
@@ -523,51 +496,6 @@ final class OverworldTerrainBlendCommands {
                 || material == Material.SNOW || material == Material.LILY_PAD;
     }
 
-    private Material infectedTop(int x, int z) {
-        int value = Math.floorMod(stableHash(x, z), 100);
-        if (value < 58) return Material.MOSS_BLOCK;
-        if (value < 73) return Material.GRASS_BLOCK;
-        if (value < 84) return Material.PODZOL;
-        if (value < 93) return Material.ROOTED_DIRT;
-        return Material.COARSE_DIRT;
-    }
-
-    private Material subsurfaceMaterial(int y, int x, int z) {
-        if (y < 16) return Material.DEEPSLATE;
-        int value = Math.floorMod(x * 31 + y * 17 + z * 13, 17);
-        if (value == 0) return Material.TUFF;
-        if (value == 1) return Material.ANDESITE;
-        return Material.STONE;
-    }
-
-    private boolean clearTreeColumn(World world, int x, int y, int z) {
-        for (int ox = -2; ox <= 2; ox++) {
-            for (int oz = -2; oz <= 2; oz++) {
-                for (int h = 1; h <= 10; h++) {
-                    Material material = world.getBlockAt(x + ox, y + h, z + oz).getType();
-                    if (!material.isAir() && !isPlant(material)
-                            && !material.name().endsWith("_LOG")
-                            && !material.name().endsWith("_WOOD")) return false;
-                }
-            }
-        }
-        return true;
-    }
-
-    private double terrainNoise(int x, int z) {
-        double first = Math.sin(x * 0.071D + z * 0.043D);
-        double second = Math.cos(x * 0.029D - z * 0.061D);
-        return (first + second) * 0.5D;
-    }
-
-    private int stableHash(int x, int z) {
-        int value = x * 73428767 ^ z * 912931;
-        value ^= value >>> 16;
-        value *= 0x7feb352d;
-        value ^= value >>> 15;
-        return value;
-    }
-
     private boolean apply(World world, Edit edit) {
         if (edit.y() < world.getMinHeight() || edit.y() >= world.getMaxHeight()) return false;
         Block block = world.getBlockAt(edit.x(), edit.y(), edit.z());
@@ -588,6 +516,11 @@ final class OverworldTerrainBlendCommands {
         return (((long) x & 0x3FFFFFFL) << 38)
                 | (((long) z & 0x3FFFFFFL) << 12)
                 | ((long) y & 0xFFFL);
+    }
+
+    private double smooth01(double value) {
+        double t = Math.max(0.0D, Math.min(1.0D, value));
+        return t * t * (3.0D - 2.0D * t);
     }
 
     private boolean isProtectedHarbor(World world, int x, int z, int radius) {
@@ -639,43 +572,28 @@ final class OverworldTerrainBlendCommands {
         return properties;
     }
 
-    private void writeMarker(World world, Center center, int radius, String snapshot,
+    private void writeMarker(World world, Selection selection, String snapshot,
                              TerrainPlan plan, int changedBlocks) {
-        String text = "version=1.48.40\n"
+        String text = "version=1.48.41\n"
                 + "revision=" + REVISION + "\n"
                 + "appliedAt=" + System.currentTimeMillis() + "\n"
-                + "center=" + center.x() + "," + center.z() + "\n"
-                + "radius=" + radius + "\n"
+                + "selection=" + selection.token() + "\n"
+                + "zones=" + selection.zones().size() + "\n"
                 + "snapshot=" + snapshot + "\n"
                 + "changedBlocks=" + changedBlocks + "\n"
                 + "changedColumns=" + plan.changedColumns() + "\n"
                 + "protectedColumns=" + plan.protectedColumns() + "\n"
+                + "deterministicGenerator=true\n"
                 + "harborProtected=true\n"
-                + "architectureProtected=true\n";
+                + "automaticMineScan=false\n";
         try {
             Files.writeString(world.getWorldFolder().toPath().resolve(
                             "arlight-overworld-terrain-blend.properties"), text,
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException error) {
-            plugin.getLogger().warning("No se pudo escribir el marcador de terreno 1.48.40: "
+            plugin.getLogger().warning("No se pudo escribir el marcador de terreno 1.48.41: "
                     + error.getMessage());
-        }
-    }
-
-    private int parseRadius(CommandSender sender, String raw) {
-        if (raw == null || raw.isBlank()) return DEFAULT_RADIUS;
-        try {
-            int radius = Integer.parseInt(raw);
-            if (radius < MIN_RADIUS || radius > MAX_RADIUS) {
-                sender.sendMessage(ChatColor.RED + "El radio debe estar entre "
-                        + MIN_RADIUS + " y " + MAX_RADIUS + ".");
-                return -1;
-            }
-            return radius;
-        } catch (NumberFormatException error) {
-            sender.sendMessage(ChatColor.RED + "El radio debe ser un número.");
-            return -1;
         }
     }
 
@@ -684,8 +602,6 @@ final class OverworldTerrainBlendCommands {
     }
 
     private String status() {
-        if (waitTask != null) return detail;
-        if (applyTask != null) return detail;
         return detail;
     }
 
@@ -702,8 +618,8 @@ final class OverworldTerrainBlendCommands {
             cancelled = true;
         }
         detail = cancelled ? "cancelada manualmente" : "sin operación activa";
-        sender.sendMessage(cancelled ? ChatColor.YELLOW + "Reparación regional cancelada."
-                : ChatColor.GRAY + "No hay una reparación regional activa.");
+        sender.sendMessage(cancelled ? ChatColor.YELLOW + "Restauración cancelada."
+                : ChatColor.GRAY + "No hay una restauración activa.");
     }
 
     private List<String> filter(List<String> values, String prefix) {
@@ -720,20 +636,20 @@ final class OverworldTerrainBlendCommands {
 
     private void sendUsage(CommandSender sender) {
         sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo template overworld terrain "
-                + "<preview|apply|status|cancel> [radio 16-128]");
+                + "<preview|apply|status|cancel> <citadel|coast|mine-surface|all-damage|radio>");
     }
 
+    private enum Policy { PRESERVE_ARCHITECTURE, CLEAR_GENERATED_VOLUME }
     private record Center(int x, int z) { }
-    private record Sample(int x, int z, int y) { }
-    private record Plane(double a, double b, double c) {
-        double yAt(int x, int z) { return a * x + b * z + c; }
-    }
+    private record Zone(String name, int centerX, int centerZ, int radius,
+                        Policy policy, boolean clearStructures, int structureClearRadius) { }
+    private record Selection(String token, String label, List<Zone> zones,
+                             boolean rebuildCitadel) { }
     private record Edit(int x, int y, int z, Material material) { }
-    private record GroundPoint(int x, int y, int z, double radial) { }
     private record TerrainPlan(boolean valid, String message, List<Edit> edits,
-                               int changedColumns, int protectedColumns, int boundarySamples) {
+                               int changedColumns, int protectedColumns) {
         static TerrainPlan invalid(String message) {
-            return new TerrainPlan(false, message, List.of(), 0, 0, 0);
+            return new TerrainPlan(false, message, List.of(), 0, 0);
         }
     }
 }
