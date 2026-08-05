@@ -54,7 +54,7 @@ final class OverworldIslandLoreDecorator {
     private static final String TEMPLATE_MARKER = "arlight-overworld-template.properties";
     private static final String LEGACY_DECORATION_MARKER = "arlight-overworld-decoration.properties";
     private static final String LORE_MARKER = "arlight-overworld-lore-decoration.properties";
-    private static final String REVISION = "1.48.39-mine-cleanup-independent-final-accessibility-spine-1";
+    private static final String REVISION = "1.48.40-no-automatic-legacy-scan-terrain-blend-1";
     private static final int DEFAULT_BATCH = 1400;
     private static final int PORT_PROTECTION_RADIUS = 220;
 
@@ -100,7 +100,7 @@ final class OverworldIslandLoreDecorator {
             return;
         }
         if (action.equals("status")) {
-            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.39: "
+            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld 1.48.40: "
                     + ChatColor.WHITE + status(sender));
             return;
         }
@@ -167,7 +167,7 @@ final class OverworldIslandLoreDecorator {
         List<MineSite> legacyMines = detectLegacyMineSitesRobust(world, anchors, storedMine);
         MineSite mine = fixedMainMineSite(world, anchors);
 
-        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.39 ===");
+        sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración Overworld 1.48.40 ===");
         sender.sendMessage(ChatColor.GRAY + "- categoría=" + ChatColor.WHITE + category);
         sender.sendMessage(ChatColor.GRAY + "- puerto=" + ChatColor.GREEN
                 + "PROTEGIDO: el comando no planifica ni cambia ningún bloque del puerto");
@@ -182,7 +182,7 @@ final class OverworldIslandLoreDecorator {
         sender.sendMessage(ChatColor.GRAY + "- corrupción=" + ChatColor.WHITE
                 + "limpia junto a la aldea principal, transición creciente y cobertura musgosa total en montaña y zona marrón");
         sender.sendMessage(ChatColor.GRAY + "- minas antiguas detectables=" + ChatColor.WHITE
-                + legacyMines.size() + " · se restauran antes de construir la nueva");
+                + legacyMines.size() + " · escaneo automático desactivado por seguridad");
         if (mine == null) {
             sender.sendMessage(ChatColor.RED + "- mina=no se pudo calcular la ubicación fija");
         } else {
@@ -258,7 +258,7 @@ final class OverworldIslandLoreDecorator {
                 planMineRestoration(world, restorationPlan, anchors, legacy);
             }
             existing.setProperty("mineLegacySitesRestoredLastRun", String.valueOf(legacyMines.size()));
-            existing.setProperty("mineLegacyDetector", "dense-signature-scan+stored-marker+fixed-fallbacks");
+            existing.setProperty("mineLegacyDetector", "disabled-1.48.40-no-structure-scanning");
         }
 
         Plan decorationPlan = new Plan();
@@ -348,7 +348,7 @@ final class OverworldIslandLoreDecorator {
                     + "Revisa la isla y guarda con /bingo template overworld commit.");
         }, 1L, 1L);
 
-        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.39 iniciada: " + activeCategory
+        sender.sendMessage(ChatColor.GREEN + "Decoración 1.48.40 iniciada: " + activeCategory
                 + " · " + operations.size() + " operaciones protegidas.");
         if (migrateMine) {
             sender.sendMessage(ChatColor.GRAY + "Minas antiguas detectadas para naturalizar: "
@@ -510,43 +510,12 @@ final class OverworldIslandLoreDecorator {
     }
 
     private List<MineSite> detectLegacyMineSitesRobust(World world, Anchors anchors, MineSite stored) {
-        List<LegacyMineMatch> matches = new ArrayList<>();
-        if (stored != null) addLegacyMineMatch(matches,
-                new LegacyMineMatch(stored, Math.max(20, mineSignature(world, stored))), 72);
-
-        Anchor dungeon = anchors.dungeon();
-        int[] radii = {190, 225, 260, 300, 340, 385, 430, 470, 510};
-        int[][] directions = {
-                {-1, -1}, {0, -1}, {-1, 0}
-        };
-        for (int radius : radii) {
-            for (int[] direction : directions) {
-                int scale = direction[0] != 0 && direction[1] != 0
-                        ? (int) Math.round(radius / Math.sqrt(2.0D)) : radius;
-                LegacyMineMatch match = searchLegacyMineAround(world,
-                        dungeon.x() + direction[0] * scale,
-                        dungeon.z() + direction[1] * scale, 42);
-                if (match != null) addLegacyMineMatch(matches, match, 72);
-            }
-        }
-
-        // Posiciones deterministas usadas por las revisiones que produjeron las capturas.
-        int[][] fixedOffsets = {
-                {-183, -149}, {-184, -184}, {-240, -240}, {-255, -290},
-                {-272, -272}, {-304, -304}
-        };
-        for (int[] offset : fixedOffsets) {
-            LegacyMineMatch match = searchLegacyMineAround(world,
-                    dungeon.x() + offset[0], dungeon.z() + offset[1], 58);
-            if (match != null) addLegacyMineMatch(matches, match, 78);
-        }
-
-        matches.sort(Comparator.comparingInt(LegacyMineMatch::score).reversed());
-        List<MineSite> result = new ArrayList<>();
-        for (LegacyMineMatch match : matches) {
-            if (!containsNearbyMine(result, match.site(), 78)) result.add(match.site());
-        }
-        return result;
+        // 1.48.40: queda prohibido buscar minas antiguas por materiales o proximidad.
+        // El barrido 1.48.39 confundió castillos, torres y patios con galerías y dañó
+        // la campaña. Una reanudación normal nunca naturaliza estructuras existentes.
+        // La mina nueva se genera en el sitio fijo después de la auditoría, sin limpiar
+        // automáticamente ningún volumen anterior.
+        return List.of();
     }
 
     private LegacyMineMatch searchLegacyMineAround(World world, int centerX, int centerZ, int radius) {
@@ -619,9 +588,52 @@ final class OverworldIslandLoreDecorator {
         }
         MineSite site = buildMineSite(world,
                 new MineCandidate(entranceX, entranceY, entranceZ, 0, -1, 9999.0D));
-        if (site != null) return site;
-        return buildMineSite(world,
+        if (site != null && !mineIntersectsCampaign(site)) return site;
+        site = buildMineSite(world,
                 new MineCandidate(entranceX, entranceY, entranceZ, -1, 0, 9998.0D));
+        if (site != null && !mineIntersectsCampaign(site)) return site;
+
+        // Fallback igualmente fijo, más al noreste del distrito comercial.
+        int fallbackX = dungeon.x() - 130;
+        int fallbackZ = dungeon.z() - 250;
+        int fallbackY = medianSurfaceY(world, fallbackX, fallbackZ, 28, 4) + 1;
+        site = buildMineSite(world,
+                new MineCandidate(fallbackX, fallbackY, fallbackZ, 0, -1, 9997.0D));
+        return site != null && !mineIntersectsCampaign(site) ? site : null;
+    }
+
+    private boolean mineIntersectsCampaign(MineSite site) {
+        int citadelX = plugin.getConfig().getInt(
+                "template-worlds.overworld.campaign-layout-1-48.citadel-x", 140);
+        int citadelZ = plugin.getConfig().getInt(
+                "template-worlds.overworld.campaign-layout-1-48.citadel-z", 30);
+        int villageX = plugin.getConfig().getInt(
+                "template-worlds.overworld.layout.village-x", -360);
+        int villageZ = plugin.getConfig().getInt(
+                "template-worlds.overworld.layout.village-z", 0);
+        int[][] protectedSites = {
+                {villageX, villageZ, 155},
+                {citadelX, citadelZ, 112},
+                {citadelX - 170, citadelZ + 100, 90},
+                {citadelX, citadelZ - 190, 90},
+                {citadelX + 170, citadelZ + 80, 96},
+                {citadelX, citadelZ + 210, 105},
+                {citadelX, citadelZ + 320, 72}
+        };
+        int[][] minePoints = {
+                {site.entranceX(), site.entranceZ()},
+                {site.geodeX(), site.geodeZ()},
+                {site.bossX(), site.bossZ()}
+        };
+        for (int[] point : minePoints) {
+            for (int[] protectedSite : protectedSites) {
+                long dx = (long) point[0] - protectedSite[0];
+                long dz = (long) point[1] - protectedSite[1];
+                long radius = protectedSite[2];
+                if (dx * dx + dz * dz <= radius * radius) return true;
+            }
+        }
+        return false;
     }
 
     private List<MineSite> detectLegacyMineSites(World world, Anchors anchors, MineSite stored) {
@@ -2905,7 +2917,7 @@ final class OverworldIslandLoreDecorator {
             existing.setProperty("villageCleanRadius", "150-blocks-plus-irregular-transition");
             existing.setProperty("infectionGradient", "clean-near-main-village-to-full-moss-mountains");
             existing.setProperty("mineFixedEntrance", "true");
-            existing.setProperty("legacyMineRestorationIndependentOfNewSite", "true");
+            existing.setProperty("legacyMineRestorationIndependentOfNewSite", "disabled-no-automatic-cleanup");
         }
         existing.setProperty("categories", appliedCategoryList(existing));
 
@@ -2917,7 +2929,7 @@ final class OverworldIslandLoreDecorator {
             Files.writeString(marker, text.toString(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException error) {
-            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.39: "
+            plugin.getLogger().warning("No se pudo escribir el marcador de decoración 1.48.40: "
                     + error.getMessage());
         }
     }

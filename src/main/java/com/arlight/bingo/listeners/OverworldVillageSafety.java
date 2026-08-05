@@ -42,6 +42,7 @@ public final class OverworldVillageSafety implements Listener {
     private final OverworldIslandLoreDecorator islandLoreDecorator;
     private final OverworldTemplateRecoveryCommands recoveryCommands;
     private final OverworldCampaignRecoveryCommands campaignRecoveryCommands;
+    private final OverworldTerrainBlendCommands terrainBlendCommands;
     private final Map<UUID, SafeZone> zones = new HashMap<>();
     private final Map<UUID, Long> retryAfter = new HashMap<>();
 
@@ -51,12 +52,17 @@ public final class OverworldVillageSafety implements Listener {
         this.islandLoreDecorator = new OverworldIslandLoreDecorator(plugin);
         this.recoveryCommands = new OverworldTemplateRecoveryCommands(plugin);
         this.campaignRecoveryCommands = new OverworldCampaignRecoveryCommands(plugin);
+        this.terrainBlendCommands = new OverworldTerrainBlendCommands(plugin);
         long interval = Math.max(20L, plugin.getConfig().getLong(
                 "template-worlds.overworld.safe-village.purge-interval-ticks", 40L));
         Bukkit.getScheduler().runTaskTimer(plugin, this::maintenanceTick, interval, interval);
     }
 
     public boolean dispatchTemplateUtility(CommandSender sender, String rawCommand) {
+        if (terrainBlendCommands.matches(rawCommand)) {
+            terrainBlendCommands.execute(sender, rawCommand);
+            return true;
+        }
         if (campaignRecoveryCommands.matches(rawCommand)) {
             campaignRecoveryCommands.execute(sender, rawCommand);
             return true;
@@ -73,6 +79,8 @@ public final class OverworldVillageSafety implements Listener {
     }
 
     public List<String> templateUtilityCompletions(String rawCommand) {
+        List<String> terrain = terrainBlendCommands.completions(rawCommand);
+        if (!terrain.isEmpty()) return terrain;
         List<String> campaign = campaignRecoveryCommands.completions(rawCommand);
         if (!campaign.isEmpty()) return campaign;
         List<String> recovery = recoveryCommands.completions(rawCommand);
@@ -109,6 +117,11 @@ public final class OverworldVillageSafety implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onTabComplete(TabCompleteEvent event) {
+        var terrainCompletions = terrainBlendCommands.completions(event.getBuffer());
+        if (!terrainCompletions.isEmpty()) {
+            event.setCompletions(terrainCompletions);
+            return;
+        }
         var campaignRecoveryCompletions = campaignRecoveryCommands.completions(event.getBuffer());
         if (!campaignRecoveryCompletions.isEmpty()) {
             event.setCompletions(campaignRecoveryCompletions);
@@ -133,6 +146,7 @@ public final class OverworldVillageSafety implements Listener {
         islandLoreDecorator.onWorldUnload(event.getWorld());
         recoveryCommands.onWorldUnload(event.getWorld());
         campaignRecoveryCommands.onWorldUnload(event.getWorld());
+        terrainBlendCommands.onWorldUnload(event.getWorld());
     }
 
     private void maintenanceTick() {

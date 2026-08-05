@@ -123,7 +123,7 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                     }
                     if (args[1].equalsIgnoreCase("overworld")) {
                         return filter(Arrays.asList("generate", "resume", "status", "audit",
-                                "revisions", "commit", "snapshot", "village", "recover", "decorate",
+                                "revisions", "commit", "snapshot", "village", "recover", "decorate", "terrain",
                                 "promote", "rollback", "force-stage", "cancel", "reset", "tp",
                                 "lootr", "testboss"), args[2]);
                     }
@@ -607,7 +607,7 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                 }
                 if (args.length < 3) {
                     sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo template <overworld|nether|end|all> "
-                            + "<generate|resume|status|audit|revisions|commit|snapshot|village|recover|decorate|promote|rollback|force-stage|cancel|reset|tp> [opción]");
+                            + "<generate|resume|status|audit|revisions|commit|snapshot|village|recover|decorate|terrain|promote|rollback|force-stage|cancel|reset|tp> [opción]");
                     return true;
                 }
 
