@@ -7,6 +7,9 @@ on:
       - build/1.48.33-safe-recovery-snapshots
     paths:
       - '.github/workflows/build-1.48.33.yml'
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -43,6 +46,7 @@ jobs:
           grep -q 'recoveryCommands.matches' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
 
       - name: Guardar fuente 1.48.33 en la rama
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
