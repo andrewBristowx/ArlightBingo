@@ -1,5 +1,6 @@
 package com.arlight.bingo.commands;
 
+import com.arlight.bingo.util.CampaignItemBridge;
 import com.arlight.bingo.game.BingoGame;
 import com.arlight.bingo.game.BingoGoal;
 import com.arlight.bingo.game.BingoTeam;
@@ -741,7 +742,7 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo campaign <status|giveigneous|unlocknether|givedragon|opengolem|summondragon|tp|tpnether|tpend|survival|somita> [etapa]");
+                    sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo campaign <status|givemedals|givepedestals|giveigneous|unlocknether|givedragon|opengolem|summondragon|tp|tpnether|tpend|survival|somita> [etapa]");
                     return true;
                 }
 
@@ -827,6 +828,20 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
 
                 boolean success;
                 switch (action) {
+                    case "givemedals" -> {
+                        CampaignItemBridge.give(player, CampaignItemBridge.MOSSBOUND_HOME_MEDAL);
+                        CampaignItemBridge.give(player, CampaignItemBridge.GILDED_TRADE_MEDAL);
+                        CampaignItemBridge.give(player, CampaignItemBridge.EMERALD_BASTION_MEDAL);
+                        player.sendMessage(ChatColor.GREEN + "Recibiste las tres medallas de prueba.");
+                        success = true;
+                    }
+                    case "givepedestals" -> {
+                        CampaignItemBridge.give(player, CampaignItemBridge.HOME_MEDAL_PEDESTAL);
+                        CampaignItemBridge.give(player, CampaignItemBridge.TRADE_MEDAL_PEDESTAL);
+                        CampaignItemBridge.give(player, CampaignItemBridge.BASTION_MEDAL_PEDESTAL);
+                        player.sendMessage(ChatColor.GREEN + "Recibiste los tres pedestales GeckoLib.");
+                        success = true;
+                    }
                     case "giveigneous" -> success = dimensions != null && dimensions.debugGiveIgneousKey(player);
                     case "unlocknether" -> success = dimensions != null && dimensions.debugUnlockNetherGate(player);
                     case "givedragon" -> success = end != null && end.debugGiveDragonKey(player);

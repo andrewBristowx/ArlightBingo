@@ -1,7 +1,7 @@
 package com.arlight.bingo.listeners;
 
 import com.arlight.bingo.BingoPlugin;
-import com.arlight.bingo.util.CampaignMissionItems;
+import com.arlight.bingo.util.CampaignItemBridge;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -14,7 +14,6 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.ItemStack;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -23,7 +22,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,15 +49,18 @@ public final class OverworldCampaignLandscape148 {
     private final Set<UUID> activeBuilds = new HashSet<>();
     private final Set<UUID> dormantBossNotices = new HashSet<>();
     private final Map<UUID, Layout> layouts = new HashMap<>();
+    private final OverworldMedalRitual medalRitual;
 
     public OverworldCampaignLandscape148(BingoPlugin plugin) {
         this.plugin = plugin;
+        this.medalRitual = new OverworldMedalRitual(plugin, this::completeMedalRitual);
     }
 
     public void tick() {
         for (World world : Bukkit.getWorlds()) {
             startIfEligible(world);
             maintainGate(world);
+            maintainMedalRitual(world);
             maintainRitualBoss(world);
         }
     }
@@ -69,6 +70,7 @@ public final class OverworldCampaignLandscape148 {
         activeBuilds.remove(world.getUID());
         dormantBossNotices.remove(world.getUID());
         layouts.remove(world.getUID());
+        medalRitual.onWorldUnload(world);
     }
 
     public void handleInteraction(PlayerInteractEvent event) {
@@ -77,6 +79,7 @@ public final class OverworldCampaignLandscape148 {
         World world = event.getClickedBlock().getWorld();
         Layout layout = loadLayout(world);
         if (layout == null) return;
+        if (medalRitual.handle(event, layout)) return;
         Location clicked = event.getClickedBlock().getLocation();
         if (near(clicked, layout.outerAltar(), 2.25D)) {
             event.setCancelled(true);
@@ -93,30 +96,16 @@ public final class OverworldCampaignLandscape148 {
             player.sendMessage(ChatColor.GREEN + "La puerta ritual ya está abierta. Entra y activa el altar central.");
             return;
         }
-        List<String> missing = missingItems(world);
+        List<String> missing = medalRitual.missing(world);
         if (!missing.isEmpty()) {
             player.sendTitle(ChatColor.DARK_GREEN + "Puerta sellada",
                     ChatColor.GRAY + "Faltan " + String.join(", ", missing), 5, 55, 10);
             player.sendMessage(ChatColor.YELLOW
-                    + "Libera los tres asentamientos y trae sus piezas a los pedestales.");
+                    + "Coloca cada medalla en su pedestal GeckoLib correspondiente.");
             player.playSound(player.getLocation(), Sound.BLOCK_RESPAWN_ANCHOR_DEPLETE,
                     0.9F, 0.72F);
-            return;
-        }
-
-        consume(world, CampaignMissionItems.HOME_EMBLEM);
-        consume(world, CampaignMissionItems.TRADE_EMBLEM);
-        consume(world, CampaignMissionItems.EMERALD_CORE);
-        openGate(world, layout);
-        writeMarker(marker, player, "gate");
-        for (Player online : world.getPlayers()) {
-            online.sendTitle(ChatColor.GOLD + "Las tres piezas encajan",
-                    ChatColor.GREEN + "La puerta de la arena se ha abierto", 10, 70, 20);
-            online.sendMessage(ChatColor.GREEN + "[Bingo] La entrada quedó libre. "
-                    + ChatColor.WHITE + "El Guardián aún debe ser invocado desde el altar central.");
-            online.playSound(online.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.1F, 0.75F);
-            online.spawnParticle(Particle.TOTEM_OF_UNDYING,
-                    online.getLocation().add(0, 1.2D, 0), 42, 0.8D, 0.8D, 0.8D, 0.04D);
+        } else {
+            player.sendMessage(ChatColor.GOLD + "Las tres medallas están colocadas. El mecanismo está terminando de abrirse.");
         }
     }
 
@@ -134,9 +123,7 @@ public final class OverworldCampaignLandscape148 {
         }
         writeMarker(awakened, player, "boss");
         awakenRitualBoss(world, layout);
-        world.getBlockAt(layout.invocationAltar().getBlockX(),
-                layout.invocationAltar().getBlockY(),
-                layout.invocationAltar().getBlockZ()).setType(Material.BEACON, false);
+        CampaignItemBridge.animateCorruptedAltar(layout.invocationAltar());
         for (Player online : world.getPlayers()) {
             online.sendTitle(ChatColor.DARK_GREEN + "El Guardián despierta",
                     ChatColor.GOLD + "La corrupción responde al altar", 10, 75, 20);
@@ -205,6 +192,7 @@ public final class OverworldCampaignLandscape148 {
                     StandardOpenOption.TRUNCATE_EXISTING);
             Files.deleteIfExists(folder.resolve(GATE_OPEN_MARKER));
             Files.deleteIfExists(folder.resolve(BOSS_AWAKENED_MARKER));
+            Files.deleteIfExists(folder.resolve(OverworldMedalRitual.MARKER_FILE));
             if (!Files.isRegularFile(pendingMarker)) {
                 Files.move(baseMarker, pendingMarker, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -281,57 +269,75 @@ public final class OverworldCampaignLandscape148 {
         Layout known = layouts.get(world.getUID());
         if (known != null) return known;
         Path file = world.getWorldFolder().toPath().resolve(LAYOUT_MARKER);
-        if (!Files.isRegularFile(file)) return null;
         try {
-            Properties p = read(file);
-            Layout layout = new Layout(required(world, p, "village"),
-                    required(world, p, "residential"), required(world, p, "commercial"),
-                    required(world, p, "military"), required(world, p, "citadel"),
-                    required(world, p, "boss"), required(world, p, "portal"),
-                    required(world, p, "outerAltar"), required(world, p, "invocationAltar"),
-                    required(world, p, "ritualGate"));
+            Layout layout;
+            if (Files.isRegularFile(file)) {
+                Properties p = read(file);
+                layout = new Layout(required(world, p, "village"),
+                        required(world, p, "residential"), required(world, p, "commercial"),
+                        required(world, p, "military"), required(world, p, "citadel"),
+                        required(world, p, "boss"), required(world, p, "portal"),
+                        required(world, p, "outerAltar"), required(world, p, "invocationAltar"),
+                        required(world, p, "ritualGate"));
+            } else {
+                layout = fallbackLayout(world);
+                if (layout == null) return null;
+            }
             layouts.put(world.getUID(), layout);
             return layout;
         } catch (IOException | IllegalArgumentException exception) {
-            plugin.getLogger().warning("No se pudo leer el diseño 1.48.28 en "
+            plugin.getLogger().warning("No se pudo leer el diseño ritual en "
                     + world.getName() + ": " + exception.getMessage());
             return null;
         }
     }
 
-    private List<String> missingItems(World world) {
-        List<String> missing = new ArrayList<>();
-        if (!has(world, CampaignMissionItems.HOME_EMBLEM)) missing.add("Emblema del Hogar");
-        if (!has(world, CampaignMissionItems.TRADE_EMBLEM)) missing.add("Emblema del Comercio");
-        if (!has(world, CampaignMissionItems.EMERALD_CORE)) missing.add("Núcleo Esmeralda");
-        return missing;
+    private Layout fallbackLayout(World world) throws IOException {
+        Path marker = world.getWorldFolder().toPath().resolve(TEMPLATE_MARKER);
+        if (!Files.isRegularFile(marker)) return null;
+        Properties p = read(marker);
+        Location village = required(world, p, "village");
+        Location boss = required(world, p, "boss");
+        Location portal = required(world, p, "portal");
+        int citadelX = plugin.getConfig().getInt(
+                "template-worlds.overworld.campaign-layout-1-48.citadel-x", 140);
+        int citadelZ = plugin.getConfig().getInt(
+                "template-worlds.overworld.campaign-layout-1-48.citadel-z", 30);
+        Location citadel = surface(world, citadelX, citadelZ);
+        Location residential = surface(world, citadelX - 170, citadelZ + 100);
+        Location commercial = surface(world, citadelX, citadelZ - 190);
+        Location military = surface(world, citadelX + 170, citadelZ + 80);
+        Location gate = new Location(world, boss.getBlockX(), boss.getBlockY(), boss.getBlockZ() - 50);
+        Location outer = surface(world, boss.getBlockX(), boss.getBlockZ() - 64);
+        return new Layout(village, residential, commercial, military, citadel, boss, portal,
+                outer, boss.clone(), gate);
     }
 
-    private boolean has(World world, String id) {
-        for (Player player : world.getPlayers()) {
-            if (CampaignMissionItems.has(player, plugin, id)) return true;
-        }
-        return false;
+    private Location surface(World world, int x, int z) {
+        return new Location(world, x, world.getHighestBlockYAt(x, z) + 1, z);
     }
 
-    private void consume(World world, String id) {
-        for (Player player : world.getPlayers()) {
-            ItemStack[] contents = player.getInventory().getContents();
-            for (int slot = 0; slot < contents.length; slot++) {
-                ItemStack stack = contents[slot];
-                if (!CampaignMissionItems.is(plugin, stack, id)) continue;
-                if (stack.getAmount() <= 1) player.getInventory().setItem(slot, null);
-                else stack.setAmount(stack.getAmount() - 1);
-                player.updateInventory();
-                return;
-            }
-            ItemStack offhand = player.getInventory().getItemInOffHand();
-            if (CampaignMissionItems.is(plugin, offhand, id)) {
-                if (offhand.getAmount() <= 1) player.getInventory().setItemInOffHand(null);
-                else offhand.setAmount(offhand.getAmount() - 1);
-                player.updateInventory();
-                return;
-            }
+    private void maintainMedalRitual(World world) {
+        Layout layout = loadLayout(world);
+        if (layout == null) return;
+        boolean gateOpen = Files.isRegularFile(
+                world.getWorldFolder().toPath().resolve(GATE_OPEN_MARKER));
+        medalRitual.maintain(world, layout, gateOpen);
+    }
+
+    private void completeMedalRitual(World world, Layout layout, Player activator) {
+        Path marker = world.getWorldFolder().toPath().resolve(GATE_OPEN_MARKER);
+        if (Files.isRegularFile(marker)) return;
+        openGate(world, layout);
+        writeMarker(marker, activator, "three-medals");
+        for (Player online : world.getPlayers()) {
+            online.sendTitle(ChatColor.GOLD + "Las tres medallas resonaron",
+                    ChatColor.GREEN + "La puerta del Guardián se ha abierto", 10, 75, 20);
+            online.sendMessage(ChatColor.GREEN + "[Bingo] El sello exterior fue destruido. "
+                    + ChatColor.WHITE + "El Guardián aún debe ser invocado desde el altar central.");
+            online.playSound(online.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.1F, 0.75F);
+            online.spawnParticle(Particle.TOTEM_OF_UNDYING,
+                    online.getLocation().add(0, 1.2D, 0), 42, 0.8D, 0.8D, 0.8D, 0.04D);
         }
     }
 
@@ -405,9 +411,6 @@ public final class OverworldCampaignLandscape148 {
                 world.getBlockAt(gx + x, gy + y, gz).setType(Material.AIR, false);
             }
         }
-        world.getBlockAt(layout.outerAltar().getBlockX(),
-                layout.outerAltar().getBlockY() + 4,
-                layout.outerAltar().getBlockZ()).setType(Material.BEACON, false);
         world.playSound(layout.outerAltar(), Sound.BLOCK_BEACON_ACTIVATE, 1.2F, 0.78F);
         world.spawnParticle(Particle.END_ROD,
                 layout.ritualGate().clone().add(0.5D, 5.0D, 0.5D),
@@ -417,7 +420,8 @@ public final class OverworldCampaignLandscape148 {
     private void writeMarker(Path marker, Player player, String stage) {
         try {
             Files.writeString(marker,
-                    "version=1.48.28\nstage=" + stage + "\nplayer=" + player.getUniqueId()
+                    "version=1.48.42\nstage=" + stage + "\nplayer="
+                            + (player == null ? "system" : player.getUniqueId())
                             + "\ntime=" + System.currentTimeMillis() + "\n",
                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING);
