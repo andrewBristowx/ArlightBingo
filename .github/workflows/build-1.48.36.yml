@@ -8,6 +8,12 @@ on:
     paths:
       - '.github/workflows/build-1.48.36.yml'
       - '.github/import/14836-direct-dispatch.patch'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/build-1.48.36.yml'
+      - '.github/import/14836-direct-dispatch.patch'
 
 permissions:
   contents: write
@@ -44,6 +50,7 @@ jobs:
           grep -q 'dispatchOverworldTemplateUtility(sender' src/main/java/com/arlight/bingo/commands/BingoCommand.java
 
       - name: Guardar fuente corregida en la rama
+        if: github.event_name != 'pull_request'
         shell: bash
         run: |
           set -euo pipefail
