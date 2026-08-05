@@ -24,7 +24,10 @@ import com.arlight.bingo.listeners.OverworldVillageSafety;
 import com.arlight.bingo.template.OverworldTemplateManager;
 import com.arlight.bingo.template.NetherTemplateManager;
 import com.arlight.bingo.template.EndTemplateManager;
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.List;
 
 public class BingoPlugin extends JavaPlugin {
 
@@ -42,8 +45,20 @@ public class BingoPlugin extends JavaPlugin {
     private NetherTemplateManager netherTemplateManager;
     private EndTemplateManager endTemplateManager;
     private SomitaGuideNetwork somitaGuideNetwork;
+    private OverworldVillageSafety overworldVillageSafety;
 
     public WorldPoolManager getWorldPoolManager() { return worldPoolManager; }
+
+    public boolean dispatchOverworldTemplateUtility(CommandSender sender, String rawCommand) {
+        return overworldVillageSafety != null
+                && overworldVillageSafety.dispatchTemplateUtility(sender, rawCommand);
+    }
+
+    public List<String> completeOverworldTemplateUtility(String rawCommand) {
+        return overworldVillageSafety == null
+                ? List.of()
+                : overworldVillageSafety.templateUtilityCompletions(rawCommand);
+    }
 
     @Override
     public void onEnable() {
@@ -76,7 +91,8 @@ public class BingoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(overworldTemplateManager, this);
         getServer().getPluginManager().registerEvents(netherTemplateManager, this);
         getServer().getPluginManager().registerEvents(endTemplateManager, this);
-        getServer().getPluginManager().registerEvents(new OverworldVillageSafety(this), this);
+        this.overworldVillageSafety = new OverworldVillageSafety(this);
+        getServer().getPluginManager().registerEvents(overworldVillageSafety, this);
         overworldTemplateManager.resumeIfNeeded();
         netherTemplateManager.resumeIfNeeded();
         endTemplateManager.resumeIfNeeded();

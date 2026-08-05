@@ -3,6 +3,7 @@ package com.arlight.bingo.listeners;
 import com.arlight.bingo.BingoPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Monster;
 import org.bukkit.event.EventHandler;
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
@@ -54,6 +56,31 @@ public final class OverworldVillageSafety implements Listener {
         Bukkit.getScheduler().runTaskTimer(plugin, this::maintenanceTick, interval, interval);
     }
 
+    public boolean dispatchTemplateUtility(CommandSender sender, String rawCommand) {
+        if (campaignRecoveryCommands.matches(rawCommand)) {
+            campaignRecoveryCommands.execute(sender, rawCommand);
+            return true;
+        }
+        if (recoveryCommands.matches(rawCommand)) {
+            recoveryCommands.execute(sender, rawCommand);
+            return true;
+        }
+        if (islandLoreDecorator.matches(rawCommand)) {
+            islandLoreDecorator.execute(sender, rawCommand);
+            return true;
+        }
+        return false;
+    }
+
+    public List<String> templateUtilityCompletions(String rawCommand) {
+        List<String> campaign = campaignRecoveryCommands.completions(rawCommand);
+        if (!campaign.isEmpty()) return campaign;
+        List<String> recovery = recoveryCommands.completions(rawCommand);
+        if (!recovery.isEmpty()) return recovery;
+        List<String> decoration = islandLoreDecorator.completions(rawCommand);
+        return decoration == null ? List.of() : decoration;
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCreatureSpawn(CreatureSpawnEvent event) {
         if (!(event.getEntity() instanceof Monster)) return;
@@ -70,36 +97,14 @@ public final class OverworldVillageSafety implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
-        if (campaignRecoveryCommands.matches(event.getMessage())) {
-            event.setCancelled(true);
-            campaignRecoveryCommands.execute(event.getPlayer(), event.getMessage());
-            return;
-        }
-        if (recoveryCommands.matches(event.getMessage())) {
-            event.setCancelled(true);
-            recoveryCommands.execute(event.getPlayer(), event.getMessage());
-            return;
-        }
-        if (!islandLoreDecorator.matches(event.getMessage())) return;
+        if (!dispatchTemplateUtility(event.getPlayer(), event.getMessage())) return;
         event.setCancelled(true);
-        islandLoreDecorator.execute(event.getPlayer(), event.getMessage());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onServerCommand(ServerCommandEvent event) {
-        if (campaignRecoveryCommands.matches(event.getCommand())) {
-            event.setCancelled(true);
-            campaignRecoveryCommands.execute(event.getSender(), event.getCommand());
-            return;
-        }
-        if (recoveryCommands.matches(event.getCommand())) {
-            event.setCancelled(true);
-            recoveryCommands.execute(event.getSender(), event.getCommand());
-            return;
-        }
-        if (!islandLoreDecorator.matches(event.getCommand())) return;
+        if (!dispatchTemplateUtility(event.getSender(), event.getCommand())) return;
         event.setCancelled(true);
-        islandLoreDecorator.execute(event.getSender(), event.getCommand());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)

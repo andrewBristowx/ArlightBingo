@@ -55,6 +55,14 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
 
         String sub = args[0].toLowerCase();
 
+        if (sub.equals("template") && args.length >= 3
+                && args[1].equalsIgnoreCase("overworld")
+                && plugin instanceof BingoPlugin bingoPlugin) {
+            String rawUtilityCommand = "bingo " + String.join(" ", args);
+            List<String> utilityCompletions = bingoPlugin.completeOverworldTemplateUtility(rawUtilityCommand);
+            if (!utilityCompletions.isEmpty()) return utilityCompletions;
+        }
+
         if (args.length == 2) {
             switch (sub) {
                 case "world":
@@ -115,8 +123,9 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                     }
                     if (args[1].equalsIgnoreCase("overworld")) {
                         return filter(Arrays.asList("generate", "resume", "status", "audit",
-                                "revisions", "promote", "rollback", "force-stage",
-                                "cancel", "reset", "tp", "lootr", "testboss"), args[2]);
+                                "revisions", "commit", "snapshot", "village", "recover", "decorate",
+                                "promote", "rollback", "force-stage", "cancel", "reset", "tp",
+                                "lootr", "testboss"), args[2]);
                     }
                     if (Arrays.asList("nether", "end").contains(args[1].toLowerCase())) {
                         return filter(Arrays.asList("generate", "resume", "status", "audit",
@@ -598,7 +607,7 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                 }
                 if (args.length < 3) {
                     sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo template <overworld|nether|end|all> "
-                            + "<generate|resume|status|audit|revisions|commit|promote|rollback|force-stage|cancel|reset|tp> [revisión]");
+                            + "<generate|resume|status|audit|revisions|commit|snapshot|village|recover|decorate|promote|rollback|force-stage|cancel|reset|tp> [opción]");
                     return true;
                 }
 
@@ -627,6 +636,10 @@ public class BingoCommand implements CommandExecutor, TabCompleter {
                 }
 
                 if (dimension.equals("overworld")) {
+                    String rawUtilityCommand = "bingo " + String.join(" ", args);
+                    if (bingoPlugin.dispatchOverworldTemplateUtility(sender, rawUtilityCommand)) {
+                        return true;
+                    }
                     var templates = bingoPlugin.getOverworldTemplateManager();
                     switch (action) {
                         case "generate" -> {

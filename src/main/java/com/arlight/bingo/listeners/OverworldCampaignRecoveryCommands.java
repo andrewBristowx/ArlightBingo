@@ -134,7 +134,7 @@ final class OverworldCampaignRecoveryCommands {
             return;
         }
         RecoveryPlan plan = plan(world, category);
-        sender.sendMessage(ChatColor.AQUA + "=== Recuperación estructural Overworld 1.48.34 ===");
+        sender.sendMessage(ChatColor.AQUA + "=== Recuperación estructural Overworld 1.48.36 ===");
         sender.sendMessage(ChatColor.GRAY + "- categoría=" + ChatColor.WHITE + category);
         sender.sendMessage(ChatColor.GRAY + "- operaciones=" + ChatColor.WHITE + plan.edits().size());
         sender.sendMessage(ChatColor.GRAY + "- reconstruye=" + ChatColor.WHITE
@@ -387,7 +387,7 @@ final class OverworldCampaignRecoveryCommands {
     private void writeRecoveryMarkers(World world, String category, String snapshot,
                                       List<String> categories) {
         Path folder = world.getWorldFolder().toPath();
-        String text = "version=1.48.34\n"
+        String text = "version=1.48.36\n"
                 + "recoveredAt=" + System.currentTimeMillis() + "\n"
                 + "category=" + category + "\n"
                 + "components=" + String.join(",", categories) + "\n"
