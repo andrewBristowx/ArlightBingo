@@ -1,0 +1,7 @@
+PRUEBA 1.48.18
+
+1. Apaga el servidor y cambia el JAR.
+2. Regenera solamente Overworld.
+3. Revisa boss-portal-north-rim, puerta norte, patio interior y corredores de torres.
+4. Ejecuta /bingo template overworld audit.
+5. Conserva 1.48.17 para rollback.

@@ -1,0 +1,10 @@
+ArlightBingo 1.48.17 - reparación enfocada de rutas y terreno
+
+- Repara solamente los segmentos concretos reportados por el auditor.
+- Usa tres estrategias progresivas: despeje puntual, soporte del segmento y corredor ampliado.
+- Elimina el suavizado global del terreno cuando el único fallo es un camino.
+- Añade hombros y soportes únicamente alrededor de los cortes detectados.
+- Mejora las cimentaciones visibles de casas colocadas en laderas pronunciadas.
+- Añade muros de contención al acceso norte del boss sin aplanar toda la montaña.
+- Ocupa mejor el patio de la ciudadela sin bloquear el corredor principal.
+- Conserva snapshot, rollback, memoria de fallos y reparación regional.

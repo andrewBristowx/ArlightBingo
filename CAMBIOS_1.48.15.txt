@@ -1,0 +1,8 @@
+ARLIGHTBINGO 1.48.15 - AUDITORÍA CRÍTICA SIN FALSOS BLOQUEOS
+
+- Conserva la corrección multirruta de 1.48.14 para intersecciones y calles en L.
+- Las rutas críticas del boss, portal y ciudadelas siguen bloqueando READY si están físicamente cortadas.
+- Las calles locales y caminos privados se registran como advertencias visuales en vez de rechazar toda la plantilla por bancos, faroles, puertas o decoraciones laterales.
+- La entrada ritual continúa siendo crítica y se valida contra boss-north-approach.
+- No vuelve a reproducir calles locales ni caminos de casas después de construir edificios.
+- El resto de auditorías estructurales (casas, murallas, chimeneas, descansillos, terreno y mobiliario) siguen siendo obligatorias.

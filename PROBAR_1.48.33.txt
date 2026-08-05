@@ -1,0 +1,20 @@
+PRUEBA ARLIGHTBINGO 1.48.33
+
+1. Reemplazar el JAR y reiniciar el servidor.
+2. Entrar a la plantilla:
+   /bingo template overworld tp
+3. Ver la previsualización del pueblo:
+   /bingo template overworld village preview
+4. Reconstruir el pueblo perdido:
+   /bingo template overworld village rebuild
+5. Consultar progreso:
+   /bingo template overworld village status
+6. Revisar visualmente el pueblo. El resto de la isla no debe cambiar.
+7. Guardar con snapshot automático:
+   /bingo template overworld commit
+8. Comprobar copias:
+   /bingo template overworld snapshot list
+9. Para restaurar una copia:
+   /bingo template overworld snapshot restore <nombre> confirm
+
+No uses generate, reset, resume ni force-stage para recuperar únicamente el pueblo.

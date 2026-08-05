@@ -1,0 +1,55 @@
+PRUEBA DE ARLIGHTBINGO 1.40.0
+
+1. RESPALDO Y REGISTRO
+
+- Instala 1.40.0 sin borrar la plantilla 1.39.1.
+- Reinicia completamente el servidor.
+- Ejecuta:
+  /bingo template overworld revisions
+  /bingo template overworld audit
+- La 1.39.1 debe aparecer como STABLE.
+
+2. CREAR REVISIÓN LIMPIA
+
+- Asegúrate de que nadie esté dentro de la plantilla.
+- Ejecuta:
+  /bingo template overworld generate r001-zone-a
+- Debe anunciar el nombre del respaldo estable.
+- Mientras genera, las partidas nuevas deben seguir usando el respaldo estable.
+- Si el servidor se reinicia después de Chunky:
+  /bingo template overworld resume
+
+3. REVISAR ZONA A
+
+- Espera estado READY.
+- Ejecuta:
+  /bingo template overworld tp
+- Revisa desde tierra y desde el aire:
+  * spawn fuera de la fuente;
+  * Somita única;
+  * cartógrafo visible;
+  * posada, archivo, taller, granero, almacén y casas con interiores;
+  * huertos, mercado, iluminación y caminos;
+  * cimientos hasta terreno sólido;
+  * árboles/terreno sin atravesar edificios;
+  * salida clara hacia la futura Zona B.
+
+4. AUDITAR Y PROMOVER
+
+- Ejecuta:
+  /bingo template overworld audit
+- Debe mostrar zoneAStatus=complete, revisión READY y retención 3.
+- Si la revisión fue aprobada:
+  /bingo template overworld promote r001-zone-a
+- Crea una arena nueva; debe copiar r001-zone-a.
+
+5. ROLLBACK
+
+- Consulta el ID anterior:
+  /bingo template overworld revisions
+- Ejecuta:
+  /bingo template overworld rollback <revision-anterior>
+- La siguiente arena debe volver a copiar la versión anterior.
+
+No uses reset sobre una revisión promovida. El comando está protegido y solo
+descarta la revisión de trabajo actual.

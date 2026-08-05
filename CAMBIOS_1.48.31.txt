@@ -1,0 +1,24 @@
+ArlightBingo 1.48.31 ISLAND-DECORATOR-COMMAND
+
+Cambios principales
+- Añadido el comando seguro de decoración de la revisión Overworld:
+  /bingo template overworld decorate preview
+  /bingo template overworld decorate apply
+  /bingo template overworld decorate force
+  /bingo template overworld decorate status
+  /bingo template overworld decorate cancel
+- El decorador solo trabaja sobre una revisión de trabajo; no modifica directamente la plantilla estable.
+- Añade un puerto costero con muelles, almacén de pescadores, iluminación, cajas, barriles y una embarcación decorativa.
+- Añade arboledas, helechos, azaleas, campamentos y vegetación exterior en zonas naturales.
+- Añade frentes de corrosión de esmeralda musgosa, cristales, árboles marchitos y manchas de musgo alrededor de distritos y ciudadela.
+- La colocación usa reglas protegidas: solo reemplaza aire, agua, plantas o terreno natural y evita sobrescribir bloques de edificios.
+- Guarda un marcador arlight-overworld-decoration.properties para impedir aplicar accidentalmente dos veces la misma revisión decorativa.
+- Se conserva el comando /bingo template overworld commit para guardar la revisión exactamente como quede editada.
+
+Flujo recomendado
+1. /bingo template overworld decorate preview
+2. /bingo template overworld decorate apply
+3. Revisar la isla.
+4. /bingo template overworld commit
+5. /bingo template overworld audit
+6. /bingo template overworld promote <revision>

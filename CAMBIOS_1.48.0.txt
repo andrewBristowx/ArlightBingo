@@ -1,0 +1,20 @@
+ArlightBingo 1.48.0 - VILLAGE-STRUCTURAL-REPAIR
+
+- Parte de la candidata compilada 1.47.0 y conserva campaña, tres piezas, altar exterior,
+  invocación interior, Lootr, spawners, zona segura y bloqueo de estructuras externas.
+- Elimina todos los cultivos y huertos estampados del pueblo y del asentamiento residencial.
+- Sustituye esas parcelas por corrales, granero, patios de trabajo y campamentos ocupados.
+- Mantiene una paleta medieval común de madera oscura, piedra envejecida y revoco neutro.
+- Cierra por completo faldones, cumbreras y frontones de todos los edificios generados.
+- Añade siluetas distintas mediante porches, balcones, talleres, aleros y funciones interiores.
+- Genera terreno y carreteras antes que edificios; ninguna ruta calcula altura sobre un tejado.
+- Conecta cada puerta a una calle real; la auditoría rechaza los senderos privados que terminan
+  unos bloques después de la fachada sin alcanzar la red pública.
+- Retira la torre comercial sin función, muros civiles aislados y la puerta runtime verde.
+- Reemplaza la costa semicircular artificial por suavizado adaptativo limitado a la orilla.
+- Refuerza ciudadela y santuario con cimientos profundos, contrafuertes y apoyos reales.
+- Rehace la fuente como un vaso cerrado, simétrico, iluminado y separado de la campana.
+- Coloca la corrupción en campamentos y objetivos, no repartida uniformemente por la isla.
+- La arena aprobada conserva su forma y la ruta al portal la rodea sin perforar sus muros.
+- La auditoría impide marcar READY con techos abiertos, casas superpuestas, caminos cortados,
+  cultivos, faroles sin soporte, fuente rota, acceso ritual enterrado o cimientos flotantes.

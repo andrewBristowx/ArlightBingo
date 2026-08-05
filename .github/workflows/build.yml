@@ -1,8 +1,10 @@
-name: Compilar ArlightBingo
+name: Compilar ArlightBingo 1.48.31
 
 on:
   workflow_dispatch:
   push:
+    branches:
+      - build/1.48.31-island-decorator
     paths:
       - '.github/workflows/build.yml'
 
@@ -23,13 +25,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .github/run-info
-          printf '%s\n' "$GITHUB_RUN_ID" > .github/run-info/LAST_RUN_ID.txt
+          printf '%s\n' "$GITHUB_RUN_ID" > .github/run-info/LAST_RUN_ID_14831.txt
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add .github/run-info/LAST_RUN_ID.txt
+          git add .github/run-info/LAST_RUN_ID_14831.txt
           if ! git diff --cached --quiet; then
-            git commit -m "Registrar build ${GITHUB_RUN_ID}"
-            git push origin HEAD:main
+            git commit -m "Registrar build 1.48.31 ${GITHUB_RUN_ID}"
+            git push origin HEAD:build/1.48.31-island-decorator
           fi
 
       - name: Configurar Java 21
@@ -46,22 +48,72 @@ jobs:
           git clone --depth 1 https://github.com/andrewBristowx/ArlightCore.git /tmp/ArlightCore
           mvn -B -U -DskipTests -f /tmp/ArlightCore/pom.xml clean install
 
+      - name: Descargar fuente ArlightBingo 1.48.31
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE_ID='17gIqAAUlJHuSEw8NM5lizKCwKZXlWiJm'
+          curl -L --fail --retry 3 \
+            "https://drive.usercontent.google.com/download?id=${FILE_ID}&export=download&confirm=t" \
+            -o /tmp/ArlightBingo-1.48.31-source.zip
+          unzip -t /tmp/ArlightBingo-1.48.31-source.zip
+          rm -rf /tmp/ArlightBingo-1.48.31-source
+          mkdir -p /tmp/ArlightBingo-1.48.31-source
+          unzip -q /tmp/ArlightBingo-1.48.31-source.zip -d /tmp/ArlightBingo-1.48.31-source
+
+      - name: Localizar proyecto Maven
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          POM="$(find /tmp/ArlightBingo-1.48.31-source -maxdepth 5 -type f -name pom.xml | head -n 1)"
+          if [ -z "$POM" ]; then
+            echo 'No se encontró pom.xml dentro del ZIP.' >&2
+            exit 1
+          fi
+          ROOT="$(dirname "$POM")"
+          grep -q '<version>1.48.31</version>' "$POM"
+          echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+          echo "Proyecto: $ROOT"
+
+      - name: Importar fuente completa a la rama
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="${{ steps.source.outputs.root }}"
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            "$ROOT/" ./
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m 'Importar fuente ArlightBingo 1.48.31'
+            git push origin HEAD:build/1.48.31-island-decorator
+          fi
+
       - name: Compilar con Maven
-        run: mvn -B -U -DskipTests clean package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -U -DskipTests clean package
 
       - name: Reunir JAR
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' -exec cp {} dist/ \;
+          find target -maxdepth 1 -type f -name '*.jar' \
+            ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' \
+            -exec cp {} dist/ \;
           test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
           ls -lh dist
 
       - name: Subir JAR compilado
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.39.1-JAR
+          name: ArlightBingo-1.48.31-JAR
           path: dist/*.jar
           if-no-files-found: error
           retention-days: 30
