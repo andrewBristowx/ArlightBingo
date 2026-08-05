@@ -39,6 +39,7 @@ public final class OverworldVillageSafety implements Listener {
     private final OverworldCampaignLandscape148 campaignLayout;
     private final OverworldIslandLoreDecorator islandLoreDecorator;
     private final OverworldTemplateRecoveryCommands recoveryCommands;
+    private final OverworldCampaignRecoveryCommands campaignRecoveryCommands;
     private final Map<UUID, SafeZone> zones = new HashMap<>();
     private final Map<UUID, Long> retryAfter = new HashMap<>();
 
@@ -47,6 +48,7 @@ public final class OverworldVillageSafety implements Listener {
         this.campaignLayout = new OverworldCampaignLandscape148(plugin);
         this.islandLoreDecorator = new OverworldIslandLoreDecorator(plugin);
         this.recoveryCommands = new OverworldTemplateRecoveryCommands(plugin);
+        this.campaignRecoveryCommands = new OverworldCampaignRecoveryCommands(plugin);
         long interval = Math.max(20L, plugin.getConfig().getLong(
                 "template-worlds.overworld.safe-village.purge-interval-ticks", 40L));
         Bukkit.getScheduler().runTaskTimer(plugin, this::maintenanceTick, interval, interval);
@@ -68,6 +70,11 @@ public final class OverworldVillageSafety implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerCommand(PlayerCommandPreprocessEvent event) {
+        if (campaignRecoveryCommands.matches(event.getMessage())) {
+            event.setCancelled(true);
+            campaignRecoveryCommands.execute(event.getPlayer(), event.getMessage());
+            return;
+        }
         if (recoveryCommands.matches(event.getMessage())) {
             event.setCancelled(true);
             recoveryCommands.execute(event.getPlayer(), event.getMessage());
@@ -80,6 +87,11 @@ public final class OverworldVillageSafety implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onServerCommand(ServerCommandEvent event) {
+        if (campaignRecoveryCommands.matches(event.getCommand())) {
+            event.setCancelled(true);
+            campaignRecoveryCommands.execute(event.getSender(), event.getCommand());
+            return;
+        }
         if (recoveryCommands.matches(event.getCommand())) {
             event.setCancelled(true);
             recoveryCommands.execute(event.getSender(), event.getCommand());
@@ -92,6 +104,11 @@ public final class OverworldVillageSafety implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onTabComplete(TabCompleteEvent event) {
+        var campaignRecoveryCompletions = campaignRecoveryCommands.completions(event.getBuffer());
+        if (!campaignRecoveryCompletions.isEmpty()) {
+            event.setCompletions(campaignRecoveryCompletions);
+            return;
+        }
         var recoveryCompletions = recoveryCommands.completions(event.getBuffer());
         if (!recoveryCompletions.isEmpty()) {
             event.setCompletions(recoveryCompletions);
@@ -110,6 +127,7 @@ public final class OverworldVillageSafety implements Listener {
         campaignLayout.onWorldUnload(event.getWorld());
         islandLoreDecorator.onWorldUnload(event.getWorld());
         recoveryCommands.onWorldUnload(event.getWorld());
+        campaignRecoveryCommands.onWorldUnload(event.getWorld());
     }
 
     private void maintenanceTick() {
