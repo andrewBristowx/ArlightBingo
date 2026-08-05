@@ -1,0 +1,39 @@
+ArlightBingo 1.40.0 - SAFE REVISIONS + OVERWORLD ZONE A
+
+BASE TÉCNICA SEGURA
+
+- Cada revisión del Overworld recibe un identificador inmutable.
+- La plantilla estable se descarga y archiva antes de crear el mundo limpio.
+- Una revisión nueva nunca se construye encima de la estable.
+- Las arenas continúan copiándose desde la estable archivada mientras la nueva
+  revisión está BUILDING o READY.
+- La nueva plantilla solo pasa a ser fuente de partidas después de audit + promote.
+- Rollback cambia el puntero estable sin reconstruir mundos.
+- Se conservan las tres revisiones más recientes.
+- Reset solo puede descartar una revisión de trabajo; nunca borra la estable.
+- Resume solo continúa una revisión con marcador post-Chunky; no actualiza una
+  plantilla antigua automáticamente.
+
+ZONA A — ALDEA INICIAL
+
+- Mantiene la Somita nueva como guía personal, sin crear una segunda entidad.
+- Aldea irregular con plaza, campana, posada, archivo, herrería/taller,
+  granero, almacén, viviendas diferentes, mercado, huertos y habitantes.
+- Interiores funcionales y cofres con loot tables compatibles con Lootr.
+- Spawn seguro fuera de la fuente y cartógrafo visible junto a la campana.
+- Caminos y parcelas usan cimientos completos, contención y limpieza de volumen.
+- La salida principal señala físicamente la futura Zona B.
+
+COMANDOS
+
+- /bingo template overworld generate <revision>
+- /bingo template overworld resume
+- /bingo template overworld audit
+- /bingo template overworld revisions
+- /bingo template overworld promote <revision>
+- /bingo template overworld rollback <revision>
+- /bingo template overworld force-stage <revision> custom
+- /bingo template overworld reset
+
+Nether y End conservan en esta versión su generación de 1.39.1. Su rediseño
+visual se hará después de aprobar una partida completa del Overworld.

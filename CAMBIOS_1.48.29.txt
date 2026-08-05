@@ -1,0 +1,16 @@
+ArlightBingo 1.48.29 FORTRESS-CORRIDOR-TOWER-LANDING-FIX
+
+Cambios principales
+- Corregidas las posiciones reales de los cuatro corredores de sellado del castillo para que usen las puertas auténticas del norte, sur, oeste y este.
+- Reforzada la reconstrucción final de las transiciones de puerta del castillo: tramo más largo, más despeje vertical y ancho útil más estable.
+- Eliminado el banco central del santuario del portal que invadía el descansillo de las torres portal-north-gate-west y portal-north-gate-east.
+- Aumentado el despeje vertical de los descansillos de torres para evitar slabs u otros bloques residuales sobre la entrada.
+
+Errores objetivo
+- camino cortado en citadel-north-gate
+- camino cortado en citadel-south-approach
+- torre inaccesible por escalera en boss-gate-west
+- entradas enterradas o sin descansillo en portal-north-gate-west / east
+
+Notas
+- Esta revisión está preparada como fuente actualizada. En este entorno no hay Maven instalado, así que no pude generar el JAR compilado aquí.

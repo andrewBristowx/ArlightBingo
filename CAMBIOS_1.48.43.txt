@@ -1,0 +1,8 @@
+ArlightBingo 1.48.43 - MEDAL VISUAL AND GATE TEST
+
+- Añade prueba aislada del ritual en la plantilla Overworld.
+- Respalda exactamente la reja x=133..147, y=90..96, z=192 antes de tocarla.
+- Abre la reja por filas con sonidos y partículas tras la tercera medalla.
+- El reset restaura todos los BlockData exactos y vacía los pedestales.
+- La prueba no crea el marcador normal de partida ni vuelve estable la plantilla.
+- Comandos: ritual start, give, open, reset y status.

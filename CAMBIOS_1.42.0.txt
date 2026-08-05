@@ -1,0 +1,11 @@
+ArlightBingo 1.42.0 - INVADED ISLAND CAPITAL
+
+- Conserva la isla integrada, su relieve, costa, cuevas, minerales y bloqueo de estructuras externas.
+- Sustituye el pueblo 1.41.0 por un refugio nuevo con biblioteca, enfermería, herrería, mercado, posada y torres.
+- Sustituye las tres cajas de distritos por barrios irregulares conectados a la capital.
+- Sustituye la capital rectangular y sus edificios heredados por una ciudadela de perímetro irregular.
+- Añade mercado cubierto, biblioteca, enfermería, armería, prisión, cuarteles, alcantarillas y castillo central.
+- Eleva el santuario del Guardián y lo conecta mediante una escalera desde el sello de progresión.
+- Conserva posiciones compatibles con cofres Lootr, cuatro spawners por distrito, emblemas, sello, jefe y portal.
+- Impide reanudar revisiones interrumpidas de 1.41.0 para que nunca se mezclen estructuras antiguas y nuevas.
+- Mantiene 1.41.0 intacta como rollback y exige generar una revisión Overworld limpia.
