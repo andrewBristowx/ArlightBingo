@@ -119,3 +119,18 @@ jobs:
             dist/ArlightBingo-1.48.39-SHA256.txt
           if-no-files-found: error
           retention-days: 30
+
+      - name: Guardar ID de ejecución
+        if: always() && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/run-info
+          printf '%s\n' "$GITHUB_RUN_ID" > .github/run-info/LAST_RUN_ID_14839.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/run-info/LAST_RUN_ID_14839.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'Guardar ejecución de compilación 1.48.39'
+            git push origin HEAD:build/1.48.39-independent-mine-cleanup-accessibility
+          fi
