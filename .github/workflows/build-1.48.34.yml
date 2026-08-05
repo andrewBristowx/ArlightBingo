@@ -11,6 +11,9 @@ on:
       - '.github/workflows/build-1.48.34.yml'
       - 'BUILD_VERSION.txt'
       - 'CAMBIOS_1.48.34.txt'
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
