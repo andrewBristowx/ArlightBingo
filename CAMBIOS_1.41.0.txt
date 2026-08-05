@@ -1,0 +1,10 @@
+ArlightBingo 1.41.0 - INTEGRATED OVERWORLD ISLAND
+
+- Sustituye la Zona A pegada a terreno vanilla por una isla determinista propia.
+- Isla irregular de aproximadamente 1000 bloques de diametro con oceano y playas.
+- Integra llanuras, bosque, taiga, distrito oscuro, colinas y montanas.
+- Genera subsuelo continuo, cuevas y minerales para objetivos de Bingo.
+- Recoloca pueblo y ciudadela dentro de un unico recorrido conectado.
+- Desactiva estructuras vanilla y externas desde WorldCreator en esta plantilla.
+- Conserva revisiones, reanudacion, audit, promote y rollback de la 1.40.0.
+- La 1.40.0 y la revision estable 1.39.1 permanecen disponibles como respaldo.

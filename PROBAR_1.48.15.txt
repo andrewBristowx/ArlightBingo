@@ -1,0 +1,14 @@
+PRUEBA DE ARLIGHTBINGO 1.48.15
+
+1. Apaga el servidor y deja una sola copia del JAR.
+2. Regenera únicamente Overworld:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.15-test1
+3. Espera READY y ejecuta:
+   /bingo template overworld status
+   /bingo template overworld audit
+   /bingo template overworld tp
+4. Una calle local puede aparecer como ADVERTENCIA sin bloquear READY.
+5. Cualquier fallo de boss-north-approach, boss-portal-*, portal-north-* o ciudadelas debe seguir rechazando la plantilla.
+6. Revisa visualmente la aldea principal, accesos a casas, murallas y camino ritual.
+7. No regeneres Nether ni End.

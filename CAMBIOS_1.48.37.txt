@@ -1,0 +1,31 @@
+ArlightBingo 1.48.37 — mina única accesible, bosques laterales y contaminación extensa
+
+BASE
+- Parte exactamente de ArlightBingo 1.48.36.
+- No modifica Nether, End ni el puerto editado manualmente.
+- Mantiene 1.48.36, 1.48.35 y 1.48.34 como retrocesos.
+
+MINA
+- Corrige la causa que generaba una segunda mina al ejecutar upgrade/force: ahora la ubicación queda fijada con el identificador overworld_main_mine.
+- Durante la migración detecta la mina guardada y otras minas 1.48.35 mediante su geometría y materiales característicos.
+- Naturaliza las minas anteriores: recompone la ladera desde las alturas sanas del perímetro y sella galerías, salas, ramales y geodas con terreno compatible con la profundidad.
+- Busca una ubicación nueva separada de todas las minas antiguas.
+- Genera una sola mina nueva.
+- Añade eje principal, dos corredores de servicio paralelos, conexiones transversales, puertas amplias y pasarela final a la geoda.
+- Audita antes de aplicar que entrada, estaciones, salas, corredores laterales y geoda tengan suelo y dos bloques libres.
+- Ningún sector obligatorio requiere picar bloques.
+
+BOSQUES
+- Aumenta el objetivo de cinco a ocho masas forestales grandes.
+- Añade bandas forestales a ambos lados del eje entre pueblo y ciudadela para rellenar laterales vacíos.
+- Amplía radios, densidad de árboles, sotobosque y persistencia de hojas.
+
+CONTAMINACIÓN
+- Convierte en bioma contaminado continuo aproximadamente el 86 % del terreno natural elegible de la mitad opuesta.
+- Combina musgo, adoquín musgoso, tierra enraizada, esmeralda, cristales, raíces y árboles enfermos.
+- Conserva caminos, edificios, pueblo seguro, agua y puerto.
+
+SEGURIDAD
+- La restauración y construcción se aplican por lotes.
+- No se escribe sobre la plantilla estable directamente.
+- El marcador registra mina única, red accesible, auditoría aprobada y cobertura objetivo.

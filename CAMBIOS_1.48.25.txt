@@ -1,0 +1,11 @@
+ArlightBingo 1.48.26 - FINAL GATE, ROAD AND TERRAIN INTEGRATION
+
+- El portón ritual cubre todo el ancho transitable y tiene jambas de tres bloques de profundidad.
+- La apertura elimina exactamente todas las barras del nuevo ancho.
+- Las rutas que comparten una columna se realinean a una sola altura física.
+- Se elimina el modo de puente de madera; los desniveles usan terraplén de piedra y taludes laterales.
+- La periferia de la ciudadela se mezcla gradualmente con el terreno y evita paredes verticales.
+- Los cimientos de todas las torres se reconstruyen con los doce bloques exigidos por auditoría.
+- El coliseo se cierra antes de restaurar torres, accesos y portón para no volver a romperlos.
+- Se restauran también las dos torres traseras del coliseo después del cierre circular.
+- No cambia aldeas, Nether ni End.

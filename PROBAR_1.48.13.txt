@@ -1,0 +1,13 @@
+PRUEBA DE ARLIGHTBINGO 1.48.13
+
+1. Apaga el servidor y sustituye el JAR anterior.
+2. Regenera únicamente Overworld:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.13-test1
+3. Espera READY y ejecuta:
+   /bingo template overworld audit
+   /bingo template overworld tp
+4. Revisa especialmente residential-citadel, military-citadel, boss-north-approach,
+   boss-portal-north-rim y las calles/entradas de la aldea principal.
+5. La auditoría solo debe rechazar una ruta cuando no exista ningún carril transitable
+   de extremo a extremo. No regeneres Nether ni End.

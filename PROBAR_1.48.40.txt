@@ -1,0 +1,18 @@
+PRUEBA 1.48.40
+
+1. No ejecutar `decorate all`.
+2. Instalar el JAR y reiniciar; no usar /reload.
+3. En cada cicatriz de terreno, colocarse aproximadamente en el centro y ejecutar:
+   /bingo template overworld terrain preview 72
+4. Ajustar el radio si el círculo de daño es mayor; máximo 128.
+5. Aplicar con:
+   /bingo template overworld terrain apply 72
+6. Revisar el borde antes de repetir en otra zona.
+7. Después de reparar el terreno del castillo:
+   /bingo template overworld recover preview citadel
+   /bingo template overworld recover apply citadel
+8. Para la mina nueva ejecutar solamente:
+   /bingo template overworld decorate preview mine
+   /bingo template overworld decorate mine
+9. Confirmar que no aparece `mine-cleanup` ni se modifican estructuras de campaña.
+10. No hacer commit antes de la revisión visual completa.

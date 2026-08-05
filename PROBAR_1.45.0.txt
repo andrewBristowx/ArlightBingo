@@ -1,0 +1,30 @@
+PRUEBAS ARLIGHTBINGO 1.45.0
+============================
+
+1. Guarda la versión anterior y reemplaza únicamente el JAR de ArlightBingo.
+2. Reinicia completamente el servidor; no uses /reload.
+3. Confirma con /version ArlightBingo que aparece 1.45.0.
+4. Descarta solo la revisión de trabajo anterior:
+   /bingo template overworld reset
+5. Genera una revisión nueva:
+   /bingo template overworld generate island-1.45-test1
+6. Espera READY y después el mensaje de consola:
+   Overworld 1.45.0 completado
+7. Comprueba que existan en la carpeta del mundo:
+   arlight-overworld-campaign-1.45.done
+   arlight-overworld-campaign-1.45.properties
+   arlight-overworld-campaign-1.45-report.txt
+8. Ejecuta:
+   /bingo template overworld audit
+   /bingo template overworld tp
+9. Recorre el camino desde el pueblo hasta la Aldea de los Tejados.
+10. Comprueba que las tres zonas estén separadas, apoyadas y sin casas flotantes.
+11. Comprueba que la arena del jefe esté vacía de casas y reservada para combate.
+12. Inicia una partida de prueba y libera los spawners de cada asentamiento.
+13. Recoge en orden:
+    Emblema del Hogar, Emblema del Comercio y Núcleo Esmeralda.
+14. Tras el tercer objeto, cruza el sello exterior y usa clic derecho sobre el
+    Ancla de Reaparición del altar ritual.
+15. El sello interior debe abrirse y permitir la pelea con el jefe.
+16. Derrota al jefe y confirma que se construya el portal al Nether.
+17. No promociones la revisión hasta aprobar recorrido, estructuras y progresión.

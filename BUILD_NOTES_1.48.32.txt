@@ -1,0 +1,4 @@
+ArlightBingo 1.48.32
+- Compilar con Java 21 y Maven: mvn -B -U -DskipTests clean package
+- JAR esperado: target/ArlightBingo-1.48.32.jar
+- Requiere ArlightCore 1.20.0 como dependencia provided durante la compilación.
