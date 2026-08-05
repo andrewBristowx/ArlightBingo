@@ -1,0 +1,14 @@
+PRUEBAS ARLIGHTBINGO 1.42.0 - CAPITAL INVADIDA
+
+1. Instalar 1.42.0 sin borrar la revisión estable ni el JAR 1.41.0 de respaldo.
+2. Si existe una revisión de trabajo 1.41.0, ejecutar /bingo template overworld reset.
+3. Generar una revisión limpia: /bingo template overworld generate island-1.42-test1
+4. Esperar READY y ejecutar /bingo template overworld audit.
+5. Entrar con /bingo template overworld tp y verificar que no queda ningún edificio de 1.41.0.
+6. Revisar refugio: mercado, biblioteca, enfermería, herrería, posada, caminos y torres.
+7. Revisar los tres distritos, sus cuatro spawners y sus cofres de progresión.
+8. Revisar capital: muralla irregular, mercado, biblioteca, enfermería, armería, prisión, cuarteles y alcantarillas.
+9. Recorrer el castillo hasta el sello, subir al santuario del jefe y comprobar el portal posterior.
+10. Confirmar cimientos y caminos sobre el relieve, sin edificios flotantes ni plataformas rectangulares gigantes.
+11. Reiniciar durante la construcción custom y comprobar que resume solo una revisión 1.42.0.
+12. Probar una partida completa sin promover; promover únicamente después de aprobarla visualmente.

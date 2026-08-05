@@ -1,0 +1,4 @@
+Compilación en este entorno
+- Se actualizó el código fuente a la versión 1.48.29.
+- No se generó JAR aquí porque Maven no está instalado en el entorno de trabajo.
+- Para compilar localmente: mvn clean package
