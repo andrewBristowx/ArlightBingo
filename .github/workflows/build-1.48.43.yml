@@ -40,12 +40,12 @@ jobs:
         run: |
           set -euo pipefail
           cat .github/import/14843.patch.gz.b64.part* | base64 -d | gzip -d > /tmp/14843.patch
-          if ! grep -q '<version>1.48.43</version>' pom.xml; then
+          if ! test -f src/main/java/com/arlight/bingo/listeners/OverworldRitualTestCommands.java; then
             git apply /tmp/14843.patch
           fi
           grep -q '<version>1.48.43</version>' pom.xml
           grep -q 'version: 1.48.43' src/main/resources/plugin.yml
-          grep -q 'class OverworldRitualTestCommands' src/main/java/com/arlight/bingo/commands/OverworldRitualTestCommands.java
+          grep -q 'class OverworldRitualTestCommands' src/main/java/com/arlight/bingo/listeners/OverworldRitualTestCommands.java
           grep -q 'TEST_GATE_MIN_X = 133' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           grep -q 'TEST_GATE_MAX_X = 147' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           grep -q 'TEST_GATE_MIN_Y = 90' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
@@ -64,7 +64,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add pom.xml src/main/resources/plugin.yml BUILD_VERSION.txt SOURCE_VERSION.txt CAMBIOS_1.48.43.txt PROBAR_1.48.43.txt \
             src/main/java/com/arlight/bingo/commands/BingoCommand.java \
-            src/main/java/com/arlight/bingo/commands/OverworldRitualTestCommands.java \
+            src/main/java/com/arlight/bingo/listeners/OverworldRitualTestCommands.java \
             src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java \
             src/main/java/com/arlight/bingo/listeners/OverworldMedalRitual.java \
             src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
@@ -93,7 +93,7 @@ jobs:
           JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' -print -quit)"
           test -n "$JAR"
           unzip -p "$JAR" plugin.yml | grep -q 'version: 1.48.43'
-          jar tf "$JAR" | grep -q 'com/arlight/bingo/commands/OverworldRitualTestCommands.class'
+          jar tf "$JAR" | grep -q 'com/arlight/bingo/listeners/OverworldRitualTestCommands.class'
           jar tf "$JAR" | grep -q 'com/arlight/bingo/listeners/OverworldMedalRitual.class'
           jar tf "$JAR" | grep -q 'com/arlight/bingo/listeners/OverworldCampaignLandscape148.class'
 
