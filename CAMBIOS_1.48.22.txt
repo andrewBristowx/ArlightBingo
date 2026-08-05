@@ -1,0 +1,8 @@
+ArlightBingo 1.48.22 — STRICT ROAD CONTINUITY
+
+- No cambia aldeas, Nether ni End.
+- Reconstruye la escalinata boss-north-monumental-stairs después de muros y cimientos.
+- Ejecuta una restauración estricta final de todos los caminos registrados.
+- Todo camino desconectado bloquea READY; ya no existen advertencias secundarias permisivas.
+- La auditoría exige suelo y espacio transitables en la altura planificada exacta.
+- La autorreparación reconstruye la ruta completa, no solo un radio alrededor del primer fallo.

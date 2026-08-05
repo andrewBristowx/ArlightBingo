@@ -1,0 +1,14 @@
+PRUEBA DE ARLIGHTBINGO 1.48.11
+
+1. Apaga el servidor; no uses /reload.
+2. Conserva 1.48.10, 1.48.9 y 1.48.8 como retrocesos.
+3. Instala 1.48.11.
+4. Ejecuta:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.11-test1
+   /bingo template overworld status
+5. Cuando aparezca READY:
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+Revisar paredes, puertas, tejados y aleros de todas las casas. En la zona del boss, comprobar que solo el interior de la arena esté nivelado y que las laderas exteriores conserven el terreno natural. No regenerar Nether ni End.

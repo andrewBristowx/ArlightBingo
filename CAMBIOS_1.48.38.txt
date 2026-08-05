@@ -1,0 +1,22 @@
+ArlightBingo 1.48.38 — restauración real de minas e infección musgosa progresiva
+
+MINAS
+- La eliminación de minas antiguas ya no depende de encontrar una tercera montaña natural.
+- Escaneo denso alrededor de todas las posiciones históricas y de las coordenadas observadas en la plantilla 1.48.37.
+- Reconoce entradas desplazadas o tapadas usando raíles, vigas, deepslate, amatista y utilería interna.
+- Naturaliza cada mina detectada: entrada, campamento, galería principal, ramales, habitaciones y geoda.
+- Barrido adicional retira restos estructurales sueltos fuera de la geometría principal.
+- Genera una única mina en una posición fija y registra overworld_main_mine.
+- Una sola entrada exterior; galería principal, dos rutas de servicio, conexiones transversales y geoda final accesible sin picar.
+
+INFECCIÓN
+- Cinturón limpio alrededor de la aldea principal.
+- Transición irregular y gradual al alejarse hacia la montaña y la zona opuesta.
+- La montaña gris y la antigua zona marrón pasan a estar cubiertas casi totalmente por musgo, raíces, podzol, árboles infectados, esmeralda y cristales.
+- La cobertura se calcula sobre toda la franja entre aldea y ciudadela, no solo alrededor del dungeon.
+- Caminos, edificios y puerto manual siguen protegidos.
+
+SEGURIDAD
+- Parte de 1.48.37 sin promoverla.
+- 1.48.36 continúa como rollback estable.
+- No modifica Nether ni End.

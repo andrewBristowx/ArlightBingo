@@ -20,10 +20,14 @@ import com.arlight.bingo.util.CardNetwork;
 import com.arlight.bingo.util.BingoWaitingNetwork;
 import com.arlight.bingo.util.SomitaGuideNetwork;
 import com.arlight.bingo.listeners.BingoChatListener;
+import com.arlight.bingo.listeners.OverworldVillageSafety;
 import com.arlight.bingo.template.OverworldTemplateManager;
 import com.arlight.bingo.template.NetherTemplateManager;
 import com.arlight.bingo.template.EndTemplateManager;
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
+
+import java.util.List;
 
 public class BingoPlugin extends JavaPlugin {
 
@@ -41,8 +45,20 @@ public class BingoPlugin extends JavaPlugin {
     private NetherTemplateManager netherTemplateManager;
     private EndTemplateManager endTemplateManager;
     private SomitaGuideNetwork somitaGuideNetwork;
+    private OverworldVillageSafety overworldVillageSafety;
 
     public WorldPoolManager getWorldPoolManager() { return worldPoolManager; }
+
+    public boolean dispatchOverworldTemplateUtility(CommandSender sender, String rawCommand) {
+        return overworldVillageSafety != null
+                && overworldVillageSafety.dispatchTemplateUtility(sender, rawCommand);
+    }
+
+    public List<String> completeOverworldTemplateUtility(String rawCommand) {
+        return overworldVillageSafety == null
+                ? List.of()
+                : overworldVillageSafety.templateUtilityCompletions(rawCommand);
+    }
 
     @Override
     public void onEnable() {
@@ -75,6 +91,8 @@ public class BingoPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(overworldTemplateManager, this);
         getServer().getPluginManager().registerEvents(netherTemplateManager, this);
         getServer().getPluginManager().registerEvents(endTemplateManager, this);
+        this.overworldVillageSafety = new OverworldVillageSafety(this);
+        getServer().getPluginManager().registerEvents(overworldVillageSafety, this);
         overworldTemplateManager.resumeIfNeeded();
         netherTemplateManager.resumeIfNeeded();
         endTemplateManager.resumeIfNeeded();
@@ -204,7 +222,27 @@ public class BingoPlugin extends JavaPlugin {
         getConfig().addDefault("template-worlds.overworld.lootr-mode", "LOOT_TABLES");
         getConfig().addDefault("template-worlds.overworld.max-build-millis-per-tick", 8L);
         getConfig().addDefault("template-worlds.overworld.dungeon-extra-spawners", 18);
+        getConfig().addDefault("template-worlds.overworld.layout.village-x", -360);
+        getConfig().addDefault("template-worlds.overworld.layout.village-z", 0);
+        getConfig().addDefault("template-worlds.overworld.layout.city-x", 420);
+        getConfig().addDefault("template-worlds.overworld.layout.city-z", 0);
+        getConfig().addDefault("template-worlds.overworld.zone-a.enabled", true);
+        getConfig().addDefault("template-worlds.overworld.zone-a.irregular-boundary", true);
+        getConfig().addDefault("template-worlds.overworld.zone-a.functional-interiors", true);
+        getConfig().addDefault("template-worlds.overworld.zone-a.visible-route-to-zone-b", true);
+        getConfig().addDefault("template-worlds.overworld.safe-village.enabled", true);
+        getConfig().addDefault("template-worlds.overworld.safe-village.radius", 112);
+        getConfig().addDefault("template-worlds.overworld.safe-village.purge-interval-ticks", 40L);
+        getConfig().addDefault("template-worlds.overworld.autorepair.enabled", true);
+        getConfig().addDefault("template-worlds.overworld.autorepair.max-passes", 3);
+        getConfig().addDefault("template-worlds.overworld.autorepair.blocks-per-tick", 900);
+        getConfig().addDefault("template-worlds.overworld.autorepair.max-millis-per-tick", 5L);
+        getConfig().addDefault("template-worlds.overworld.autorepair.preview-radius", 96);
+        getConfig().addDefault("template-worlds.overworld.autorepair.rollback.enabled", true);
 
+
+        getConfig().addDefault("template-worlds.revisions.keep-latest", 3);
+        getConfig().addDefault("template-worlds.revisions.require-explicit-promotion", true);
         getConfig().addDefault("template-worlds.safety.chunky-tile-radius", 384);
         getConfig().addDefault("template-worlds.safety.max-loaded-chunks-between-batches", 1024);
         getConfig().addDefault("template-worlds.safety.drain-check-interval-ticks", 100L);

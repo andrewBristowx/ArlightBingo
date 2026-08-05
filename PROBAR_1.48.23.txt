@@ -1,0 +1,21 @@
+PRUEBA OBLIGATORIA ARLIGHTBINGO 1.48.23
+
+1. Apagar el servidor y conservar el JAR 1.48.22 como respaldo.
+2. Instalar 1.48.23.
+3. Generar una plantilla Overworld completamente nueva.
+4. Esperar READY; si queda un camino o el coliseo abierto, la auditoría debe rechazarla.
+5. Revisar visualmente:
+   - Entrada sur de la ciudadela y sus dos laterales.
+   - Entradas norte, este y oeste: el camino debe cruzar el muro y continuar.
+   - Franja interior junto a las cuatro murallas: sin zanjas ni plataformas flotantes.
+   - Contrafuertes: deben tocar el terreno con base de tres bloques.
+   - Escalinata norte del boss desde la calzada hasta la puerta.
+   - Puerta del boss, alas curvas y pasaje central.
+   - Cierre completo del coliseo salvo la entrada ceremonial.
+
+Comandos:
+/bingo template overworld reset
+/bingo template overworld generate island-1.48.23-test1
+/bingo template overworld status
+/bingo template overworld audit
+/bingo template overworld tp

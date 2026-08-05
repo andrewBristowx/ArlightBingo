@@ -33,7 +33,7 @@ public final class OverworldCampaignProgression {
                             List<List<String>> spawnerPools) { }
 
     private static final int[][] SPAWNER_OFFSETS = {
-            {0, 0}, {-20, -10}, {19, 13}, {0, 27}
+            {0, 0}, {-20, -10}, {19, 13}, {18, 38}
     };
 
     private final JavaPlugin plugin;
@@ -277,11 +277,11 @@ public final class OverworldCampaignProgression {
                     SomitaGuideNetwork.Variant.OVERWORLD,
                     SomitaGuideNetwork.Animation.POINT,
                     guide, 180,
-                    "Los tres distritos están libres. La ciudadela se abrió: derrota al Guardián de la Superficie.");
+                    "Los tres distritos están libres. Lleva las tres piezas al altar exterior de la arena.");
             somita.effect(player, SomitaGuideNetwork.Effect.OVERWORLD_POINT, 60, bossHome);
         }
         game.sendToParticipants(ChatColor.GOLD + "[Bingo] La ciudadela está abierta. "
-                + ChatColor.WHITE + "El Guardián de la Superficie ha despertado.");
+                + ChatColor.WHITE + "Sigue la calzada hasta la puerta ritual y coloca las tres piezas.");
     }
 
     public void onBossDefeated() {
@@ -302,43 +302,28 @@ public final class OverworldCampaignProgression {
     }
 
     private void buildCitadelSeal() {
+        // 1.48.4 seals the real citadel doorway. Older revisions created a second
+        // emerald/iron cage eighty-eight blocks away, which invaded the approved route.
         gateCenter = new Location(world, citadel.getBlockX(), citadel.getBlockY(),
-                citadel.getBlockZ() + 88);
+                citadel.getBlockZ() + 55);
         int baseY = gateCenter.getBlockY();
         for (int x = -4; x <= 4; x++) {
-            for (int y = 0; y <= 6; y++) {
+            for (int y = 1; y <= 6; y++) {
                 Location at = new Location(world, gateCenter.getBlockX() + x, baseY + y,
                         gateCenter.getBlockZ());
-                Material material;
-                boolean edge = Math.abs(x) == 4 || y == 0 || y == 6;
-                if (edge) material = ((x + y) & 1) == 0
-                        ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS;
-                else if (x == 0 && y >= 2 && y <= 4) material = Material.EMERALD_BLOCK;
-                else material = Material.IRON_BARS;
-                at.getBlock().setType(material, false);
+                at.getBlock().setType(Material.DARK_OAK_FENCE, false);
                 protect(at);
             }
         }
-
         pedestalIndicators.clear();
-        for (int i = 0; i < 3; i++) {
-            int x = gateCenter.getBlockX() - 3 + i * 3;
-            Location base = new Location(world, x, baseY, gateCenter.getBlockZ() - 3);
-            base.getBlock().setType(Material.CHISELED_STONE_BRICKS, false);
-            Location indicator = base.clone().add(0, 1, 0);
-            indicator.getBlock().setType(Material.GRAY_GLAZED_TERRACOTTA, false);
-            pedestalIndicators.add(indicator);
-            protect(base);
-            protect(indicator);
-        }
     }
 
     private void openCitadelGate() {
         if (gateOpened || gateCenter == null) return;
         gateOpened = true;
         int baseY = gateCenter.getBlockY();
-        for (int x = -3; x <= 3; x++) {
-            for (int y = 1; y <= 5; y++) {
+        for (int x = -4; x <= 4; x++) {
+            for (int y = 1; y <= 6; y++) {
                 Location at = new Location(world, gateCenter.getBlockX() + x, baseY + y,
                         gateCenter.getBlockZ());
                 at.getBlock().setType(Material.AIR, false);
