@@ -1,0 +1,9 @@
+ARLIGHTBINGO 1.48.14 - RUTAS E INTERSECCIONES REALES
+
+- Cada columna conserva todas sus pertenencias de ruta; un cruce ya no borra celdas de la calle anterior.
+- La conectividad usa las regiones inicial y final registradas, no el eje del bounding box.
+- Calles curvas, diagonales, en L y con ramales se validan mediante su grafo transitable real.
+- La altura final se busca hasta cuatro bloques arriba o abajo y mantiene pendiente máxima de un bloque.
+- El acceso ritual reutiliza la ruta boss-north-approach y tolera sus escalones y carriles laterales.
+- Se conserva la reparación no destructiva: no se reproducen calles locales ni caminos privados sobre casas.
+- Los mensajes, marcadores y metadatos del Overworld ahora indican 1.48.14.

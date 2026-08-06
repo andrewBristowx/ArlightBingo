@@ -1,0 +1,101 @@
+name: Compilar ArlightBingo 1.48.45
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/1.48.45-spawns-boss-preview-no-guide
+    paths:
+      - '.github/workflows/build-1.48.45.yml'
+      - '.github/import/14845.patch.gz.b64'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Descargar rama candidata
+        uses: actions/checkout@v4
+        with:
+          ref: feature/1.48.45-spawns-boss-preview-no-guide
+          fetch-depth: 0
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Aplicar y validar corrección 1.48.45
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .github/import/14845.patch.gz.b64 | gzip -d > /tmp/14845.patch
+          git apply /tmp/14845.patch
+          grep -q '<version>1.48.45</version>' pom.xml
+          grep -q 'version: 1.48.45' src/main/resources/plugin.yml
+          grep -q 'class TemplateSpawnPoints' src/main/java/com/arlight/bingo/util/TemplateSpawnPoints.java
+          grep -q 'surface_guardian' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
+          grep -q 'removeLegacyCompassGuide' src/main/java/com/arlight/bingo/template/OverworldTemplateManager.java
+          grep -q 'OverworldTemplateSpawnCommands' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
+          grep -q 'OverworldBossTestCommands' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
+          git diff --check
+
+      - name: Instalar ArlightCore
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/andrewBristowx/ArlightCore.git /tmp/ArlightCore
+          mvn -B -U -DskipTests -f /tmp/ArlightCore/pom.xml clean install
+
+      - name: Compilar con Maven
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -U -DskipTests clean package
+
+      - name: Verificar JAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' -print -quit)"
+          test -n "$JAR"
+          unzip -p "$JAR" plugin.yml | grep -q 'version: 1.48.45'
+          jar tf "$JAR" > /tmp/jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/util/TemplateSpawnPoints.class' /tmp/jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldTemplateSpawnCommands.class' /tmp/jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldBossTestCommands.class' /tmp/jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldCampaignLandscape148.class' /tmp/jar-contents.txt
+
+      - name: Reunir entregables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/source
+          JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' -print -quit)"
+          cp "$JAR" dist/ArlightBingo-1.48.45.jar
+          rsync -a --exclude '.git/' --exclude '.github/import/' --exclude 'target/' --exclude 'dist/' ./ dist/source/
+          (cd dist/source && zip -qr ../ArlightBingo-1.48.45-SOURCE.zip .)
+          sha256sum dist/ArlightBingo-1.48.45.jar dist/ArlightBingo-1.48.45-SOURCE.zip > dist/ArlightBingo-1.48.45-SHA256.txt
+
+      - name: Subir JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.45-JAR
+          path: dist/ArlightBingo-1.48.45.jar
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Subir fuente y hashes
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.45-SOURCE
+          path: |
+            dist/ArlightBingo-1.48.45-SOURCE.zip
+            dist/ArlightBingo-1.48.45-SHA256.txt
+          if-no-files-found: error
+          retention-days: 30

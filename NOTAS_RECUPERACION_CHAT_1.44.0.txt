@@ -1,0 +1,17 @@
+RECUPERACIÓN DEL CHAT FIJADO "TRABAJO EN PROYECTOS"
+====================================================
+
+Estado recuperado después del error de transmisión:
+
+- El usuario ya había generado y revisado visualmente el Overworld 1.43.0.
+- Las capturas mostraban huellas de estructuras y caminos que se interferían,
+  agua confundida con terreno válido, parcelas sin apoyo suficiente, accesos
+  sin conexión clara, desniveles incómodos y edificios cercanos demasiado
+  parecidos.
+- Se aprobó preparar ArlightBingo 1.44.0 conservando 1.43.0 como respaldo.
+- La solución acordada era usar huellas tridimensionales con margen, parcelas
+  secas y apoyadas, límites de pendiente, detección de solapamientos, rutas
+  reales desde las entradas y variación de modelos próximos.
+- El chat se interrumpió antes de compilar, empaquetar o guardar una versión
+  1.44.0. Esta rama retoma ese trabajo desde el commit 1.43.0
+  3b5c743d5b61f13c5cb6b908430326ca52449a6e.

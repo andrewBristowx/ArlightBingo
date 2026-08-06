@@ -1,0 +1,13 @@
+PRUEBA ARLIGHTBINGO 1.48.16
+
+1. Apaga el servidor y sustituye solo el JAR de Bingo.
+2. Regenera únicamente la plantilla Overworld con una revisión nueva.
+3. Observa en consola si el auditor inicia intentos de autorreparación.
+4. La plantilla solo debe quedar READY después de una auditoría limpia.
+5. Usa /bingo repair overworld status.
+6. Usa /bingo repair overworld scan.
+7. Dentro de la plantilla usa /bingo repair overworld preview 96.
+8. Para una zona concreta usa /bingo repair overworld region 96.
+9. Si el resultado empeora usa /bingo repair overworld rollback.
+10. Comprueba caminos, laderas, casas y acceso al boss.
+11. No regeneres Nether ni End.

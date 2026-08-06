@@ -1,0 +1,64 @@
+name: PR ArlightBingo 1.48.45
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/1.48.45-spawns-boss-preview-no-guide
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Aplicar fuente 1.48.45
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .github/import/14845.patch.gz.b64 | gzip -d > /tmp/14845.patch
+          git apply /tmp/14845.patch
+          grep -q '<version>1.48.45</version>' pom.xml
+          grep -q 'version: 1.48.45' src/main/resources/plugin.yml
+          git diff --check
+      - name: Instalar ArlightCore
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/andrewBristowx/ArlightCore.git /tmp/ArlightCore
+          mvn -B -U -DskipTests -f /tmp/ArlightCore/pom.xml clean install
+      - name: Compilar
+        run: mvn -B -U -DskipTests clean package
+      - name: Empaquetar
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/source
+          JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' -print -quit)"
+          test -n "$JAR"
+          unzip -p "$JAR" plugin.yml | grep -q 'version: 1.48.45'
+          jar tf "$JAR" > /tmp/index
+          grep -Fxq 'com/arlight/bingo/util/TemplateSpawnPoints.class' /tmp/index
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldTemplateSpawnCommands.class' /tmp/index
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldBossTestCommands.class' /tmp/index
+          cp "$JAR" dist/ArlightBingo-1.48.45.jar
+          rsync -a --exclude '.git/' --exclude '.github/import/' --exclude 'target/' --exclude 'dist/' ./ dist/source/
+          (cd dist/source && zip -qr ../ArlightBingo-1.48.45-SOURCE.zip .)
+          sha256sum dist/ArlightBingo-1.48.45.jar dist/ArlightBingo-1.48.45-SOURCE.zip > dist/ArlightBingo-1.48.45-SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.45-JAR
+          path: dist/ArlightBingo-1.48.45.jar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.45-SOURCE
+          path: |
+            dist/ArlightBingo-1.48.45-SOURCE.zip
+            dist/ArlightBingo-1.48.45-SHA256.txt

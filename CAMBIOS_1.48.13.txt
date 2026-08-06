@@ -1,0 +1,8 @@
+ARLIGHTBINGO 1.48.13 - CONTINUIDAD REAL DE CAMINOS
+
+- La auditoría deja de exigir AIR en cada bloque decorativo del ancho de una calle.
+- Las rutas se agrupan por corredor y se valida conectividad de extremo a extremo.
+- Se permiten puertas, portones, losas, escaleras y desniveles transitables de un bloque.
+- Faroles, bancos, postes, muros y marcos laterales ya no producen falsos positivos si queda un carril continuo.
+- Una barrera que corte todo el ancho sigue rechazando la plantilla.
+- Se conservan las reparaciones de viviendas, chimeneas, descansillos y terreno de 1.48.11/1.48.12.

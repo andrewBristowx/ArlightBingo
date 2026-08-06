@@ -1,0 +1,27 @@
+ArlightBingo 1.48.2 - CLEAN-BASE-STRUCTURAL-AUDIT
+
+- La fase base del Overworld sólo guarda anclas cuando la campaña 1.48 está activa.
+  Ya no construye primero la aldea y la ciudadela antiguas para borrarlas después.
+- Se retiraron las reconstrucciones circulares de huellas heredadas, el pulido radial
+  de costa y los refuerzos de cimentación visibles que dejaban domos, cráteres y pilares.
+- Las transiciones del terreno usan bordes orgánicos irregulares y mezclan la superficie
+  diseñada con el material natural antes de llegar al límite.
+- Todas las casas tienen una puerta real de abeto, paredes cerradas, iluminación interior
+  invisible y escaleras continuas con respaldo y desembarcos abiertos.
+- Cada chimenea nace en un ahumador apoyado y forma una columna continua hasta el remate;
+  la auditoría rechaza las chimeneas cortadas que antes terminaban en el aire.
+- Las 16 torres activas, incluidas las puertas de ciudadela, arena y santuario, tienen
+  puerta, pisos intermedios, mobiliario, ventanas, luz y una escalera continua. La
+  auditoría impide que una torre hueca, oscura o inaccesible llegue a READY.
+- Los contrafuertes salen desde el propio muro y avanzan hacia afuera; no quedan segmentos
+  aislados en el patio ni en la ladera.
+- El atril de village-hall se movió fuera del eje de entrada y el cuarto santuario de
+  residential-lodge pasó a una posición compatible con los edificios y las calles.
+- La auditoría 1.48.2 comprueba puertas, paredes, tejados, escaleras, desembarcos,
+  chimeneas, pisos de torre, iluminación, caminos, cimientos, fuente, aproximación ritual
+  y cortes de terreno.
+- Un FAILED sigue siendo terminal. Sólo un reset/generate que escriba una base más nueva
+  permite otro intento.
+
+IMPORTANTE: esta revisión requiere reset y regeneración completa del Overworld de Bingo.
+No puede reparar de forma segura una plantilla 1.48.1 ya deformada.
