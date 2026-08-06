@@ -1,0 +1,19 @@
+PRUEBAS ARLIGHTBINGO 1.43.0
+
+1. Sustituir 1.42.0 por 1.43.0 y reiniciar completamente; no usar /reload.
+2. Ejecutar /version ArlightBingo y confirmar 1.43.0.
+3. Descartar solo la revisión de trabajo anterior con:
+   /bingo template overworld reset
+4. Generar una revisión nueva:
+   /bingo template overworld generate island-1.43-test1
+5. Esperar READY con /bingo template overworld status.
+6. Auditar y visitar con:
+   /bingo template overworld audit
+   /bingo template overworld tp
+7. Recorrer todas las calles desde el spawn hasta las puertas. Comprobar escaleras,
+   iluminación, interiores accesibles y ausencia de estructuras flotantes.
+8. Esperar una noche en la aldea principal: no debe aparecer ni permanecer ningún
+   monstruo dentro de su radio seguro.
+9. Revisar los tres asentamientos ocupados y confirmar que conservan sus spawners,
+   cofres y progresión, pero no repiten el mismo edificio.
+10. No promover la revisión hasta aprobarla visualmente.

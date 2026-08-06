@@ -1,0 +1,13 @@
+ARLIGHTBINGO 1.48.9 - CAMINOS, PUERTA DEL BOSS, CASAS Y TERRENO
+
+- Caminos locales registrados, más anchos y con bordes claros.
+- Accesos de casas extendidos hasta encontrar una calle real.
+- Ruta al boss escalonada en terrazas y conectada al altar exterior.
+- Puerta del boss reconstruida con arco, portón elevado, almenas y alas unidas a la muralla.
+- Huecos bajo los aleros cerrados.
+- Interiores reforzados con vigas, columnas, almacenaje y detalles según el tamaño.
+- Terreno suavizado alrededor de edificios y caminos.
+- Plaza y anexos exteriores más trabajados.
+- Auditorías nuevas para aleros, caminos de casas y puerta del boss.
+
+Solo requiere regenerar la plantilla Overworld.

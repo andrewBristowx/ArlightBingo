@@ -1,0 +1,6 @@
+1. Apaga el servidor y conserva ArlightBingo 1.48.20/1.48.21 como respaldo.
+2. Instala ArlightBingo-1.48.22.jar.
+3. Genera una plantilla Overworld completamente nueva.
+4. Confirma que ninguna ruta cortada permite READY.
+5. Revisa boss-north-monumental-stairs desde z=boss.z-68 hasta la puerta z=boss.z-50.
+6. Revisa los caminos anteriores de aldeas y fortaleza.

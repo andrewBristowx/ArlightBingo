@@ -6,7 +6,7 @@
 
     <groupId>com.arlight</groupId>
     <artifactId>ArlightBingo</artifactId>
-    <version>1.39.1</version>
+    <version>1.48.44</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -23,8 +23,6 @@
     </repositories>
 
     <dependencies>
-        <!-- Paper API: funciona igual en servidores hibridos tipo Arclight,
-             ya que estos implementan la API de Bukkit/Paper por encima de Forge/NeoForge -->
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
@@ -48,16 +46,13 @@
                 <version>3.13.0</version>
             </plugin>
             <plugin>
-                <!-- Empaqueta el jar final listo para poner en /plugins -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.5.3</version>
                 <executions>
                     <execution>
                         <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
+                        <goals><goal>shade</goal></goals>
                     </execution>
                 </executions>
             </plugin>

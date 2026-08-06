@@ -1,0 +1,26 @@
+PRUEBA DE ARLIGHTBINGO 1.48.5
+
+1. Apaga completamente el servidor. No uses /reload.
+2. Retira ArlightBingo 1.48.4 de plugins e instala únicamente 1.48.5.
+3. Inicia el servidor y regenera solo Overworld:
+
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.5-test1
+   /bingo template overworld status
+
+4. Espera READY. Después ejecuta:
+
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+5. Comprueba dentro del mundo:
+
+- military-supply tiene puerta, descansillo y calle continua;
+- military-tower-0..3 tienen puerta y cinco bloques exteriores despejados;
+- citadel-tower-southwest/southeast/northwest/northeast son accesibles;
+- citadel-south-gate-west/east conservan sus puertas;
+- boss-gate-west/east conservan puerta tras construir el camino transversal;
+- ninguna entrada queda enterrada, flotante o ocupada por decoración.
+
+Si la auditoría falla, conserva la línea roja completa y no vuelvas a generar
+sin hacer reset. Nether y End no necesitan regeneración.

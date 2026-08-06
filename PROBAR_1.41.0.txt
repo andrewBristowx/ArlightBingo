@@ -1,0 +1,12 @@
+PRUEBAS ARLIGHTBINGO 1.41.0 - ISLA OVERWORLD
+
+1. No borrar ni promover la revision estable 1.39.1.
+2. Generar una revision nueva: /bingo template overworld generate island-a-1
+3. Esperar READY y revisar: /bingo template overworld audit
+4. Confirmar costa irregular sin paredes verticales ni cortes de terreno.
+5. Recorrer pueblo, bosque, montanas, ciudadela, caminos, minas y mazmorra.
+6. Confirmar que no aparecen estructuras vanilla ni de otros mods en la isla.
+7. Comprobar minerales, cuevas, agua, cofres Lootr, spawners, llave y altar.
+8. Reiniciar el servidor durante pregeneracion y durante construccion; reanudar.
+9. Probar una partida completa sin promover la revision candidata.
+10. Promover solo despues de aprobar visualmente toda la isla y su progresion.

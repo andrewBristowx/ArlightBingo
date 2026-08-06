@@ -1,0 +1,16 @@
+1. Conserva ArlightBingo 1.48.0 y 1.47.0 como rollback; instala 1.48.1 solo en el servidor.
+2. Reinicia completamente. No uses /reload.
+3. Si 1.48.0 estaba repitiendo la construcción, regenera únicamente Overworld con una revisión
+   nueva; Nether y End no deben borrarse ni regenerarse.
+4. Espera a READY y ejecuta:
+   /bingo template overworld status
+   /bingo template overworld audit
+   /bingo template overworld tp
+5. Recorre village-home-southwest, village-hall y residential-lodge; las puertas deben tener
+   dos bloques libres de altura y alcanzar una calle pública sin saltos ni faroles en medio.
+6. Recorre pueblo -> residencial -> ciudadela -> arena -> santuario. Comprueba especialmente
+   military-citadel, citadel-boss y los dos tramos exteriores que rodean la arena.
+7. Confirma que la auditoría no informa entradas bloqueadas ni caminos cortados.
+8. Prueba de seguridad: si una auditoría estructural falla, el registro debe mostrar un único
+   fallo, crear arlight-overworld-campaign-1.48.failed y no volver a iniciar la construcción.
+9. Una generación nueva y explícita debe eliminar el FAILED anterior y comenzar normalmente.

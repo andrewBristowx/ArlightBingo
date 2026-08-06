@@ -1,0 +1,7 @@
+1. Generar una plantilla Overworld completamente nueva.
+2. Confirmar que no aparezcan puentes de madera en las rutas exteriores.
+3. Revisar la transición oeste de la ciudadela y los demás desniveles.
+4. Confirmar que el portón de barras ocupe todo el pasillo y no permita rodearlo.
+5. Ejecutar /bingo template overworld audit y confirmar READY sin autorreparación repetitiva.
+6. Entregar los tres objetos y comprobar que todas las barras desaparezcan.
+7. Reiniciar antes y después de abrir el portón para validar persistencia.

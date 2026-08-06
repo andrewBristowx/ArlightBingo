@@ -1,0 +1,9 @@
+PRUEBA 1.48.39
+
+1. Instalar el JAR y reiniciar; no usar /reload.
+2. Ejecutar /bingo template overworld decorate preview all.
+3. Ejecutar /bingo template overworld decorate all.
+4. Confirmar que ya no aparece el rechazo de accesibilidad.
+5. Si apareciera un rechazo inesperado, la restauración de minas antiguas debe comenzar igualmente como categoría mine-cleanup.
+6. Revisar que solo quede una mina y que entrada, eje, galerías laterales, cruces y geoda sean transitables.
+7. No hacer commit antes de revisar visualmente.

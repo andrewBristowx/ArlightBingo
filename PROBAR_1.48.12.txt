@@ -1,0 +1,21 @@
+PRUEBA DE ARLIGHTBINGO 1.48.12
+
+1. Apaga completamente el servidor. No uses /reload.
+2. Conserva 1.48.11, 1.48.10 y 1.48.9 como retrocesos.
+3. Instala ArlightBingo-1.48.12.jar.
+4. Regenera solo Overworld:
+   /bingo template overworld reset
+   /bingo template overworld generate island-1.48.12-test1
+   /bingo template overworld status
+5. Cuando aparezca READY:
+   /bingo template overworld audit
+   /bingo template overworld tp
+
+Revisión dirigida
+- Verifica boss-gate-east y boss-gate-west: puerta, suelo y espacio de cabeza.
+- Verifica portal-north-gate-west/east: los bancos no deben ocupar sus descansillos.
+- Revisa las chimeneas de posada, herrería, granero, cartógrafo, panadería y viviendas.
+- Confirma que cada chimenea tenga humo y remate de campfire.
+- Confirma que la auditoría termine sin errores de descansillo ni chimenea.
+
+No regeneres Nether ni End.

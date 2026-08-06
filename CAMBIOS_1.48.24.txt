@@ -1,0 +1,10 @@
+ArlightBingo 1.48.24 - GATE ROUTE RECONCILIATION
+
+- Portón ritual real de barras de hierro en el plano visual correcto.
+- El portón permanece cerrado y se repara periódicamente hasta entregar las tres piezas.
+- Al completar las tres piezas se abre exactamente el mismo plano del portón.
+- La auditoría acepta la barrera ritual como cierre intencional y exige todas sus barras.
+- Las transiciones finales realinean las rutas que ya ocupan una columna; una altura nueva reemplaza la antigua.
+- Se elimina el cruce transversal no registrado de revisiones anteriores en la puerta del boss.
+- El camino interior del ritual queda registrado y auditable.
+- Orden final: terreno/transiciones, rutas actuales, puerta/coliseo y barras.
