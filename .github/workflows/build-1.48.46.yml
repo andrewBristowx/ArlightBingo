@@ -8,12 +8,14 @@ on:
     paths:
       - '.github/workflows/build-1.48.46.yml'
       - '.github/import/14848.patch.gz.b64'
+      - '.github/import/14848b.patch.gz.b64'
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/build-1.48.46.yml'
       - '.github/import/14848.patch.gz.b64'
+      - '.github/import/14848b.patch.gz.b64'
 
 permissions:
   contents: read
@@ -50,12 +52,15 @@ jobs:
           git apply /tmp/14847.patch
           base64 -d .github/import/14848.patch.gz.b64 | gzip -d > /tmp/14848.patch
           git apply /tmp/14848.patch
+          base64 -d .github/import/14848b.patch.gz.b64 | gzip -d > /tmp/14848b.patch
+          git apply /tmp/14848b.patch
           grep -q '<version>1.48.48</version>' pom.xml
           grep -q 'version: 1.48.48' src/main/resources/plugin.yml
           grep -q 'ItemDisplay' src/main/java/com/arlight/bingo/util/CampaignItemBridge.java
           grep -q 'tickPedestalVisuals' src/main/java/com/arlight/bingo/util/CampaignItemBridge.java
           grep -q 'spawnSurfaceGuardianViaBosses' src/main/java/com/arlight/bingo/util/ArclightDirectBridge.java
           grep -q 'BingoRuntimeBridge' src/main/java/com/arlight/bingo/util/ArclightDirectBridge.java
+          ! grep -q 'setShadowed' src/main/java/com/arlight/bingo/util/CampaignItemBridge.java
           git diff --check
 
       - name: Instalar ArlightCore
