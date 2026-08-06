@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+from pathlib import Path
+R = Path(__file__).resolve().parents[1]
+def read(p): return (R / p).read_text(encoding="utf-8")
+def need(c, m):
+    if not c: raise SystemExit(m)
+
+need(read("BUILD_VERSION.txt").strip() == "1.48.12", "BUILD_VERSION")
+need(read("SOURCE_VERSION.txt").strip() == "ArlightBingo 1.48.12 TOWER-LANDING-CHIMNEY-RECOVERY", "SOURCE_VERSION")
+need("<version>1.48.12</version>" in read("pom.xml"), "pom")
+need("version: 1.48.12" in read("src/main/resources/plugin.yml"), "plugin")
+a = read("src/main/java/com/arlight/bingo/listeners/OverworldCampaignArchitecture148.java")
+t = read("src/main/java/com/arlight/bingo/listeners/OverworldCampaignTerrain148.java")
+u = read("src/main/java/com/arlight/bingo/listeners/OverworldCampaignAudit148.java")
+b = read("src/main/java/com/arlight/bingo/listeners/OverworldCampaignBuilder148.java")
+
+need("1.48.12-tower-landing-chimney-recovery-1" in b, "structure marker")
+need("passed_1_48_12_tower_landing_chimney_recovery" in b, "audit marker")
+need("repairRegisteredTowerLandings(world, auditRegistry)" in b, "tower landing phase")
+need("repairRegisteredChimneys(auditRegistry)" in b, "chimney phase")
+need(b.index("repairRegisteredHouseShells") < b.index("repairRegisteredChimneys"), "chimneys must run after roofs")
+need(b.index("repairRegisteredVerticalAccess") < b.index("repairRegisteredTowerLandings"), "tower landing order")
+need("repairRegisteredTowerLandings(World world, Registry registry)" in u, "tower landing repair")
+need("int sideRadius = step <= 2 ? 2 : 1" in u, "audited landing geometry")
+need("repairRegisteredChimneys(Registry registry)" in u, "chimney repair")
+need("Material.CAMPFIRE" in u and "Material.BRICKS" in u, "chimney materials")
+need("esperado=CAMPFIRE, encontrado=" in u, "chimney diagnostic")
+need("suelo=" in u and "pies=" in u and "cabeza=" in u, "landing diagnostic")
+need("int x = cx + side * 5" in a, "portal furniture moved")
+need("step == 0 ? 0 : step <= 2 ? 2 : 1" in a, "tower landing build geometry")
+need("repairRegisteredHouseShells(auditRegistry)" in b, "house shell phase")
+need("shapeBossArena" in t and "if (target <= natural) continue;" in t, "boss terrain safety")
+need('cell.id.startsWith("local-street-")' in u, "local road replay guard")
+need('cell.id.startsWith("house-path-")' in u, "house path replay guard")
+print("validate_1_48_12: OK")

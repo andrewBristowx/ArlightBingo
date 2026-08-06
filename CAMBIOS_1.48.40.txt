@@ -1,0 +1,9 @@
+ArlightBingo 1.48.40
+
+- Desactiva por completo el escaneo automático de minas antiguas que confundió castillos y distritos con galerías.
+- `decorate mine` ya no naturaliza ninguna estructura previa; únicamente intenta construir la mina fija y cancela sin cambios si falla.
+- Añade `/bingo template overworld terrain preview <radio>` y `terrain apply <radio>`.
+- El reparador se ejecuta desde el centro de cada cicatriz, calcula la pendiente desde el borde natural, suaviza el volumen y lo redecorará con musgo, raíces, rocas, cristales y árboles pequeños.
+- Protege columnas con muros, casas, torres, caminos construidos, cofres, mobiliario y el puerto.
+- Cada aplicación crea un snapshot completo antes de tocar bloques.
+- La recuperación `recover citadel` continúa disponible para reconstruir el castillo después de reparar su terreno.

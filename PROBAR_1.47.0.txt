@@ -1,0 +1,8 @@
+1) Genera una plantilla Overworld nueva y verifica que aparezcan los marcadores 1.47.0.
+2) Revisa la ciudadela, bastión y arena: los muros no deben quedar flotando ni con esquinas abiertas.
+3) Revisa el portón/entrada: rejas conectadas, marco completo y acceso más sólido.
+4) Revisa los huertos: deben verse integrados al relieve y no como un rectángulo simple.
+5) Revisa el santuario/península: sin isla circular extraña ni cuello demasiado fino.
+6) Verifica que el ritual exterior/interior siga funcionando igual que en 1.46.0.
+
+7) Revisa aproximadamente al sureste del pueblo inicial: la torre/techo heredado debe desaparecer y la ladera debe quedar natural, sin hueco ni plataforma plana.

@@ -1,4 +1,4 @@
-# ArlightBingo 1.36.5 - configuración modular
+# ArlightBingo 1.41.0 - isla Overworld integrada y revisiones seguras
 arena-world:
   enabled: true
   lobby-world: legos
@@ -48,6 +48,10 @@ template-worlds:
   matches:
     enabled: true
     require-complete: true
+  revisions:
+    # La estable activa cuenta dentro de este límite.
+    keep-latest: 3
+    require-explicit-promotion: true
   safety:
     chunky-tile-radius: 384
     max-loaded-chunks-between-batches: 1024
@@ -60,15 +64,49 @@ template-worlds:
     name: bingo_template_overworld
     seed: 741905270311
     radius: 1536
+    island:
+      enabled: true
+      # Isla principal de unos 1000 bloques de diametro, rodeada por oceano.
+      land-radius: 500
+      sea-level: 62
+      ocean-margin: 160
+      block-external-structures: true
     blocks-per-tick: 500
     corruption-spacing: 48
     max-build-millis-per-tick: 8
     safe-corruption:
-      decorate-on-chunk-load: true
+      # La campaña 1.48 coloca y audita su propia corrupción; el decorador global
+      # queda apagado para no generar agujas o ruinas dentro de casas y caminos.
+      decorate-on-chunk-load: false
       max-patches-per-chunk: 2
       ruin-chance-per-chunk: 0.035
     lootr-mode: LOOT_TABLES
     dungeon-extra-spawners: 18
+    layout:
+      # 1.43.0 conserva las anclas de la isla aprobada y rehace pueblos, caminos,
+      # accesos, iluminación e integración con el relieve.
+      village-x: -230
+      village-z: 0
+      city-x: 230
+      city-z: 0
+    zone-a:
+      enabled: true
+      width: 170
+      depth: 155
+      irregular-boundary: true
+      functional-interiors: true
+      visible-route-to-zone-b: true
+    safe-village:
+      enabled: true
+      radius: 116
+      purge-interval-ticks: 40
+    campaign-layout-1-48:
+      enabled: true
+      citadel-x: 140
+      citadel-z: 30
+      planning-strip-width: 10
+      blocks-per-tick: 1400
+      max-millis-per-tick: 6
   nether:
     enabled: true
     name: bingo_template_nether
