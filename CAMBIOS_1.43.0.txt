@@ -1,0 +1,16 @@
+ArlightBingo 1.43.0 - ALDEAS VIVAS Y OCUPADAS
+
+- Conserva el terreno insular aprobado en 1.42.0.
+- Sustituye la repetición de casas por posada, archivo, panadería, granero, taller,
+  mercado y viviendas con plantas y funciones diferentes.
+- Reduce las terrazas planas y mezcla los cimientos con el terreno mediante bordes
+  escalonados, muros de contención y materiales naturales.
+- Los caminos ahora describen curvas deterministas, se adaptan a cada desnivel,
+  colocan escaleras y conectan las entradas reales.
+- Todas las rutas principales y edificios del pueblo seguro tienen iluminación.
+- El servidor bloquea apariciones hostiles dentro del pueblo inicial y elimina
+  cualquier enemigo que entre desde fuera.
+- Los otros distritos parecen aldeas tomadas: arquitectura civil, barricadas,
+  campamentos, jaulas, carros abandonados, ruinas y corrupción.
+- La pasada de campaña ya no borra parcelas para pegar catorce manzanas repetidas.
+- 1.42.0 permanece intacta como versión de retorno.

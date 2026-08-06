@@ -1,0 +1,23 @@
+ARLIGHTBINGO 1.48.33 - RECUPERACIÓN SEGURA DE PLANTILLAS
+
+- Añade reconstrucción aislada del pueblo inicial:
+  /bingo template overworld village preview
+  /bingo template overworld village rebuild
+  /bingo template overworld village status
+  /bingo template overworld village cancel
+- La reconstrucción repite el terreno, calles, plaza, edificios, corrales,
+  árboles, faroles, envolventes, entradas, caminos y chimeneas del pueblo.
+- La reconstrucción no toca el puerto, la fortaleza, la arena del jefe,
+  la mina, los bosques exteriores ni los otros asentamientos.
+- Crea un snapshot completo antes de reconstruir el pueblo.
+- Añade snapshots manuales completos del mundo plantilla y conserva los tres
+  más recientes:
+  /bingo template overworld snapshot create [nombre]
+  /bingo template overworld snapshot list
+  /bingo template overworld snapshot restore <nombre> confirm
+  /bingo template overworld snapshot status
+- El comando commit queda interceptado por un flujo seguro: crea un snapshot
+  previo y escribe un guard de campaña antes de actualizar el marcador COMPLETE.
+- Evita que un commit manual sea confundido con una plantilla recién generada
+  y vuelva a ejecutar el constructor completo 1.48.
+- Al restaurar un snapshot crea antes una copia de emergencia del estado actual.

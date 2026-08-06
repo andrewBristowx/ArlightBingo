@@ -1,0 +1,95 @@
+name: Compilar ArlightBingo 1.48.34
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/1.48.34-full-structural-recovery
+    paths:
+      - 'pom.xml'
+      - 'src/**'
+      - '.github/workflows/build-1.48.34.yml'
+      - 'BUILD_VERSION.txt'
+      - 'CAMBIOS_1.48.34.txt'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+        with:
+          ref: build/1.48.34-full-structural-recovery
+
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Instalar ArlightCore 1.20.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/andrewBristowx/ArlightCore.git /tmp/ArlightCore
+          mvn -B -U -DskipTests -f /tmp/ArlightCore/pom.xml clean install
+
+      - name: Validar versión y fuentes
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '<version>1.48.34</version>' pom.xml
+          grep -q 'version: 1.48.34' src/main/resources/plugin.yml
+          grep -q 'class OverworldCampaignRecoveryCommands' src/main/java/com/arlight/bingo/listeners/OverworldCampaignRecoveryCommands.java
+          grep -q 'campaignRecoveryCommands.matches' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
+
+      - name: Compilar con Maven
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn -B -U -DskipTests clean package
+
+      - name: Reunir entregables
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/source
+          find target -maxdepth 1 -type f -name '*.jar' \
+            ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' \
+            -exec cp {} dist/ \;
+          test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
+          rsync -a \
+            --exclude '.git/' \
+            --exclude 'target/' \
+            --exclude 'dist/' \
+            ./ dist/source/
+          (cd dist/source && zip -qr ../ArlightBingo-1.48.34-SOURCE.zip .)
+          sha256sum dist/*.jar > dist/ArlightBingo-1.48.34-SHA256.txt
+          ls -lh dist
+
+      - name: Subir JAR compilado
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.34-JAR
+          path: dist/*.jar
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Subir fuente y verificación
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.34-SOURCE
+          path: |
+            dist/ArlightBingo-1.48.34-SOURCE.zip
+            dist/ArlightBingo-1.48.34-SHA256.txt
+          if-no-files-found: error
+          retention-days: 30

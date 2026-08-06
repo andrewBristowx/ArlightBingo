@@ -1,0 +1,7 @@
+1. Generar una plantilla Overworld nueva.
+2. Confirmar que el portón visible tenga barras de hierro antes de entregar piezas.
+3. Revisar que no reaparezcan caminos a una altura antigua en las cuatro entradas de la ciudadela.
+4. Entregar Emblema del Hogar, Emblema del Comercio y Núcleo Esmeralda en el altar exterior.
+5. Confirmar que las barras desaparezcan y el pasillo quede transitable.
+6. Reiniciar el servidor antes y después de abrir el portón para comprobar persistencia.
+7. Ejecutar /bingo template overworld audit.
