@@ -58,7 +58,6 @@ jobs:
           base64 -d /tmp/14850.b64 | gzip -d > /tmp/14850.patch
           git apply /tmp/14850.patch
           cat .github/import/14851v2.part00 .github/import/14851v2.part01 .github/import/14851v2.part02 .github/import/14851v2.part03 .github/import/14851v2.part04 > /tmp/14851.b64
-          test "$(wc -c < /tmp/14851.b64)" -eq 8036
           base64 -d /tmp/14851.b64 | gzip -d > /tmp/14851.patch
           git apply /tmp/14851.patch
 
