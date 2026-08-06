@@ -8,14 +8,14 @@ on:
     paths:
       - '.github/workflows/build-1.48.46.yml'
       - '.github/import/14846.patch.gz.b64'
-      - '.github/import/14847.patch.gz.b64'
+      - '.github/import/14847.part*'
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/build-1.48.46.yml'
       - '.github/import/14846.patch.gz.b64'
-      - '.github/import/14847.patch.gz.b64'
+      - '.github/import/14847.part*'
 
 permissions:
   contents: read
@@ -46,7 +46,9 @@ jobs:
           git apply /tmp/14845.patch
           base64 -d .github/import/14846.patch.gz.b64 | gzip -d > /tmp/14846.patch
           git apply /tmp/14846.patch
-          base64 -d .github/import/14847.patch.gz.b64 | gzip -d > /tmp/14847.patch
+          cat .github/import/14847.part00 .github/import/14847.part01 .github/import/14847.part02 .github/import/14847.part03 .github/import/14847.part04 .github/import/14847.part05 .github/import/14847.part06 > /tmp/14847.b64
+          test "$(wc -c < /tmp/14847.b64)" -eq 10336
+          base64 -d /tmp/14847.b64 | gzip -d > /tmp/14847.patch
           git apply /tmp/14847.patch
           grep -q '<version>1.48.47</version>' pom.xml
           grep -q 'version: 1.48.47' src/main/resources/plugin.yml
