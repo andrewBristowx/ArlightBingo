@@ -8,6 +8,12 @@ on:
     paths:
       - '.github/workflows/build-1.48.46.yml'
       - '.github/import/14846.patch.gz.b64'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/build-1.48.46.yml'
+      - '.github/import/14846.patch.gz.b64'
 
 permissions:
   contents: read
