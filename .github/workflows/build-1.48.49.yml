@@ -8,14 +8,14 @@ on:
     paths:
       - '.github/workflows/build-1.48.49.yml'
       - '.github/import/14849.patch.gz.b64'
-      - '.github/import/14850.patch.gz.b64'
+      - '.github/import/14850.part*'
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/build-1.48.49.yml'
       - '.github/import/14849.patch.gz.b64'
-      - '.github/import/14850.patch.gz.b64'
+      - '.github/import/14850.part*'
 
 permissions:
   contents: read
@@ -55,7 +55,9 @@ jobs:
           sed -i '/display\.setShadowed(false);/d' src/main/java/com/arlight/bingo/util/CampaignItemBridge.java
           base64 -d .github/import/14849.patch.gz.b64 | gzip -d > /tmp/14849.patch
           git apply /tmp/14849.patch
-          base64 -d .github/import/14850.patch.gz.b64 | gzip -d > /tmp/14850.patch
+          cat .github/import/14850.part00 .github/import/14850.part01 .github/import/14850.part02 .github/import/14850.part03 .github/import/14850.part04 > /tmp/14850.b64
+          test "$(wc -c < /tmp/14850.b64)" -eq 5516
+          base64 -d /tmp/14850.b64 | gzip -d > /tmp/14850.patch
           git apply /tmp/14850.patch
 
           grep -q '<version>1.48.50</version>' pom.xml
