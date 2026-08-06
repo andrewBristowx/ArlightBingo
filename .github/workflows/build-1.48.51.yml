@@ -64,7 +64,7 @@ jobs:
           grep -q '<version>1.48.51</version>' pom.xml
           grep -q 'version: 1.48.51' src/main/resources/plugin.yml
           test -f src/main/java/com/arlight/bingo/util/SurfaceGuardianRequestBridge.java
-          test -f src/main/java/com/arlight/bingo/commands/OverworldBossTestCommands.java
+          test -f src/main/java/com/arlight/bingo/listeners/OverworldBossTestCommands.java
           grep -q 'arlightbosses:surface_guardian' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
           grep -q 'boss-cinematic-request' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           ! grep -q 'setShadowed' src/main/java/com/arlight/bingo/util/CampaignItemBridge.java
@@ -89,7 +89,7 @@ jobs:
           unzip -p "$JAR" plugin.yml | grep -q 'version: 1.48.51'
           jar tf "$JAR" > /tmp/jar-contents.txt
           grep -Fxq 'com/arlight/bingo/util/SurfaceGuardianRequestBridge.class' /tmp/jar-contents.txt
-          grep -Fxq 'com/arlight/bingo/commands/OverworldBossTestCommands.class' /tmp/jar-contents.txt
+          grep -Fxq 'com/arlight/bingo/listeners/OverworldBossTestCommands.class' /tmp/jar-contents.txt
           grep -Fxq 'com/arlight/bingo/listeners/OverworldCampaignLandscape148.class' /tmp/jar-contents.txt
           grep -Fxq 'com/arlight/bingo/listeners/OverworldVillageSafety.class' /tmp/jar-contents.txt
 
