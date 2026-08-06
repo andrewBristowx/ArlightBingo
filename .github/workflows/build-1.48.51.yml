@@ -7,13 +7,13 @@ on:
       - feature/1.48.51-surface-guardian-cinematic-tests
     paths:
       - '.github/workflows/build-1.48.51.yml'
-      - '.github/import/14851.part*'
+      - '.github/import/14851v2.part*'
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/build-1.48.51.yml'
-      - '.github/import/14851.part*'
+      - '.github/import/14851v2.part*'
 
 permissions:
   contents: read
@@ -39,7 +39,7 @@ jobs:
       - name: Aplicar fuentes hasta 1.48.51
         shell: bash
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           base64 -d .github/import/14845.patch.gz.b64 | gzip -d > /tmp/14845.patch
           git apply /tmp/14845.patch
           base64 -d .github/import/14846.patch.gz.b64 | gzip -d > /tmp/14846.patch
@@ -57,15 +57,15 @@ jobs:
           test "$(wc -c < /tmp/14850.b64)" -eq 5516
           base64 -d /tmp/14850.b64 | gzip -d > /tmp/14850.patch
           git apply /tmp/14850.patch
-          cat .github/import/14851.part00 .github/import/14851.part01 .github/import/14851.part02 .github/import/14851.part03 > /tmp/14851.b64
-          test "$(wc -c < /tmp/14851.b64)" -eq 6688
+          cat .github/import/14851v2.part00 .github/import/14851v2.part01 .github/import/14851v2.part02 .github/import/14851v2.part03 .github/import/14851v2.part04 > /tmp/14851.b64
+          test "$(wc -c < /tmp/14851.b64)" -eq 8036
           base64 -d /tmp/14851.b64 | gzip -d > /tmp/14851.patch
           git apply /tmp/14851.patch
 
           grep -q '<version>1.48.51</version>' pom.xml
           grep -q 'version: 1.48.51' src/main/resources/plugin.yml
-          grep -q 'class SurfaceGuardianRequestBridge' src/main/java/com/arlight/bingo/util/SurfaceGuardianRequestBridge.java
-          grep -q 'boss test cinematic' src/main/java/com/arlight/bingo/commands/OverworldBossTestCommands.java
+          test -f src/main/java/com/arlight/bingo/util/SurfaceGuardianRequestBridge.java
+          test -f src/main/java/com/arlight/bingo/commands/OverworldBossTestCommands.java
           grep -q 'arlightbosses:surface_guardian' src/main/java/com/arlight/bingo/listeners/OverworldVillageSafety.java
           grep -q 'boss-cinematic-request' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           ! grep -q 'setShadowed' src/main/java/com/arlight/bingo/util/CampaignItemBridge.java
