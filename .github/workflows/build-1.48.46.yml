@@ -1,4 +1,4 @@
-name: Compilar ArlightBingo 1.48.46
+name: Compilar ArlightBingo 1.48.47
 
 on:
   workflow_dispatch:
@@ -8,12 +8,14 @@ on:
     paths:
       - '.github/workflows/build-1.48.46.yml'
       - '.github/import/14846.patch.gz.b64'
+      - '.github/import/14847.patch.gz.b64'
   pull_request:
     branches:
       - main
     paths:
       - '.github/workflows/build-1.48.46.yml'
       - '.github/import/14846.patch.gz.b64'
+      - '.github/import/14847.patch.gz.b64'
 
 permissions:
   contents: read
@@ -36,7 +38,7 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Aplicar fuentes 1.48.45 y corrección 1.48.46
+      - name: Aplicar fuentes hasta 1.48.47
         shell: bash
         run: |
           set -euo pipefail
@@ -44,13 +46,14 @@ jobs:
           git apply /tmp/14845.patch
           base64 -d .github/import/14846.patch.gz.b64 | gzip -d > /tmp/14846.patch
           git apply /tmp/14846.patch
-          grep -q '<version>1.48.46</version>' pom.xml
-          grep -q 'version: 1.48.46' src/main/resources/plugin.yml
-          grep -q 'spawnModEntity' src/main/java/com/arlight/bingo/util/ArclightDirectBridge.java
-          grep -q 'spawnPedestalMedalDisplay' src/main/java/com/arlight/bingo/util/ArclightDirectBridge.java
-          grep -q 'ensureMedalPedestalVisual' src/main/java/com/arlight/bingo/util/CampaignItemBridge.java
-          grep -q 'debugRitualTestResync' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
-          grep -q 'getChunkAt(TEST_BOSS_X' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
+          base64 -d .github/import/14847.patch.gz.b64 | gzip -d > /tmp/14847.patch
+          git apply /tmp/14847.patch
+          grep -q '<version>1.48.47</version>' pom.xml
+          grep -q 'version: 1.48.47' src/main/resources/plugin.yml
+          grep -q 'spawnPedestalMedalItem' src/main/java/com/arlight/bingo/util/ArclightDirectBridge.java
+          grep -q 'summonModEntityCommand' src/main/java/com/arlight/bingo/util/ArclightDirectBridge.java
+          grep -q 'minecraft:item' src/main/java/com/arlight/bingo/util/ArclightDirectBridge.java
+          grep -q 'Medallas flotantes visibles recreadas' src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
           git diff --check
 
       - name: Instalar ArlightCore
@@ -69,7 +72,7 @@ jobs:
           set -euo pipefail
           JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' -print -quit)"
           test -n "$JAR"
-          unzip -p "$JAR" plugin.yml | grep -q 'version: 1.48.46'
+          unzip -p "$JAR" plugin.yml | grep -q 'version: 1.48.47'
           jar tf "$JAR" > /tmp/jar-contents.txt
           grep -Fxq 'com/arlight/bingo/util/ArclightDirectBridge.class' /tmp/jar-contents.txt
           grep -Fxq 'com/arlight/bingo/util/CampaignItemBridge.class' /tmp/jar-contents.txt
@@ -82,25 +85,25 @@ jobs:
           set -euo pipefail
           mkdir -p dist/source
           JAR="$(find target -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' -print -quit)"
-          cp "$JAR" dist/ArlightBingo-1.48.46.jar
+          cp "$JAR" dist/ArlightBingo-1.48.47.jar
           rsync -a --exclude '.git/' --exclude '.github/import/' --exclude 'target/' --exclude 'dist/' ./ dist/source/
-          (cd dist/source && zip -qr ../ArlightBingo-1.48.46-SOURCE.zip .)
-          sha256sum dist/ArlightBingo-1.48.46.jar dist/ArlightBingo-1.48.46-SOURCE.zip > dist/ArlightBingo-1.48.46-SHA256.txt
+          (cd dist/source && zip -qr ../ArlightBingo-1.48.47-SOURCE.zip .)
+          sha256sum dist/ArlightBingo-1.48.47.jar dist/ArlightBingo-1.48.47-SOURCE.zip > dist/ArlightBingo-1.48.47-SHA256.txt
 
       - name: Subir JAR
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.48.46-JAR
-          path: dist/ArlightBingo-1.48.46.jar
+          name: ArlightBingo-1.48.47-JAR
+          path: dist/ArlightBingo-1.48.47.jar
           if-no-files-found: error
           retention-days: 30
 
       - name: Subir fuente y hashes
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.48.46-SOURCE
+          name: ArlightBingo-1.48.47-SOURCE
           path: |
-            dist/ArlightBingo-1.48.46-SOURCE.zip
-            dist/ArlightBingo-1.48.46-SHA256.txt
+            dist/ArlightBingo-1.48.47-SOURCE.zip
+            dist/ArlightBingo-1.48.47-SHA256.txt
           if-no-files-found: error
           retention-days: 30
