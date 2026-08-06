@@ -1,6 +1,7 @@
 package com.arlight.bingo.template;
 
 import com.arlight.bingo.BingoPlugin;
+import com.arlight.bingo.listeners.OverworldAutoRepair148;
 import com.arlight.bingo.util.ChunkyBridge;
 import com.arlight.bingo.util.CampaignMissionItems;
 import org.bukkit.Bukkit;
@@ -56,9 +57,10 @@ import java.util.function.Consumer;
  * futura la carpeta se copiará; no se volverán a construir millones de bloques.
  *
  * La generación se divide en dos fases:
- *  1) Chunky pregenera el mundo vanilla completo dentro del borde.
- *  2) Este constructor añade pueblo, corrupción, minas, fortines y ciudadela
- *     por lotes pequeños en el hilo del servidor.
+ *  1) Chunky pregenera la isla determinista completa dentro del borde.
+ *  2) Con la campaña 1.48 activa sólo escribe anclas; el constructor auditado
+ *     crea después todo el diseño sobre una isla limpia. El modo 1.43 queda
+ *     disponible únicamente cuando esa campaña se desactiva explícitamente.
  */
 public final class OverworldTemplateManager implements Listener {
 
@@ -69,14 +71,17 @@ public final class OverworldTemplateManager implements Listener {
 
     private static final String MARKER = "arlight-overworld-template.properties";
     private static final String IN_PROGRESS_MARKER = "arlight-overworld-template-building.properties";
-    private static final String VERSION = "1.39.1-overworld-playable-city-v2-hang-fix";
-    private static final String STRUCTURE_REVISION = "1.39.1-linear-district-campaign-v2-safe-planning";
+    private static final String DECORATION_MARKER = "arlight-overworld-decoration.properties";
+    private static final String DECORATION_REVISION = "1.48.31-harbor-corrosion-groves-1";
+    private static final String VERSION = "1.43.0-living-occupied-villages";
+    private static final String STRUCTURE_REVISION = "1.48.30-manual-commit-frontier-dressing-1";
     private static final String SOMITA_TAG = "arlightbingo_template_somita";
     private static final String GUIDE_TAG = "arlightbingo_template_guide";
     private static final String VILLAGE_LIFE_TAG = "arlightbingo_village_life";
 
     private final BingoPlugin plugin;
     private final ChunkyBridge chunky;
+    private final TemplateRevisionManager revisions;
     private final NamespacedKey guideKey;
     private final NamespacedKey dungeonXKey;
     private final NamespacedKey dungeonZKey;
@@ -90,14 +95,20 @@ public final class OverworldTemplateManager implements Listener {
     private OverworldTemplateBuilder builder;
     private CompletableFuture<Void> pregenerationFuture;
     private CompletableFuture<Void> stabilizationFuture;
+    private BukkitTask decorationTask;
+    private volatile String decorationDetail = "sin iniciar";
+    private volatile int decorationApplied;
+    private volatile int decorationTotal;
 
     public OverworldTemplateManager(BingoPlugin plugin) {
         this.plugin = plugin;
         this.chunky = new ChunkyBridge(plugin);
+        this.revisions = new TemplateRevisionManager(plugin);
         this.guideKey = new NamespacedKey(plugin, "template_guide_villager");
         this.dungeonXKey = new NamespacedKey(plugin, "template_dungeon_x");
         this.dungeonZKey = new NamespacedKey(plugin, "template_dungeon_z");
         this.corruptionChunkKey = new NamespacedKey(plugin, "template_corruption_chunk_v2");
+        this.revisions.bootstrapOverworld(worldName(), "legacy-1.39.1");
     }
 
     public String worldName() {
@@ -107,23 +118,25 @@ public final class OverworldTemplateManager implements Listener {
     public void resumeIfNeeded() {
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (isBusy()) return;
-            if (isCompleteOnDisk()) {
+            Path inProgress = TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER)
+                    .orElse(null);
+            if (revisions.hasWorkingRevision() && inProgress != null
+                    && VERSION.equals(TemplateAuditUtil.readProperty(inProgress, "version"))) {
+                plugin.getLogger().warning("Se detectó una revisión Overworld interrumpida después de Chunky. "
+                        + "Reanudando únicamente la construcción custom.");
+                resume(Bukkit.getConsoleSender());
+                return;
+            }
+            if (revisions.hasWorkingRevision() && inProgress != null) {
+                String interruptedVersion = TemplateAuditUtil.readProperty(inProgress, "version");
+                plugin.getLogger().warning("Existe una revisión Overworld interrumpida de "
+                        + (interruptedVersion == null ? "una versión desconocida" : interruptedVersion)
+                        + ". Bingo 1.43.0 no la mezclará con los pueblos nuevos; usa reset y genera una revisión limpia.");
+            }
+            if (isReadyForMatches()) {
                 stage = Stage.COMPLETE;
                 progress = 1.0D;
-                detail = "plantilla completa y disponible para copiar a partidas";
-                return;
-            }
-            if (TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER).isPresent()) {
-                plugin.getLogger().warning("Se detectó una plantilla Overworld interrumpida después de Chunky. Reanudando solo la construcción custom.");
-                resume(Bukkit.getConsoleSender());
-                return;
-            }
-            // Existe una plantilla completa de una revisión anterior, pero su versión
-            // ya no coincide con la capital jugable V2. Se reutilizan sus chunks y seed:
-            // únicamente se ejecuta la fase custom, sin repetir Chunky ni borrar el mundo.
-            if (TemplateMarkerLookup.findMarker(plugin, worldName(), MARKER).isPresent()) {
-                plugin.getLogger().warning("Plantilla Overworld anterior detectada. Aplicando automáticamente la revisión jugable 1.39.0 sin repetir Chunky.");
-                resume(Bukkit.getConsoleSender());
+                detail = "revisión estable disponible; no se modifica automáticamente";
             }
         });
     }
@@ -141,9 +154,25 @@ public final class OverworldTemplateManager implements Listener {
         if (isCompleteOnDisk()) {
             stage = Stage.COMPLETE;
             progress = 1.0D;
-            detail = "plantilla completa y disponible para copiar a partidas";
-            sender.sendMessage(ChatColor.GREEN + "La plantilla Overworld ya está completa; no se ejecutó Chunky ni se modificó el mundo.");
+            detail = "revisión candidata completa y lista para auditar";
+            sender.sendMessage(ChatColor.GREEN + "La revisión candidata ya está completa; audítala y usa promote.");
             return true;
+        }
+        Path inProgress = TemplateMarkerLookup.findMarker(plugin, worldName(), IN_PROGRESS_MARKER)
+                .orElse(null);
+        if (!revisions.hasWorkingRevision() || inProgress == null) {
+            sender.sendMessage(ChatColor.RED + "No existe una revisión interrumpida reanudable. "
+                    + "No se aplicarán estructuras nuevas sobre la estable; crea una revisión limpia con "
+                    + "/bingo template overworld generate <revision>.");
+            return false;
+        }
+        String interruptedVersion = TemplateAuditUtil.readProperty(inProgress, "version");
+        if (!VERSION.equals(interruptedVersion)) {
+            sender.sendMessage(ChatColor.RED + "La revisión interrumpida pertenece a "
+                    + (interruptedVersion == null ? "una versión desconocida" : interruptedVersion)
+                    + ". Para impedir que edificios antiguos se mezclen con los nuevos, usa "
+                    + "/bingo template overworld reset y genera una revisión limpia de 1.43.0.");
+            return false;
         }
         Path folder = TemplateMarkerLookup.activeFolder(plugin, worldName());
         if (!Files.isDirectory(folder)) {
@@ -189,15 +218,29 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     public boolean isReadyForMatches() {
-        return stage == Stage.COMPLETE || isCompleteOnDisk();
+        String activeWorld = revisions.activeOverworldWorld(worldName());
+        return Files.isRegularFile(TemplateMarkerLookup.activeFolder(plugin, activeWorld).resolve(MARKER));
     }
 
     public String markerDiagnostic() {
-        return (isCompleteOnDisk() ? "READY" : "MISSING")
-                + " [" + TemplateMarkerLookup.checkedFolders(plugin, worldName()) + "]";
+        String activeWorld = revisions.activeOverworldWorld(worldName());
+        boolean ready = Files.isRegularFile(TemplateMarkerLookup.activeFolder(plugin, activeWorld).resolve(MARKER));
+        return (ready ? "READY" : "MISSING") + " [estable=" + revisions.activeRevision()
+                + ", mundo=" + activeWorld + "]";
     }
 
     public synchronized boolean generate(CommandSender sender, boolean force) {
+        String revision = revisions.automaticRevisionId();
+        if (!force && (isReadyForMatches() || Files.exists(
+                plugin.getServer().getWorldContainer().toPath().resolve(worldName())))) {
+            sender.sendMessage(ChatColor.YELLOW + "Ya existe una plantilla estable. "
+                    + "Crea una revisión limpia con /bingo template overworld generate <revision>.");
+            return false;
+        }
+        return generate(sender, revision);
+    }
+
+    public synchronized boolean generate(CommandSender sender, String revisionId) {
         if (!plugin.getConfig().getBoolean("template-worlds.overworld.enabled", true)) {
             sender.sendMessage(ChatColor.RED + "La plantilla Overworld está desactivada en config.yml.");
             return false;
@@ -207,26 +250,42 @@ public final class OverworldTemplateManager implements Listener {
             return false;
         }
 
-        String name = worldName();
-        World loaded = Bukkit.getWorld(name);
-        Path folder = plugin.getServer().getWorldContainer().toPath().resolve(name);
-        if ((loaded != null || Files.exists(folder)) && !force) {
-            sender.sendMessage(ChatColor.YELLOW + "La plantilla '" + name + "' ya existe. Usa /bingo template overworld generate force para reemplazarla.");
+        TemplateRevisionManager.BeginResult prepared =
+                revisions.beginOverworldRevision(sender, revisionId, worldName());
+        if (!prepared.success()) {
+            sender.sendMessage(ChatColor.RED + prepared.message());
             return false;
         }
 
-        if (force && !deleteExisting(name, sender)) return false;
+        String name = worldName();
+        if (Bukkit.getWorld(name) != null || Files.exists(
+                plugin.getServer().getWorldContainer().toPath().resolve(name))) {
+            revisions.markOverworldFailed("la carpeta limpia no quedó disponible");
+            sender.sendMessage(ChatColor.RED + "No se pudo liberar el nombre del mundo para la revisión limpia.");
+            return false;
+        }
 
         stage = Stage.CREATING_WORLD;
-        detail = "creando mundo vanilla base";
+        detail = "creando revisión limpia " + prepared.revision();
         progress = 0.01D;
 
         long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        boolean islandMode = plugin.getConfig().getBoolean(
+                "template-worlds.overworld.island.enabled", true);
+        int islandRadius = Math.max(420, plugin.getConfig().getInt(
+                "template-worlds.overworld.island.land-radius", 500));
+        int seaLevel = plugin.getConfig().getInt(
+                "template-worlds.overworld.island.sea-level", 62);
+        int oceanMargin = Math.max(96, plugin.getConfig().getInt(
+                "template-worlds.overworld.island.ocean-margin", 160));
         WorldCreator creator = new WorldCreator(name)
                 .environment(World.Environment.NORMAL)
                 .type(WorldType.NORMAL)
                 .seed(seed)
-                .generateStructures(true);
+                .generateStructures(!islandMode);
+        if (islandMode) {
+            creator.generator(new OverworldIslandGenerator(seed, islandRadius, seaLevel));
+        }
         World world = creator.createWorld();
         if (world == null) {
             fail("Bukkit no pudo crear el mundo plantilla.");
@@ -234,7 +293,9 @@ public final class OverworldTemplateManager implements Listener {
             return false;
         }
 
-        int radius = Math.max(512, plugin.getConfig().getInt("template-worlds.overworld.radius", 1536));
+        int radius = islandMode
+                ? islandRadius + oceanMargin
+                : Math.max(512, plugin.getConfig().getInt("template-worlds.overworld.radius", 1536));
         world.getWorldBorder().setCenter(0.0D, 0.0D);
         world.getWorldBorder().setSize(radius * 2.0D);
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
@@ -246,9 +307,11 @@ public final class OverworldTemplateManager implements Listener {
         world.setAutoSave(true);
 
         stage = Stage.PREGENERATING;
-        detail = "Chunky pregenerando " + (radius * 2) + "×" + (radius * 2) + " bloques";
+        detail = "Chunky pregenerando " + (islandMode ? "isla " : "Overworld ")
+                + (radius * 2) + "×" + (radius * 2) + " bloques";
         progress = 0.03D;
-        sender.sendMessage(ChatColor.GREEN + "Plantilla creada. Chunky empezó a pregenerar el Overworld; después se construirá por lotes.");
+        sender.sendMessage(ChatColor.GREEN + "Revisión " + prepared.revision()
+                + " creada. Chunky empezó a pregenerar el Overworld limpio.");
 
         int tileRadius = plugin.getConfig().getInt(
                 "template-worlds.safety.chunky-tile-radius", 384);
@@ -286,7 +349,7 @@ public final class OverworldTemplateManager implements Listener {
             return;
         }
         stage = Stage.PLANNING;
-        detail = "calculando pueblo, ciudadela, minas y corrupción";
+        detail = "planificando refugio, distritos y capital invadida";
         progress = 0.20D;
         Location savedVillageSpawn = readMarkerLocation(world, "village");
         Location savedDungeon = readMarkerLocation(world, "dungeon");
@@ -335,12 +398,14 @@ public final class OverworldTemplateManager implements Listener {
                         fail("La estructura terminó, pero no se pudo guardar su marcador COMPLETE.");
                         return;
                     }
+                    revisions.markOverworldReady(VERSION,
+                            world.getWorldFolder().toPath().resolve(MARKER));
                     deleteInProgressMarker();
                     stage = Stage.COMPLETE;
-                    detail = "plantilla completa y lista para revisar";
+                    detail = "revisión READY; pendiente de audit y promote";
                     progress = 1.0D;
                     Bukkit.broadcast(ChatColor.GREEN
-                                    + "[Bingo] Plantilla Overworld completada. Usa /bingo template overworld tp para revisarla.",
+                                    + "[Bingo] Revisión Overworld READY. Revísala con tp/audit y luego usa promote.",
                             "arlightbingo.admin");
                 }));
     }
@@ -373,8 +438,14 @@ public final class OverworldTemplateManager implements Listener {
             sender.sendMessage(ChatColor.RED + "La plantilla o Chunky siguen trabajando. Espera a que termine antes de borrar el mundo.");
             return false;
         }
+        if (!revisions.hasWorkingRevision()) {
+            sender.sendMessage(ChatColor.RED + "No hay una revisión de trabajo que descartar. "
+                    + "La plantilla estable no se borra con reset.");
+            return false;
+        }
         boolean ok = deleteExisting(worldName(), sender);
         if (ok) {
+            revisions.discardWorkingAfterReset();
             stage = Stage.IDLE;
             detail = "sin iniciar";
             progress = 0.0D;
@@ -421,15 +492,20 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     public boolean teleport(Player player) {
-        World world = Bukkit.getWorld(worldName());
-        if (world == null && Files.isDirectory(TemplateMarkerLookup.activeFolder(plugin, worldName()))) {
+        String reviewWorldName = reviewWorldName();
+        World world = Bukkit.getWorld(reviewWorldName);
+        if (world == null && Files.isDirectory(TemplateMarkerLookup.activeFolder(plugin, reviewWorldName))) {
             long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
-            world = new WorldCreator(worldName()).environment(World.Environment.NORMAL)
+            world = new WorldCreator(reviewWorldName).environment(World.Environment.NORMAL)
                     .type(WorldType.NORMAL).seed(seed).generateStructures(true).createWorld();
         }
         if (world == null) return false;
-        if (villageCenter == null) villageCenter = readMarkerLocation(world, "village");
-        if (dungeonCenter == null) dungeonCenter = readMarkerLocation(world, "dungeon");
+        if (villageCenter == null || villageCenter.getWorld() != world) {
+            villageCenter = readMarkerLocation(world, "village");
+        }
+        if (dungeonCenter == null || dungeonCenter.getWorld() != world) {
+            dungeonCenter = readMarkerLocation(world, "dungeon");
+        }
         installMatchActors(world);
         Location target = villageCenter != null ? villageCenter.clone().add(0.5, 1.0, 0.5) : world.getSpawnLocation();
         return player.teleport(target);
@@ -591,9 +667,10 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     public boolean testBoss(Player player) {
-        World world = Bukkit.getWorld(worldName());
+        World world = Bukkit.getWorld(reviewWorldName());
         if (world == null || !templateMarkerExists(world)) return false;
-        Location dungeonLocation = dungeonCenter != null ? dungeonCenter.clone() : readMarkerLocation(world, "dungeon");
+        Location dungeonLocation = dungeonCenter != null && dungeonCenter.getWorld() == world
+                ? dungeonCenter.clone() : readMarkerLocation(world, "dungeon");
         if (dungeonLocation == null) return false;
         Location markedBoss = readMarkerLocation(world, "boss");
         Location arena = markedBoss != null
@@ -625,28 +702,773 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     public String status() {
-        return stage.name().toLowerCase(Locale.ROOT) + " · " + Math.round(progress * 100.0D) + "% · " + detail;
+        String base = stage.name().toLowerCase(Locale.ROOT) + " · "
+                + Math.round(progress * 100.0D) + "% · " + detail;
+        return decorationTask == null ? base : base + " · decoración: " + decorationDetail;
     }
 
     public void audit(CommandSender sender) {
         long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        String auditedWorld = reviewWorldName();
         sender.sendMessage(ChatColor.GREEN + "=== Auditoría plantilla Overworld ===");
-        for (String line : TemplateAuditUtil.audit(plugin, worldName(), MARKER, IN_PROGRESS_MARKER,
+        for (String line : TemplateAuditUtil.audit(plugin, auditedWorld, MARKER, IN_PROGRESS_MARKER,
                 VERSION, World.Environment.NORMAL, seed)) {
             sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + line);
         }
-        Path marker = TemplateMarkerLookup.findMarker(plugin, worldName(), MARKER).orElse(null);
+        Path marker = TemplateMarkerLookup.findMarker(plugin, auditedWorld, MARKER).orElse(null);
         String revision = TemplateAuditUtil.readProperty(marker, "structureRevision");
+        String zoneAStatus = TemplateAuditUtil.readProperty(marker, "zoneAStatus");
+        String templateRevision = TemplateAuditUtil.readProperty(marker, "templateRevision");
+        String terrainMode = TemplateAuditUtil.readProperty(marker, "terrainMode");
+        String capitalArchitecture = TemplateAuditUtil.readProperty(marker, "capitalArchitecture");
+        String frontierDecoration = TemplateAuditUtil.readProperty(marker, "frontierDecoration");
+        String legacyStructures = TemplateAuditUtil.readProperty(marker, "legacyStructures");
         sender.sendMessage(ChatColor.GRAY + "- revisión-estructural=" + ChatColor.WHITE
                 + (revision == null ? "ausente" : revision) + " (esperada " + STRUCTURE_REVISION + ")");
+        sender.sendMessage(ChatColor.GRAY + "- revisión-plantilla=" + ChatColor.WHITE
+                + (templateRevision == null ? "ausente" : templateRevision));
+        sender.sendMessage(ChatColor.GRAY + "- zona-a=" + ChatColor.WHITE
+                + (zoneAStatus == null ? "incompleta" : zoneAStatus));
+        sender.sendMessage(ChatColor.GRAY + "- terreno=" + ChatColor.WHITE
+                + (terrainMode == null ? "legacy/desconocido" : terrainMode));
+        sender.sendMessage(ChatColor.GRAY + "- arquitectura-capital=" + ChatColor.WHITE
+                + (capitalArchitecture == null ? "ausente" : capitalArchitecture));
+        sender.sendMessage(ChatColor.GRAY + "- decoración-exterior=" + ChatColor.WHITE
+                + (frontierDecoration == null ? "ausente" : frontierDecoration));
+        sender.sendMessage(ChatColor.GRAY + "- estructuras-heredadas=" + ChatColor.WHITE
+                + (legacyStructures == null ? "desconocido" : legacyStructures));
+        sender.sendMessage(ChatColor.GRAY + "- anclas-zona-a=" + ChatColor.WHITE
+                + TemplateAuditUtil.missingProperties(marker, "village", "guide", "somita",
+                "zoneABounds", "dungeon"));
         sender.sendMessage(ChatColor.GRAY + "- integración-terreno=" + ChatColor.WHITE
                 + "cimientos completos, muros de contención y caminos apoyados");
         sender.sendMessage(ChatColor.GRAY + "- estado-runtime=" + ChatColor.WHITE + status());
         sender.sendMessage(ChatColor.GRAY + "- diagnóstico-marker=" + ChatColor.WHITE + markerDiagnostic());
+        Path decorationMarker = TemplateMarkerLookup.activeFolder(plugin, auditedWorld)
+                .resolve(DECORATION_MARKER);
+        sender.sendMessage(ChatColor.GRAY + "- decoración-isla=" + ChatColor.WHITE
+                + (Files.isRegularFile(decorationMarker)
+                ? TemplateAuditUtil.readProperty(decorationMarker, "revision") : "no aplicada"));
+        for (String line : revisions.overworldAuditLines(worldName())) {
+            sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + line);
+        }
+    }
+
+    public void repairScan(CommandSender sender) {
+        if (isBusy()) {
+            sender.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return;
+        }
+        World world = loadReviewWorld();
+        if (world == null) {
+            sender.sendMessage(ChatColor.RED + "No se pudo cargar la revisión Overworld para escanearla.");
+            return;
+        }
+        OverworldAutoRepair148.scan(plugin, world, world.getWorldFolder().toPath(), sender);
+    }
+
+    public void repairPreview(Player player, int radius) {
+        if (isBusy()) {
+            player.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return;
+        }
+        World world = loadReviewWorld();
+        if (world == null) {
+            player.sendMessage(ChatColor.RED + "No se pudo cargar la revisión Overworld.");
+            return;
+        }
+        if (player.getWorld() != world) {
+            player.sendMessage(ChatColor.YELLOW + "Primero usa /bingo template overworld tp para ver la revisión.");
+            return;
+        }
+        OverworldAutoRepair148.preview(plugin, world, world.getWorldFolder().toPath(),
+                player, Math.max(0, radius));
+    }
+
+    public boolean repairApply(CommandSender sender, Location center, int radius) {
+        if (isBusy()) {
+            sender.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return false;
+        }
+        World world = loadReviewWorld();
+        if (world == null) {
+            sender.sendMessage(ChatColor.RED + "No se pudo cargar la revisión Overworld.");
+            return false;
+        }
+        Location effectiveCenter = center != null && center.getWorld() == world ? center : null;
+        return OverworldAutoRepair148.apply(plugin, world, world.getWorldFolder().toPath(),
+                sender, effectiveCenter, Math.max(0, radius));
+    }
+
+    public boolean repairRollback(CommandSender sender) {
+        if (isBusy()) {
+            sender.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return false;
+        }
+        World world = loadReviewWorld();
+        if (world == null) {
+            sender.sendMessage(ChatColor.RED + "No se pudo cargar la revisión Overworld.");
+            return false;
+        }
+        return OverworldAutoRepair148.rollback(plugin, world, world.getWorldFolder().toPath(), sender);
+    }
+
+    public String repairStatus() {
+        World world = loadReviewWorld();
+        if (world == null) return "mundo no disponible";
+        return OverworldAutoRepair148.status(world, world.getWorldFolder().toPath());
+    }
+
+    private World loadReviewWorld() {
+        String name = reviewWorldName();
+        World loaded = Bukkit.getWorld(name);
+        if (loaded != null) return loaded;
+        Path folder = TemplateMarkerLookup.activeFolder(plugin, name);
+        if (!Files.isDirectory(folder)) return null;
+        long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        return new WorldCreator(name).environment(World.Environment.NORMAL)
+                .type(WorldType.NORMAL).seed(seed).generateStructures(true).createWorld();
+    }
+
+    public void revisions(CommandSender sender) {
+        sender.sendMessage(ChatColor.GREEN + "=== Revisiones Overworld ===");
+        for (String line : revisions.overworldRevisionLines()) {
+            sender.sendMessage(ChatColor.GRAY + "- " + ChatColor.WHITE + line);
+        }
+    }
+
+    public synchronized boolean commit(CommandSender sender, boolean force) {
+        if (isBusy()) {
+            sender.sendMessage(ChatColor.YELLOW + "La plantilla todavía se está generando: " + status());
+            return false;
+        }
+        if (!revisions.hasWorkingRevision()) {
+            sender.sendMessage(ChatColor.RED + "No hay una revisión Overworld en trabajo para guardar.");
+            return false;
+        }
+
+        World world = loadReviewWorld();
+        if (world == null || !worldName().equalsIgnoreCase(world.getName())) {
+            sender.sendMessage(ChatColor.RED + "No se pudo cargar la revisión de trabajo actual.");
+            return false;
+        }
+
+        flushTemplateWorld(world);
+        Location village = resolveCommitLocation(world, "village", true);
+        Location dungeon = resolveCommitLocation(world, "dungeon", false);
+        if (village == null || dungeon == null) {
+            sender.sendMessage(ChatColor.RED + "No se pudieron resolver las coordenadas base de la revisión para guardarla.");
+            return false;
+        }
+
+        this.villageCenter = village.clone();
+        this.dungeonCenter = dungeon.clone();
+        if (!writeMarker(world, BuildResult.success(village, dungeon))) {
+            sender.sendMessage(ChatColor.RED + "No se pudo escribir el marcador COMPLETE de la revisión manual.");
+            return false;
+        }
+
+        revisions.markOverworldManualCommit(force ? "force" : "standard");
+        revisions.markOverworldReady(VERSION, world.getWorldFolder().toPath().resolve(MARKER));
+        deleteInProgressMarker();
+
+        stage = Stage.COMPLETE;
+        progress = 1.0D;
+        detail = force
+                ? "revisión guardada manualmente con aprobación force; lista para promote"
+                : "revisión guardada manualmente; revisa con audit y luego promote";
+
+        sender.sendMessage(ChatColor.GREEN + "Revisión " + revisions.workingRevision()
+                + " guardada exactamente como está el mundo ahora.");
+        sender.sendMessage(ChatColor.YELLOW + "Siguiente paso: " + ChatColor.WHITE
+                + "/bingo template overworld audit");
+        sender.sendMessage(ChatColor.YELLOW + "Cuando la des por buena: " + ChatColor.WHITE
+                + "/bingo template overworld promote " + revisions.workingRevision());
+        if (force) {
+            sender.sendMessage(ChatColor.GOLD + "Commit force aplicado: la revisión quedó marcada como aprobación manual.");
+        }
+        return true;
+    }
+
+    public synchronized boolean decorate(CommandSender sender, String requestedAction) {
+        String action = requestedAction == null ? "apply" : requestedAction.toLowerCase(Locale.ROOT);
+        if (action.equals("status")) {
+            sender.sendMessage(ChatColor.GREEN + "Decoración Overworld: " + ChatColor.WHITE
+                    + decorationStatus());
+            return true;
+        }
+        if (action.equals("cancel")) {
+            if (decorationTask == null) {
+                sender.sendMessage(ChatColor.YELLOW + "No hay una decoración activa.");
+                return true;
+            }
+            decorationTask.cancel();
+            decorationTask = null;
+            decorationDetail = "cancelada por administrador en " + decorationApplied + "/" + decorationTotal;
+            sender.sendMessage(ChatColor.YELLOW + "Decoración cancelada. Los cambios ya aplicados se conservan.");
+            return true;
+        }
+        if (!action.equals("apply") && !action.equals("preview") && !action.equals("force")) {
+            sender.sendMessage(ChatColor.YELLOW + "Uso: /bingo template overworld decorate "
+                    + "<preview|apply|force|status|cancel>");
+            return false;
+        }
+        if (decorationTask != null) {
+            sender.sendMessage(ChatColor.YELLOW + "Ya hay una decoración activa: " + decorationStatus());
+            return false;
+        }
+        if (isBusy()) {
+            sender.sendMessage(ChatColor.YELLOW + "La plantilla todavía está ocupada: " + status());
+            return false;
+        }
+        if (!revisions.hasWorkingRevision()) {
+            sender.sendMessage(ChatColor.RED + "La decoración solo puede aplicarse sobre una revisión de trabajo. "
+                    + "No se modificará directamente la plantilla estable.");
+            return false;
+        }
+
+        World world = loadReviewWorld();
+        if (world == null || !worldName().equalsIgnoreCase(world.getName())) {
+            sender.sendMessage(ChatColor.RED + "No se pudo cargar el mundo de la revisión de trabajo.");
+            return false;
+        }
+        Location village = resolveCommitLocation(world, "village", true);
+        Location dungeon = resolveCommitLocation(world, "dungeon", false);
+        CoastAnchor coast = findCoastAnchor(world, village);
+        if (coast == null) {
+            sender.sendMessage(ChatColor.RED + "No se encontró una costa segura para colocar el puerto.");
+            return false;
+        }
+
+        if (action.equals("preview")) {
+            sender.sendMessage(ChatColor.AQUA + "=== Previsualización decoración de isla ===");
+            sender.sendMessage(ChatColor.GRAY + "- puerto=" + ChatColor.WHITE
+                    + coast.x() + "," + coast.deckY() + "," + coast.z());
+            sender.sendMessage(ChatColor.GRAY + "- vegetación=" + ChatColor.WHITE
+                    + "arboledas exteriores alrededor del refugio y rutas abiertas");
+            sender.sendMessage(ChatColor.GRAY + "- corrupción=" + ChatColor.WHITE
+                    + "frentes de esmeralda musgosa alrededor de distritos y ciudadela");
+            sender.sendMessage(ChatColor.GRAY + "- protección=" + ChatColor.WHITE
+                    + "solo reemplaza terreno natural, agua, plantas o aire; no sobrescribe edificios");
+            sender.sendMessage(ChatColor.YELLOW + "Aplicar con: " + ChatColor.WHITE
+                    + "/bingo template overworld decorate apply");
+            return true;
+        }
+
+        Path marker = world.getWorldFolder().toPath().resolve(DECORATION_MARKER);
+        String appliedRevision = TemplateAuditUtil.readProperty(marker, "revision");
+        if (DECORATION_REVISION.equals(appliedRevision) && !action.equals("force")) {
+            sender.sendMessage(ChatColor.YELLOW + "Esta decoración ya figura aplicada. "
+                    + "Usa decorate force solo si quieres reconstruir las piezas faltantes.");
+            return false;
+        }
+
+        List<DecorationOp> operations = planIslandDecoration(world, village, dungeon, coast);
+        if (operations.isEmpty()) {
+            sender.sendMessage(ChatColor.RED + "No se generaron operaciones de decoración seguras.");
+            return false;
+        }
+
+        decorationApplied = 0;
+        decorationTotal = operations.size();
+        decorationDetail = "aplicando puerto, vegetación y corrosión";
+        int batchSize = Math.max(200, plugin.getConfig().getInt(
+                "template-worlds.overworld.decoration.blocks-per-tick", 1200));
+        final int[] cursor = {0};
+        decorationTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            int limit = Math.min(operations.size(), cursor[0] + batchSize);
+            for (; cursor[0] < limit; cursor[0]++) {
+                if (applyDecorationOp(world, operations.get(cursor[0]))) decorationApplied++;
+            }
+            decorationDetail = "aplicando " + cursor[0] + "/" + decorationTotal
+                    + " operaciones; " + decorationApplied + " cambios reales";
+            if (cursor[0] < operations.size()) return;
+
+            BukkitTask finished = decorationTask;
+            decorationTask = null;
+            if (finished != null) finished.cancel();
+            flushTemplateWorld(world);
+            writeDecorationMarker(world, village, dungeon, coast);
+            decorationDetail = "completa; " + decorationApplied + " bloques cambiados";
+            sender.sendMessage(ChatColor.GREEN + "Decoración terminada: puerto, arboledas, "
+                    + "detalles costeros y corrosión de esmeralda musgosa.");
+            sender.sendMessage(ChatColor.YELLOW + "Revísala y luego guarda la revisión con: "
+                    + ChatColor.WHITE + "/bingo template overworld commit");
+        }, 1L, 1L);
+        sender.sendMessage(ChatColor.GREEN + "Decoración iniciada con " + operations.size()
+                + " operaciones protegidas. Consulta /bingo template overworld decorate status.");
+        return true;
+    }
+
+    private String decorationStatus() {
+        if (decorationTask != null) {
+            int percentage = decorationTotal <= 0 ? 0
+                    : (int) Math.min(100L, Math.round(decorationApplied * 100.0D / decorationTotal));
+            return percentage + "% · " + decorationDetail;
+        }
+        World world = Bukkit.getWorld(reviewWorldName());
+        if (world == null) return decorationDetail;
+        Path marker = world.getWorldFolder().toPath().resolve(DECORATION_MARKER);
+        String revision = TemplateAuditUtil.readProperty(marker, "revision");
+        if (revision == null) return decorationDetail;
+        return "aplicada · " + revision + " · " + decorationDetail;
+    }
+
+    private List<DecorationOp> planIslandDecoration(World world, Location village,
+                                                     Location dungeon, CoastAnchor coast) {
+        List<DecorationOp> operations = new ArrayList<>();
+        planHarbor(world, operations, village, coast);
+
+        int vx = village.getBlockX();
+        int vz = village.getBlockZ();
+        int[][] groves = {
+                {-128, 112}, {-132, -104}, {112, -126}, {142, 96},
+                {-62, 158}, {78, 162}
+        };
+        for (int index = 0; index < groves.length; index++) {
+            planGrove(world, operations, vx + groves[index][0], vz + groves[index][1],
+                    24, 7 + index % 3, 1483100L + index * 997L);
+        }
+
+        int dx = dungeon.getBlockX();
+        int dz = dungeon.getBlockZ();
+        int[][] corruption = {
+                {-148, -18}, {148, 24}, {-118, 116}, {116, 126},
+                {-34, 188}, {38, -176}, {-208, 92}, {208, 76}
+        };
+        for (int index = 0; index < corruption.length; index++) {
+            planCorruptionPatch(world, operations, dx + corruption[index][0],
+                    dz + corruption[index][1], 13 + index % 5,
+                    2 + index % 3, 1483190L + index * 131L);
+        }
+
+        planRoadsideCamp(world, operations, vx + 78, vz + 48, 1483177L);
+        planRoadsideCamp(world, operations, dx - 244, dz + 74, 1483178L);
+        return operations;
+    }
+
+    private CoastAnchor findCoastAnchor(World world, Location origin) {
+        int sea = plugin.getConfig().getInt("template-worlds.overworld.island.sea-level", 62);
+        int[][] directions = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+        CoastAnchor best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (int[] direction : directions) {
+            for (int distance = 48; distance <= 320; distance += 2) {
+                int x = origin.getBlockX() + direction[0] * distance;
+                int z = origin.getBlockZ() + direction[1] * distance;
+                Material atSea = world.getBlockAt(x, sea, z).getType();
+                if (atSea != Material.WATER) continue;
+                int landX = origin.getBlockX() + direction[0] * Math.max(1, distance - 8);
+                int landZ = origin.getBlockZ() + direction[1] * Math.max(1, distance - 8);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = new CoastAnchor(landX, sea + 1, landZ, direction[0], direction[1]);
+                }
+                break;
+            }
+        }
+        return best;
+    }
+
+    private void planHarbor(World world, List<DecorationOp> operations,
+                            Location village, CoastAnchor coast) {
+        int dx = coast.dx();
+        int dz = coast.dz();
+        int px = -dz;
+        int pz = dx;
+        int deckY = coast.deckY();
+
+        planNaturalPath(world, operations, village.getBlockX(), village.getBlockZ(),
+                coast.x() - dx * 8, coast.z() - dz * 8, 3);
+
+        for (int forward = -8; forward <= 12; forward++) {
+            for (int side = -7; side <= 7; side++) {
+                int x = coast.x() + dx * forward + px * side;
+                int z = coast.z() + dz * forward + pz * side;
+                operations.add(new DecorationOp(x, deckY, z,
+                        Math.floorMod(forward + side, 9) == 0 ? Material.DARK_OAK_PLANKS : Material.SPRUCE_PLANKS,
+                        DecorationRule.SOFT, null));
+            }
+        }
+
+        for (int pierSide : new int[]{-5, 5}) {
+            for (int forward = 10; forward <= 44; forward++) {
+                for (int width = -1; width <= 1; width++) {
+                    int x = coast.x() + dx * forward + px * (pierSide + width);
+                    int z = coast.z() + dz * forward + pz * (pierSide + width);
+                    operations.add(new DecorationOp(x, deckY, z, Material.SPRUCE_PLANKS,
+                            DecorationRule.WATER_OR_AIR, null));
+                }
+                if (forward % 6 == 0) {
+                    int x = coast.x() + dx * forward + px * pierSide;
+                    int z = coast.z() + dz * forward + pz * pierSide;
+                    for (int y = deckY - 1; y >= deckY - 5; y--) {
+                        operations.add(new DecorationOp(x, y, z, Material.DARK_OAK_LOG,
+                                DecorationRule.WATER_OR_AIR, null));
+                    }
+                }
+            }
+        }
+
+        for (int forward : new int[]{-5, 4, 14, 28, 42}) {
+            for (int side : new int[]{-7, 7}) {
+                int x = coast.x() + dx * forward + px * side;
+                int z = coast.z() + dz * forward + pz * side;
+                operations.add(new DecorationOp(x, deckY + 1, z, Material.COBBLESTONE_WALL,
+                        DecorationRule.AIR, null));
+                operations.add(new DecorationOp(x, deckY + 2, z, Material.LANTERN,
+                        DecorationRule.AIR, null));
+            }
+        }
+
+        int hutX = coast.x() - dx * 13 + px * 13;
+        int hutZ = coast.z() - dz * 13 + pz * 13;
+        int hutY = naturalSurfaceY(world, hutX, hutZ);
+        planHarborHut(world, operations, hutX, hutY, hutZ, dx, dz);
+
+        for (int i = 0; i < 7; i++) {
+            int x = coast.x() - dx * 2 + px * (-5 + i);
+            int z = coast.z() - dz * 2 + pz * (-5 + i);
+            operations.add(new DecorationOp(x, deckY + 1, z,
+                    i % 3 == 0 ? Material.CHEST : Material.BARREL, DecorationRule.AIR, null));
+        }
+        planFishingBoat(operations, coast.x() + dx * 34 + px * 13,
+                deckY, coast.z() + dz * 34 + pz * 13, dx, dz);
+    }
+
+    private void planHarborHut(World world, List<DecorationOp> operations,
+                               int cx, int y, int cz, int dx, int dz) {
+        int px = -dz;
+        int pz = dx;
+        for (int forward = -4; forward <= 4; forward++) {
+            for (int side = -3; side <= 3; side++) {
+                int x = cx + dx * forward + px * side;
+                int z = cz + dz * forward + pz * side;
+                operations.add(new DecorationOp(x, y, z, Material.COBBLESTONE,
+                        DecorationRule.NATURAL, null));
+                boolean edge = Math.abs(forward) == 4 || Math.abs(side) == 3;
+                for (int height = 1; height <= 4; height++) {
+                    if (!edge) continue;
+                    boolean doorway = forward == -4 && Math.abs(side) <= 1 && height <= 2;
+                    if (!doorway) operations.add(new DecorationOp(x, y + height, z,
+                            height == 1 ? Material.SPRUCE_LOG : Material.SPRUCE_PLANKS,
+                            DecorationRule.AIR, null));
+                }
+            }
+        }
+        for (int layer = 0; layer <= 3; layer++) {
+            for (int forward = -5 + layer; forward <= 5 - layer; forward++) {
+                for (int side : new int[]{-4 + layer, 4 - layer}) {
+                    int x = cx + dx * forward + px * side;
+                    int z = cz + dz * forward + pz * side;
+                    operations.add(new DecorationOp(x, y + 5 + layer, z, Material.DARK_OAK_PLANKS,
+                            DecorationRule.AIR, null));
+                }
+            }
+        }
+        operations.add(new DecorationOp(cx, y + 1, cz, Material.CRAFTING_TABLE,
+                DecorationRule.AIR, null));
+        operations.add(new DecorationOp(cx + px * 2, y + 1, cz + pz * 2, Material.BARREL,
+                DecorationRule.AIR, null));
+        operations.add(new DecorationOp(cx - px * 2, y + 1, cz - pz * 2, Material.SMOKER,
+                DecorationRule.AIR, null));
+        operations.add(new DecorationOp(cx, y + 3, cz, Material.LIGHT,
+                DecorationRule.AIR, "minecraft:light[level=12,waterlogged=false]"));
+    }
+
+    private void planFishingBoat(List<DecorationOp> operations, int cx, int y, int cz,
+                                 int dx, int dz) {
+        int px = -dz;
+        int pz = dx;
+        for (int forward = -5; forward <= 5; forward++) {
+            int halfWidth = Math.max(1, 3 - Math.abs(forward) / 2);
+            for (int side = -halfWidth; side <= halfWidth; side++) {
+                int x = cx + dx * forward + px * side;
+                int z = cz + dz * forward + pz * side;
+                boolean rim = Math.abs(side) == halfWidth;
+                operations.add(new DecorationOp(x, y, z,
+                        rim ? Material.DARK_OAK_PLANKS : Material.SPRUCE_SLAB,
+                        DecorationRule.WATER_OR_AIR, null));
+            }
+        }
+        for (int mast = 1; mast <= 6; mast++) {
+            operations.add(new DecorationOp(cx, y + mast, cz, Material.SPRUCE_FENCE,
+                    DecorationRule.AIR, null));
+        }
+        operations.add(new DecorationOp(cx + px, y + 2, cz + pz, Material.WHITE_BANNER,
+                DecorationRule.AIR, null));
+    }
+
+    private void planNaturalPath(World world, List<DecorationOp> operations,
+                                 int startX, int startZ, int endX, int endZ, int width) {
+        int steps = Math.max(Math.abs(endX - startX), Math.abs(endZ - startZ));
+        if (steps <= 0) return;
+        for (int step = 0; step <= steps; step++) {
+            double t = step / (double) steps;
+            int x = (int) Math.round(startX + (endX - startX) * t);
+            int z = (int) Math.round(startZ + (endZ - startZ) * t);
+            int y = naturalSurfaceY(world, x, z) - 1;
+            boolean mostlyX = Math.abs(endX - startX) >= Math.abs(endZ - startZ);
+            for (int offset = -width / 2; offset <= width / 2; offset++) {
+                int bx = x + (mostlyX ? 0 : offset);
+                int bz = z + (mostlyX ? offset : 0);
+                int by = naturalSurfaceY(world, bx, bz) - 1;
+                operations.add(new DecorationOp(bx, by, bz,
+                        step % 11 == 0 ? Material.COARSE_DIRT : Material.DIRT_PATH,
+                        DecorationRule.NATURAL, null));
+            }
+        }
+    }
+
+    private void planGrove(World world, List<DecorationOp> operations, int cx, int cz,
+                           int radius, int trees, long seed) {
+        Random random = new Random(seed);
+        for (int index = 0; index < trees; index++) {
+            int x = cx + random.nextInt(radius * 2 + 1) - radius;
+            int z = cz + random.nextInt(radius * 2 + 1) - radius;
+            int groundY = naturalSurfaceY(world, x, z) - 1;
+            if (!isNaturalGround(world.getBlockAt(x, groundY, z).getType())) continue;
+            int height = 4 + random.nextInt(4);
+            Material log = index % 3 == 0 ? Material.DARK_OAK_LOG
+                    : (index % 2 == 0 ? Material.SPRUCE_LOG : Material.OAK_LOG);
+            Material leaves = index % 3 == 0 ? Material.DARK_OAK_LEAVES
+                    : (index % 2 == 0 ? Material.SPRUCE_LEAVES : Material.OAK_LEAVES);
+            for (int trunk = 1; trunk <= height; trunk++) {
+                operations.add(new DecorationOp(x, groundY + trunk, z, log,
+                        DecorationRule.AIR, null));
+            }
+            for (int ox = -2; ox <= 2; ox++) {
+                for (int oz = -2; oz <= 2; oz++) {
+                    for (int oy = height - 1; oy <= height + 1; oy++) {
+                        if (Math.abs(ox) + Math.abs(oz) + Math.abs(oy - height) > 4) continue;
+                        operations.add(new DecorationOp(x + ox, groundY + oy, z + oz, leaves,
+                                DecorationRule.AIR, null));
+                    }
+                }
+            }
+            operations.add(new DecorationOp(x + 1, groundY + 1, z, Material.FERN,
+                    DecorationRule.AIR, null));
+        }
+        for (int patch = 0; patch < 22; patch++) {
+            int x = cx + random.nextInt(radius * 2 + 1) - radius;
+            int z = cz + random.nextInt(radius * 2 + 1) - radius;
+            int y = naturalSurfaceY(world, x, z);
+            Material plant = patch % 5 == 0 ? Material.AZALEA
+                    : (patch % 3 == 0 ? Material.FERN : Material.SHORT_GRASS);
+            operations.add(new DecorationOp(x, y, z, plant, DecorationRule.AIR, null));
+        }
+    }
+
+    private void planCorruptionPatch(World world, List<DecorationOp> operations,
+                                     int cx, int cz, int radius, int spikes, long seed) {
+        Random random = new Random(seed);
+        for (int x = cx - radius; x <= cx + radius; x++) {
+            for (int z = cz - radius; z <= cz + radius; z++) {
+                double distance = Math.hypot(x - cx, z - cz);
+                if (distance > radius + random.nextDouble() * 2.0D) continue;
+                int y = naturalSurfaceY(world, x, z) - 1;
+                Material material = random.nextDouble() < 0.08D ? Material.EMERALD_BLOCK
+                        : (random.nextDouble() < 0.23D ? Material.MOSSY_COBBLESTONE : Material.MOSS_BLOCK);
+                operations.add(new DecorationOp(x, y, z, material, DecorationRule.NATURAL, null));
+                if (random.nextDouble() < 0.22D) {
+                    operations.add(new DecorationOp(x, y + 1, z, Material.MOSS_CARPET,
+                            DecorationRule.AIR, null));
+                }
+            }
+        }
+        for (int spike = 0; spike < spikes; spike++) {
+            int x = cx + random.nextInt(radius * 2 + 1) - radius;
+            int z = cz + random.nextInt(radius * 2 + 1) - radius;
+            int y = naturalSurfaceY(world, x, z);
+            int height = 4 + random.nextInt(5);
+            for (int index = 0; index < height; index++) {
+                Material material = index % 4 == 0 ? Material.VERDANT_FROGLIGHT
+                        : (index % 2 == 0 ? Material.EMERALD_BLOCK : Material.GREEN_GLAZED_TERRACOTTA);
+                operations.add(new DecorationOp(x + index / 4, y + index, z,
+                        material, DecorationRule.AIR, null));
+            }
+        }
+        int treeX = cx + random.nextInt(radius + 1) - radius / 2;
+        int treeZ = cz + random.nextInt(radius + 1) - radius / 2;
+        int treeY = naturalSurfaceY(world, treeX, treeZ) - 1;
+        for (int height = 1; height <= 6; height++) {
+            operations.add(new DecorationOp(treeX, treeY + height, treeZ,
+                    Material.STRIPPED_DARK_OAK_LOG, DecorationRule.AIR, null));
+        }
+        operations.add(new DecorationOp(treeX, treeY + 7, treeZ, Material.EMERALD_BLOCK,
+                DecorationRule.AIR, null));
+        operations.add(new DecorationOp(treeX + 1, treeY + 5, treeZ, Material.MOSS_BLOCK,
+                DecorationRule.AIR, null));
+        operations.add(new DecorationOp(treeX - 1, treeY + 4, treeZ, Material.MOSS_BLOCK,
+                DecorationRule.AIR, null));
+    }
+
+    private void planRoadsideCamp(World world, List<DecorationOp> operations,
+                                  int cx, int cz, long seed) {
+        Random random = new Random(seed);
+        int y = naturalSurfaceY(world, cx, cz) - 1;
+        for (int x = cx - 5; x <= cx + 5; x++) {
+            for (int z = cz - 4; z <= cz + 4; z++) {
+                operations.add(new DecorationOp(x, y, z,
+                        Math.floorMod(x + z, 5) == 0 ? Material.MOSSY_COBBLESTONE : Material.COARSE_DIRT,
+                        DecorationRule.NATURAL, null));
+            }
+        }
+        operations.add(new DecorationOp(cx, y + 1, cz, Material.CAMPFIRE, DecorationRule.AIR, null));
+        operations.add(new DecorationOp(cx - 3, y + 1, cz + 1, Material.BARREL, DecorationRule.AIR, null));
+        operations.add(new DecorationOp(cx + 3, y + 1, cz + 1, Material.CRAFTING_TABLE, DecorationRule.AIR, null));
+        for (int side : new int[]{-4, 4}) {
+            operations.add(new DecorationOp(cx + side, y + 1, cz - 2, Material.SPRUCE_FENCE,
+                    DecorationRule.AIR, null));
+            operations.add(new DecorationOp(cx + side, y + 2, cz - 2, Material.LANTERN,
+                    DecorationRule.AIR, null));
+        }
+        if (random.nextBoolean()) {
+            operations.add(new DecorationOp(cx + 2, y + 1, cz - 2, Material.GREEN_BANNER,
+                    DecorationRule.AIR, null));
+        }
+    }
+
+    private int naturalSurfaceY(World world, int x, int z) {
+        return world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
+    }
+
+    private boolean applyDecorationOp(World world, DecorationOp op) {
+        if (op.y() <= world.getMinHeight() || op.y() >= world.getMaxHeight()) return false;
+        Block block = world.getBlockAt(op.x(), op.y(), op.z());
+        Material current = block.getType();
+        boolean allowed = switch (op.rule()) {
+            case AIR -> current.isAir() || isReplaceablePlant(current);
+            case NATURAL -> isNaturalGround(current);
+            case WATER_OR_AIR -> current.isAir() || current == Material.WATER || isReplaceablePlant(current);
+            case SOFT -> current.isAir() || current == Material.WATER
+                    || isReplaceablePlant(current) || isNaturalGround(current);
+        };
+        if (!allowed || current == op.material()) return false;
+        block.setType(op.material(), false);
+        if (op.data() != null) {
+            try { block.setBlockData(Bukkit.createBlockData(op.data()), false); }
+            catch (IllegalArgumentException ignored) { }
+        }
+        return true;
+    }
+
+    private boolean isNaturalGround(Material material) {
+        return material == Material.GRASS_BLOCK || material == Material.DIRT
+                || material == Material.COARSE_DIRT || material == Material.ROOTED_DIRT
+                || material == Material.PODZOL || material == Material.MUD
+                || material == Material.STONE || material == Material.ANDESITE
+                || material == Material.DIORITE || material == Material.GRANITE
+                || material == Material.GRAVEL || material == Material.TUFF
+                || material == Material.DEEPSLATE || material == Material.CLAY
+                || material == Material.SAND || material == Material.RED_SAND
+                || material == Material.MOSS_BLOCK || material == Material.MOSSY_COBBLESTONE;
+    }
+
+    private boolean isReplaceablePlant(Material material) {
+        return material == Material.SHORT_GRASS || material == Material.TALL_GRASS
+                || material == Material.FERN || material == Material.LARGE_FERN
+                || material == Material.DEAD_BUSH || material == Material.SNOW
+                || material == Material.SEAGRASS || material == Material.TALL_SEAGRASS
+                || material == Material.KELP || material == Material.KELP_PLANT
+                || material == Material.MOSS_CARPET;
+    }
+
+    private void writeDecorationMarker(World world, Location village, Location dungeon,
+                                       CoastAnchor coast) {
+        Path marker = world.getWorldFolder().toPath().resolve(DECORATION_MARKER);
+        String text = "revision=" + DECORATION_REVISION + "\n"
+                + "templateRevision=" + revisions.workingRevision() + "\n"
+                + "appliedAt=" + System.currentTimeMillis() + "\n"
+                + "changedBlocks=" + decorationApplied + "\n"
+                + "harbor=" + coast.x() + "," + coast.deckY() + "," + coast.z() + "\n"
+                + "village=" + village.getBlockX() + "," + village.getBlockY() + "," + village.getBlockZ() + "\n"
+                + "dungeon=" + dungeon.getBlockX() + "," + dungeon.getBlockY() + "," + dungeon.getBlockZ() + "\n";
+        try {
+            Files.writeString(marker, text, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException error) {
+            plugin.getLogger().warning("No se pudo escribir el marcador de decoración: " + error.getMessage());
+        }
+    }
+
+    private enum DecorationRule { AIR, NATURAL, WATER_OR_AIR, SOFT }
+    private record DecorationOp(int x, int y, int z, Material material,
+                                DecorationRule rule, String data) { }
+    private record CoastAnchor(int x, int deckY, int z, int dx, int dz) { }
+
+    public boolean promote(CommandSender sender, String revision) {
+        return revisions.promoteOverworld(sender, revision, VERSION);
+    }
+
+    public boolean rollback(CommandSender sender, String revision) {
+        return revisions.rollbackOverworld(sender, revision);
+    }
+
+    public boolean forceStage(CommandSender sender, String revision, String stageName) {
+        if (!"custom".equalsIgnoreCase(stageName) && !"building".equalsIgnoreCase(stageName)) {
+            sender.sendMessage(ChatColor.RED + "La única etapa forzable de forma segura es custom.");
+            return false;
+        }
+        if (!revisions.forceOverworldCustomStage(sender, revision, worldName())) return false;
+        Path completeMarker = TemplateMarkerLookup.activeFolder(plugin, worldName()).resolve(MARKER);
+        try {
+            Files.deleteIfExists(completeMarker);
+            TemplateMarkerLookup.forgetMarker(plugin, worldName(), MARKER);
+        } catch (IOException error) {
+            sender.sendMessage(ChatColor.RED + "No se pudo preparar la repetición de la etapa custom: "
+                    + error.getMessage());
+            return false;
+        }
+        long seed = plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L);
+        World world = loadExistingWorld(seed);
+        if (world == null || !writeInProgressMarker(world, "forced_custom")) {
+            sender.sendMessage(ChatColor.RED + "No se pudo escribir el punto de reanudación forzado.");
+            return false;
+        }
+        return resume(sender);
+    }
+
+    public String workingRevision() {
+        return revisions.workingRevision();
     }
 
     public Stage stage() {
         return stage;
+    }
+
+    private void flushTemplateWorld(World world) {
+        if (world == null) return;
+        world.setAutoSave(true);
+        world.save();
+        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), "save-all flush");
+    }
+
+    private Location resolveCommitLocation(World world, String key, boolean villageAnchor) {
+        Location fromMarker = readMarkerLocation(world, key);
+        if (fromMarker != null) return fromMarker;
+        if (villageAnchor && villageCenter != null && villageCenter.getWorld() == world) return villageCenter.clone();
+        if (!villageAnchor && dungeonCenter != null && dungeonCenter.getWorld() == world) return dungeonCenter.clone();
+        return villageAnchor ? inferVillageLocation(world) : inferDungeonLocation(world);
+    }
+
+    private Location inferVillageLocation(World world) {
+        int x = plugin.getConfig().getInt("template-worlds.overworld.layout.village-x", -360) + 3;
+        int z = plugin.getConfig().getInt("template-worlds.overworld.layout.village-z", 0) + 15;
+        return new Location(world, x, inferStandingY(world, x, z), z);
+    }
+
+    private Location inferDungeonLocation(World world) {
+        int x = plugin.getConfig().getInt("template-worlds.overworld.layout.city-x", 420);
+        int z = plugin.getConfig().getInt("template-worlds.overworld.layout.city-z", 0);
+        return new Location(world, x, inferStandingY(world, x, z), z);
+    }
+
+    private int inferStandingY(World world, int x, int z) {
+        int y = world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
+        int min = world.getMinHeight() + 1;
+        if (y < min) return min;
+        while (y > min && !world.getBlockAt(x, y - 1, z).getType().isSolid()) y--;
+        return Math.max(min, y);
     }
 
     public String lootrStatus() {
@@ -674,17 +1496,20 @@ public final class OverworldTemplateManager implements Listener {
         if (builder != null) builder.cancel();
         if (stabilizationFuture != null) stabilizationFuture.cancel(false);
         stabilizationFuture = null;
+        if (decorationTask != null) decorationTask.cancel();
+        decorationTask = null;
     }
 
     private boolean isBusy() {
         return stage == Stage.CREATING_WORLD || stage == Stage.PREGENERATING
                 || stage == Stage.PLANNING || stage == Stage.BUILDING
-                || stage == Stage.STABILIZING;
+                || stage == Stage.STABILIZING || decorationTask != null;
     }
 
     private void fail(String message) {
         stage = Stage.FAILED;
         detail = message == null ? "error desconocido" : message;
+        revisions.markOverworldFailed(detail);
     }
 
     private boolean writeMarker(World world, BuildResult result) {
@@ -693,13 +1518,37 @@ public final class OverworldTemplateManager implements Listener {
         Location somita = result.villageCenter().clone().add(13.5D, 1.0D, -3.5D);
         Location portal = result.dungeonCenter().clone().add(0.0D, 2.0D, 202.0D);
         String text = "version=" + VERSION + "\n"
+                + "templateRevision=" + revisions.workingRevision() + "\n"
+                + "templateState=ready\n"
                 + "village=" + result.villageCenter().getBlockX() + "," + result.villageCenter().getBlockY() + "," + result.villageCenter().getBlockZ() + "\n"
+                + "villageSafe=" + plugin.getConfig().getBoolean(
+                "template-worlds.overworld.safe-village.enabled", true) + "\n"
+                + "villageSafeRadius=" + plugin.getConfig().getInt(
+                "template-worlds.overworld.safe-village.radius", 112) + "\n"
                 + "guide=" + guide.getX() + "," + guide.getY() + "," + guide.getZ() + "\n"
                 + "somita=" + somita.getX() + "," + somita.getY() + "," + somita.getZ() + "\n"
                 + "dungeon=" + result.dungeonCenter().getBlockX() + "," + result.dungeonCenter().getBlockY() + "," + result.dungeonCenter().getBlockZ() + "\n"
-                + "boss=" + result.dungeonCenter().getBlockX() + "," + (result.dungeonCenter().getBlockY() + 2) + "," + (result.dungeonCenter().getBlockZ() + 130) + "\n"
+                + "boss=" + result.dungeonCenter().getBlockX() + "," + (result.dungeonCenter().getBlockY() + 10) + "," + (result.dungeonCenter().getBlockZ() + 130) + "\n"
                 + "portal=" + portal.getX() + "," + portal.getY() + "," + portal.getZ() + "\n"
                 + "structureRevision=" + STRUCTURE_REVISION + "\n"
+                + "terrainMode=" + (plugin.getConfig().getBoolean(
+                "template-worlds.overworld.island.enabled", true) ? "integrated_island" : "legacy_vanilla") + "\n"
+                + "baseConstruction=" + (plugin.getConfig().getBoolean(
+                "template-worlds.overworld.campaign-layout-1-48.enabled", true)
+                ? "campaign_1_48_anchor_only" : "legacy_1_43_structures") + "\n"
+                + "islandRadius=" + plugin.getConfig().getInt(
+                "template-worlds.overworld.island.land-radius", 500) + "\n"
+                + "externalStructures=false\n"
+                + "zoneAStatus=complete\n"
+                + "capitalArchitecture=occupied_villages_v5\n"
+                + "roadNetwork=organic_accessible_v5\n"
+                + "frontierDecoration=harbors_groves_corrosion_v1\n"
+                + "lighting=complete_safe_routes_v1\n"
+                + "legacyStructures=false\n"
+                + "zoneABounds=" + (result.villageCenter().getBlockX() - 85) + ","
+                + (result.villageCenter().getBlockZ() - 75) + ","
+                + (result.villageCenter().getBlockX() + 85) + ","
+                + (result.villageCenter().getBlockZ() + 80) + "\n"
                 + "lootrMode=loot_tables\n";
         try {
             world.save();
@@ -717,12 +1566,19 @@ public final class OverworldTemplateManager implements Listener {
         if (world != null) return world;
         Path folder = TemplateMarkerLookup.activeFolder(plugin, worldName());
         if (!Files.isDirectory(folder)) return null;
-        return new WorldCreator(worldName())
+        boolean islandMode = plugin.getConfig().getBoolean(
+                "template-worlds.overworld.island.enabled", true);
+        WorldCreator creator = new WorldCreator(worldName())
                 .environment(World.Environment.NORMAL)
                 .type(WorldType.NORMAL)
                 .seed(seed)
-                .generateStructures(true)
-                .createWorld();
+                .generateStructures(!islandMode);
+        if (islandMode) {
+            creator.generator(new OverworldIslandGenerator(seed,
+                    plugin.getConfig().getInt("template-worlds.overworld.island.land-radius", 500),
+                    plugin.getConfig().getInt("template-worlds.overworld.island.sea-level", 62)));
+        }
+        return creator.createWorld();
     }
 
     private Path inProgressMarkerPath() {
@@ -732,6 +1588,7 @@ public final class OverworldTemplateManager implements Listener {
     private boolean writeInProgressMarker(World world, String stateName) {
         Path file = world.getWorldFolder().toPath().resolve(IN_PROGRESS_MARKER);
         String text = "version=" + VERSION + "\n"
+                + "templateRevision=" + revisions.workingRevision() + "\n"
                 + "state=" + stateName + "\n"
                 + "seed=" + world.getSeed() + "\n"
                 + "chunkyComplete=true\n";
@@ -758,6 +1615,14 @@ public final class OverworldTemplateManager implements Listener {
     private int safetyLoadedChunkLimit() {
         return Math.max(64, plugin.getConfig().getInt(
                 "template-worlds.safety.max-loaded-chunks-between-batches", 1024));
+    }
+
+    private String reviewWorldName() {
+        if (revisions.hasWorkingRevision()
+                && Files.isDirectory(TemplateMarkerLookup.activeFolder(plugin, worldName()))) {
+            return worldName();
+        }
+        return revisions.activeOverworldWorld(worldName());
     }
 
     private long safetyDrainInterval() {
@@ -811,8 +1676,13 @@ public final class OverworldTemplateManager implements Listener {
     public void onTemplateChunkLoad(ChunkLoadEvent event) {
         World world = event.getWorld();
         if (!world.getName().equals(worldName())) return;
+        // Campaign 1.48 owns every decorative edit and audits the finished result.
+        // The legacy per-chunk decorator could otherwise place emerald/froglight
+        // spikes and lazy ruins while the campaign was still building.
+        if (plugin.getConfig().getBoolean(
+                "template-worlds.overworld.campaign-layout-1-48.enabled", true)) return;
         if (!plugin.getConfig().getBoolean(
-                "template-worlds.overworld.safe-corruption.decorate-on-chunk-load", true)) return;
+                "template-worlds.overworld.safe-corruption.decorate-on-chunk-load", false)) return;
         // El marcador jamás se consulta desde ChunkLoadEvent. En 1.39.0 esto disparaba
         // una búsqueda recursiva de carpetas por cada chunk y bloqueaba el servidor.
         if (stage != Stage.COMPLETE) return;
@@ -824,12 +1694,13 @@ public final class OverworldTemplateManager implements Listener {
     }
 
     private boolean templateMarkerExists(World world) {
-        return TemplateMarkerLookup.hasVersion(
-                plugin, world.getName(), MARKER, VERSION);
+        return Files.isRegularFile(world.getWorldFolder().toPath().resolve(MARKER));
     }
 
     private void decorateLoadedTemplateChunk(Chunk chunk) {
         World world = chunk.getWorld();
+        if (plugin.getConfig().getBoolean(
+                "template-worlds.overworld.campaign-layout-1-48.enabled", true)) return;
         if (!world.isChunkLoaded(chunk.getX(), chunk.getZ())) return;
         if (chunk.getPersistentDataContainer().has(corruptionChunkKey, PersistentDataType.BYTE)) return;
 
@@ -954,6 +1825,7 @@ public final class OverworldTemplateManager implements Listener {
         private Location dungeon;
         private final Location preferredVillageCenter;
         private final Location preferredDungeonCenter;
+        private final boolean campaignLayout148;
 
         OverworldTemplateBuilder(BingoPlugin plugin, World world,
                                  BiProgress progress, Consumer<BuildResult> completion,
@@ -968,6 +1840,8 @@ public final class OverworldTemplateManager implements Listener {
             this.dungeonZKey = dungeonZKey;
             this.preferredVillageCenter = preferredVillageCenter == null ? null : preferredVillageCenter.clone();
             this.preferredDungeonCenter = preferredDungeonCenter == null ? null : preferredDungeonCenter.clone();
+            this.campaignLayout148 = plugin.getConfig().getBoolean(
+                    "template-worlds.overworld.campaign-layout-1-48.enabled", true);
             this.random = new Random(plugin.getConfig().getLong("template-worlds.overworld.seed", 741905270311L) ^ 0x5EEDB1A6L);
         }
 
@@ -984,6 +1858,11 @@ public final class OverworldTemplateManager implements Listener {
             try {
                 switch (planningPhase) {
                     case 0 -> {
+                        if (campaignLayout148) {
+                            planCampaignAnchorsOnly();
+                            planningPhase = 4;
+                            break;
+                        }
                         if (preferredVillageCenter != null && preferredDungeonCenter != null) {
                             progressConsumer.accept(new Progress(0.21D,
                                     "actualizando la plantilla existente en sus coordenadas guardadas"));
@@ -991,7 +1870,7 @@ public final class OverworldTemplateManager implements Listener {
                             // La 1.39.0 no vuelve a pintar la capital lineal encima de la
                             // fortaleza circular antigua. La desplaza dentro del área ya
                             // pregenerada y actualiza el marcador al terminar. Chunky no se repite.
-                            dungeon = preferredDungeonCenter.clone().add(0, 0, 420);
+                            dungeon = preferredDungeonCenter.clone();
                             buildSpawnVillage(village);
                             progressConsumer.accept(new Progress(0.34D,
                                     "reforzando terreno y aplicando el pueblo profesional sin mover la seed"));
@@ -1041,6 +1920,12 @@ public final class OverworldTemplateManager implements Listener {
         }
 
         private void startBlockPlacement() {
+            if (blocks.isEmpty()) {
+                progressConsumer.accept(new Progress(0.96D,
+                        "anclas limpias listas; no se pintaron estructuras heredadas"));
+                completeBlockPlacement();
+                return;
+            }
             int perTick = Math.max(100, plugin.getConfig().getInt("template-worlds.overworld.blocks-per-tick", 500));
             long maxNanos = Math.max(2L,
                     plugin.getConfig().getLong("template-worlds.overworld.max-build-millis-per-tick", 8L)) * 1_000_000L;
@@ -1059,13 +1944,45 @@ public final class OverworldTemplateManager implements Listener {
                 if (cursor < total) return;
                 task.cancel();
                 try {
-                    for (Runnable runnable : afterBlocks) runnable.run();
-                    world.setSpawnLocation(village.clone().add(0.5, 1.0, 0.5));
-                    completion.accept(BuildResult.success(village, dungeon));
+                    completeBlockPlacement();
                 } catch (Throwable error) {
                     completion.accept(BuildResult.failed("Falló la fase de entidades/contenedores: " + rootMessage(error)));
                 }
             }, 1L, 1L);
+        }
+
+        private void planCampaignAnchorsOnly() {
+            progressConsumer.accept(new Progress(0.21D,
+                    "reservando anclas limpias para el diseño estructural 1.48.10"));
+            if (preferredVillageCenter != null || preferredDungeonCenter != null) {
+                throw new IllegalStateException("La base 1.48.10 no puede reutilizar una plantilla "
+                        + "estructural anterior; ejecuta reset y generate");
+            }
+            Location villageCenter = preferredVillageCenter != null
+                    ? preferredVillageCenter.clone()
+                    : deterministicAnchor(
+                    plugin.getConfig().getInt("template-worlds.overworld.layout.village-x", -360),
+                    plugin.getConfig().getInt("template-worlds.overworld.layout.village-z", 0));
+            Location cityCenter = preferredDungeonCenter != null
+                    ? preferredDungeonCenter.clone()
+                    : deterministicAnchor(
+                    plugin.getConfig().getInt("template-worlds.overworld.layout.city-x", 420),
+                    plugin.getConfig().getInt("template-worlds.overworld.layout.city-z", 0));
+            int villageBase = medianHeight(villageCenter.getBlockX(),
+                    villageCenter.getBlockZ(), 28);
+            int cityBase = medianHeight(cityCenter.getBlockX(), cityCenter.getBlockZ(), 46);
+            village = new Location(world, villageCenter.getBlockX() + 3,
+                    villageBase + 1, villageCenter.getBlockZ() + 15);
+            dungeon = new Location(world, cityCenter.getBlockX(), cityBase + 1,
+                    cityCenter.getBlockZ());
+            blocks.clear();
+            afterBlocks.clear();
+        }
+
+        private void completeBlockPlacement() {
+            for (Runnable runnable : afterBlocks) runnable.run();
+            world.setSpawnLocation(village.clone().add(0.5D, 1.0D, 0.5D));
+            completion.accept(BuildResult.success(village, dungeon));
         }
 
         private void stopPlanning(BuildResult result) {
@@ -1195,7 +2112,104 @@ public final class OverworldTemplateManager implements Listener {
             return world.getHighestBlockYAt(x, z, HeightMap.MOTION_BLOCKING_NO_LEAVES);
         }
 
+        /** Refugio vivo de 1.43.0: edificios distintos, calles accesibles y luz completa. */
         private void buildSpawnVillage(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int base = medianHeight(cx, cz, 28);
+
+            terraceCircle(cx, base, cz, 22, Material.POLISHED_ANDESITE, Material.MOSSY_COBBLESTONE);
+            road(cx - 82, cz + 10, cx + 88, cz + 4, 7, Material.COBBLESTONE);
+            road(cx + 3, cz + 15, cx + 3, cz - 76, 5, Material.DIRT_PATH);
+            road(cx - 58, cz + 49, cx + 51, cz - 51, 4, Material.COARSE_DIRT);
+
+            buildRefugeGatehouse(cx - 72, cz + 8, false);
+            // La zona norte conserva dos casas del lenguaje arquitectónico aprobado.
+            // El resto son edificios de planta, altura y función distintas.
+            buildRefugeBuilding(cx - 42, cz - 26, 21, 15, 2, false, "east", 0);
+            buildRefugeBuilding(cx + 42, cz - 31, 23, 15, 2, true, "west", 2);
+            buildVillageInn(cx - 45, cz + 37);
+            buildVillageBarn(cx + 49, cz + 39);
+            buildVillageWorkshop(cx + 61, cz + 8);
+            buildVillageArchive(cx - 56, cz + 49);
+            buildVillageBakery(cx + 7, cz + 61);
+            buildRefugeMarketArcade(cx + 6, base + 1, cz + 2);
+            buildWellAndBell(cx - 12, base + 1, cz + 5);
+            buildRefugeWatchPost(cx - 18, cz + 60, 0);
+            buildRefugeWatchPost(cx + 31, cz + 63, 1);
+            buildFarm(cx - 62, cz - 55, 17, 13);
+            buildFarm(cx + 62, cz - 60, 15, 11);
+            buildZoneAOrchard(cx + 4, base, cz + 82);
+
+            // Cada entrada desemboca en una calle; no hay edificios aislados sobre la ladera.
+            road(cx - 31, cz - 26, cx - 12, cz - 5, 3, Material.DIRT_PATH);
+            road(cx + 30, cz - 31, cx + 13, cz - 6, 3, Material.COBBLESTONE);
+            road(cx - 45, cz + 28, cx - 18, cz + 13, 3, Material.DIRT_PATH);
+            road(cx + 49, cz + 31, cx + 25, cz + 13, 4, Material.COARSE_DIRT);
+            road(cx + 61, cz - 1, cx + 35, cz + 5, 3, Material.COBBLESTONE);
+            road(cx - 56, cz + 38, cx - 28, cz + 18, 3, Material.DIRT_PATH);
+            road(cx + 7, cz + 54, cx + 5, cz + 22, 3, Material.DIRT_PATH);
+
+            // Límite bajo e irregular: protege el refugio sin formar la antigua caja gris.
+            int[][] boundary = {
+                    {-78,-18}, {-62,-64}, {-16,-82}, {38,-77}, {77,-45},
+                    {84,16}, {62,68}, {17,83}, {-40,76}, {-73,43}
+            };
+            for (int i = 0; i < boundary.length; i++) {
+                int[] a = boundary[i];
+                int[] b = boundary[(i + 1) % boundary.length];
+                boolean easternExit = a[0] > 70 && b[0] > 60;
+                if (!easternExit) buildAdaptiveWallSegment(cx + a[0], cz + a[1],
+                        cx + b[0], cz + b[1], 4, false);
+            }
+            road(cx + 74, cz + 8, cx + 128, cz + 5, 7, Material.MOSSY_COBBLESTONE);
+
+            int spawnX = cx + 3;
+            int spawnZ = cz + 15;
+            for (int x = spawnX - 4; x <= spawnX + 4; x++) {
+                for (int z = spawnZ - 4; z <= spawnZ + 4; z++) {
+                    add(x, base + 1, z, ((x + z) & 3) == 0
+                            ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_ANDESITE);
+                    for (int y = base + 2; y <= base + 8; y++) add(x, y, z, Material.AIR);
+                }
+            }
+            village = new Location(world, spawnX, base + 1, spawnZ);
+
+            int guideX = cx - 18;
+            int guideZ = cz + 9;
+            int somitaX = cx + 16;
+            int somitaZ = cz + 11;
+            buildGuidePedestal(guideX, base + 1, guideZ, Material.CHISELED_STONE_BRICKS);
+            buildGuidePedestal(somitaX, base + 1, somitaZ, Material.MOSSY_COBBLESTONE);
+            decorateVillagePublicSpace(cx, base, cz);
+            illuminateSafeVillage(cx, base, cz, 104);
+
+            afterBlocks.add(() -> {
+                cleanupTemplateEntities(world);
+                Location guideHome = new Location(world, guideX + 0.5D, base + 2.0D,
+                        guideZ + 0.5D, 270.0F, 0.0F);
+                Villager guide = world.spawn(guideHome, Villager.class, villager -> {
+                    villager.setAI(false);
+                    villager.setInvulnerable(true);
+                    villager.setPersistent(true);
+                    villager.setSilent(false);
+                    villager.setProfession(Villager.Profession.CARTOGRAPHER);
+                    villager.setVillagerType(Villager.Type.PLAINS);
+                    villager.setCustomName(ChatColor.GOLD + "Cartógrafo del Refugio");
+                    villager.setCustomNameVisible(true);
+                    villager.getPersistentDataContainer().set(guideKey, PersistentDataType.BYTE, (byte) 1);
+                    villager.getPersistentDataContainer().set(dungeonXKey, PersistentDataType.INTEGER,
+                            dungeon.getBlockX());
+                    villager.getPersistentDataContainer().set(dungeonZKey, PersistentDataType.INTEGER,
+                            dungeon.getBlockZ());
+                });
+                guide.addScoreboardTag(GUIDE_TAG);
+            });
+        }
+
+        /** Conservado sin llamadas para poder comparar una revisión 1.41.0 durante el desarrollo. */
+        @SuppressWarnings("unused")
+        private void buildLegacySpawnVillage(Location center) {
             int cx = center.getBlockX();
             int cz = center.getBlockZ();
             int base = medianHeight(cx, cz, 24);
@@ -1229,6 +2243,18 @@ public final class OverworldTemplateManager implements Listener {
             buildFarm(cx + 57, cz - 41, 17, 13);
             buildMineEntrance(cx + 72, cz - 16, false);
             decorateVillagePublicSpace(cx, base, cz);
+            if (plugin.getConfig().getBoolean(
+                    "template-worlds.overworld.zone-a.enabled", true)) {
+                buildZoneAOrchard(cx - 27, base, cz + 65);
+                if (plugin.getConfig().getBoolean(
+                        "template-worlds.overworld.zone-a.irregular-boundary", true)) {
+                    buildZoneAIrregularBoundary(cx, base, cz);
+                }
+                if (plugin.getConfig().getBoolean(
+                        "template-worlds.overworld.zone-a.visible-route-to-zone-b", true)) {
+                    buildZoneAExitRoute(cx, base, cz);
+                }
+            }
 
             // Plataforma segura del jugador. El spawn nunca vuelve a caer dentro de la fuente.
             int spawnX = cx + 3, spawnZ = cz + 15;
@@ -1276,6 +2302,242 @@ public final class OverworldTemplateManager implements Listener {
             });
         }
 
+        private void buildGuidePedestal(int cx, int y, int cz, Material floor) {
+            for (int x = cx - 2; x <= cx + 2; x++) for (int z = cz - 2; z <= cz + 2; z++) {
+                add(x, y, z, ((x + z) & 1) == 0 ? floor : Material.POLISHED_ANDESITE);
+                for (int yy = y + 1; yy <= y + 6; yy++) add(x, yy, z, Material.AIR);
+            }
+            add(cx - 2, y + 1, cz - 2, Material.SPRUCE_FENCE);
+            add(cx - 2, y + 2, cz - 2, Material.LANTERN);
+        }
+
+        private void buildRefugeBuilding(int cx, int cz, int width, int depth, int floors,
+                                         boolean ridgeAlongZ, String entrance, int role) {
+            int halfX = width / 2;
+            int halfZ = depth / 2;
+            int y = localBuildY(cx, cz, halfX + 2, halfZ + 2);
+            preparePlot(cx, y, cz, halfX + 2, halfZ + 2);
+            int wallHeight = floors * 5 + 1;
+
+            for (int x = cx - halfX; x <= cx + halfX; x++) {
+                for (int z = cz - halfZ; z <= cz + halfZ; z++) {
+                    boolean edgeX = Math.abs(x - cx) == halfX;
+                    boolean edgeZ = Math.abs(z - cz) == halfZ;
+                    boolean wall = edgeX || edgeZ;
+                    add(x, y, z, ((x + z) & 7) == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
+                    for (int yy = 1; yy <= wallHeight; yy++) {
+                        if (!wall) {
+                            add(x, y + yy, z, Material.AIR);
+                            continue;
+                        }
+                        boolean doorway = switch (entrance) {
+                            case "north" -> z == cz - halfZ && Math.abs(x - cx) <= 1 && yy <= 3;
+                            case "east" -> x == cx + halfX && Math.abs(z - cz) <= 1 && yy <= 3;
+                            case "west" -> x == cx - halfX && Math.abs(z - cz) <= 1 && yy <= 3;
+                            default -> z == cz + halfZ && Math.abs(x - cx) <= 1 && yy <= 3;
+                        };
+                        if (doorway) {
+                            add(x, y + yy, z, Material.AIR);
+                            continue;
+                        }
+                        boolean frame = yy == 1 || yy == wallHeight || yy % 5 == 0
+                                || (edgeX && Math.floorMod(z - (cz - halfZ), 6) == 0)
+                                || (edgeZ && Math.floorMod(x - (cx - halfX), 6) == 0);
+                        boolean window = yy % 5 >= 2 && yy % 5 <= 3
+                                && ((edgeX && Math.floorMod(z - cz, 7) == 0)
+                                || (edgeZ && Math.floorMod(x - cx, 7) == 0));
+                        Material material = frame ? Material.STRIPPED_DARK_OAK_LOG
+                                : (window ? Material.LIGHT_BLUE_STAINED_GLASS_PANE
+                                : (((x * 17 + z * 7 + yy) & 15) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.WHITE_TERRACOTTA));
+                        add(x, y + yy, z, material);
+                    }
+                }
+            }
+
+            for (int floor = 1; floor < floors; floor++) {
+                int floorY = y + floor * 5;
+                for (int x = cx - halfX + 1; x <= cx + halfX - 1; x++) {
+                    for (int z = cz - halfZ + 1; z <= cz + halfZ - 1; z++) {
+                        if (Math.abs(x - cx) <= 1 && Math.abs(z - cz) <= 1) continue;
+                        add(x, floorY, z, Material.SPRUCE_PLANKS);
+                    }
+                }
+                for (int yy = floorY - 3; yy <= floorY; yy++) add(cx, yy, cz, Material.SCAFFOLDING);
+            }
+            villageGabledRoof(cx - halfX - 1, cx + halfX + 1,
+                    cz - halfZ - 1, cz + halfZ + 1, y + wallHeight + 1,
+                    ridgeAlongZ, role);
+            furnishRefugeBuilding(cx, y, cz, halfX, halfZ, role);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
+        }
+
+        private void furnishRefugeBuilding(int cx, int y, int cz, int halfX, int halfZ, int role) {
+            switch (role) {
+                case 0 -> {
+                    for (int dz = -halfZ + 2; dz <= halfZ - 2; dz += 3) {
+                        add(cx - halfX + 2, y + 1, cz + dz, Material.BOOKSHELF);
+                        add(cx + halfX - 2, y + 1, cz + dz, Material.BOOKSHELF);
+                        add(cx - halfX + 2, y + 2, cz + dz, Material.BOOKSHELF);
+                        add(cx + halfX - 2, y + 2, cz + dz, Material.BOOKSHELF);
+                    }
+                    add(cx, y + 1, cz, Material.LECTERN);
+                    add(cx, y + 1, cz + 3, Material.CARTOGRAPHY_TABLE);
+                    placeLootContainer(new Location(world, cx, y + 1, cz - 3),
+                            LootTables.STRONGHOLD_LIBRARY, false);
+                }
+                case 1 -> {
+                    for (int dx = -halfX + 2; dx <= halfX - 2; dx += 4) {
+                        add(cx + dx, y + 1, cz - 2, Material.WHITE_WOOL);
+                        add(cx + dx, y + 1, cz + 2, Material.WHITE_CARPET);
+                    }
+                    add(cx - 2, y + 1, cz, Material.BREWING_STAND);
+                    add(cx + 2, y + 1, cz, Material.CAULDRON);
+                    placeLootContainer(new Location(world, cx, y + 1, cz + halfZ - 2),
+                            LootTables.VILLAGE_PLAINS_HOUSE, true);
+                }
+                case 2 -> {
+                    add(cx - 3, y + 1, cz, Material.SMITHING_TABLE);
+                    add(cx, y + 1, cz, Material.ANVIL);
+                    add(cx + 3, y + 1, cz, Material.BLAST_FURNACE);
+                    add(cx + 3, y + 1, cz + 3, Material.STONECUTTER);
+                    placeLootContainer(new Location(world, cx - 3, y + 1, cz + 3),
+                            LootTables.VILLAGE_WEAPONSMITH, true);
+                }
+                case 3 -> {
+                    add(cx - 4, y + 1, cz, Material.SMOKER);
+                    add(cx, y + 1, cz, Material.CRAFTING_TABLE);
+                    add(cx + 4, y + 1, cz, Material.BARREL);
+                    add(cx - 4, y + 1, cz + 4, Material.HAY_BLOCK);
+                    add(cx + 4, y + 1, cz + 4, Material.HAY_BLOCK);
+                    placeLootContainer(new Location(world, cx, y + 1, cz + halfZ - 2),
+                            LootTables.VILLAGE_PLAINS_HOUSE, true);
+                }
+                default -> {
+                    add(cx - 4, y + 1, cz, Material.CARTOGRAPHY_TABLE);
+                    add(cx, y + 1, cz, Material.LECTERN);
+                    add(cx + 4, y + 1, cz, Material.CRAFTING_TABLE);
+                    placeLootContainer(new Location(world, cx, y + 1, cz + halfZ - 2),
+                            LootTables.PILLAGER_OUTPOST, false);
+                }
+            }
+            for (int[] lamp : new int[][]{{-halfX + 2,-halfZ + 2},{halfX - 2,-halfZ + 2},
+                    {-halfX + 2,halfZ - 2},{halfX - 2,halfZ - 2}}) {
+                add(cx + lamp[0], y + 2, cz + lamp[1], Material.LANTERN);
+            }
+        }
+
+        private void buildRefugeMarketArcade(int cx, int y, int cz) {
+            terraceCircle(cx, y - 1, cz, 15, Material.POLISHED_ANDESITE, Material.MOSSY_COBBLESTONE);
+            for (int arm = 0; arm < 4; arm++) {
+                boolean alongX = (arm & 1) == 0;
+                int side = arm < 2 ? -1 : 1;
+                int ox = alongX ? 0 : side * 11;
+                int oz = alongX ? side * 9 : 0;
+                for (int a = -8; a <= 8; a++) {
+                    int x = cx + ox + (alongX ? a : 0);
+                    int z = cz + oz + (alongX ? 0 : a);
+                    add(x, y, z, Material.SPRUCE_PLANKS);
+                    if (a % 4 == 0) {
+                        add(x, y + 1, z, Material.STRIPPED_SPRUCE_LOG);
+                        add(x, y + 2, z, Material.STRIPPED_SPRUCE_LOG);
+                        add(x, y + 3, z, Material.STRIPPED_SPRUCE_LOG);
+                    }
+                    add(x, y + 4, z, (a & 1) == 0 ? Material.RED_WOOL : Material.WHITE_WOOL);
+                }
+            }
+            add(cx, y, cz, Material.CHISELED_STONE_BRICKS);
+            add(cx, y + 1, cz, Material.BELL);
+            placeLootContainer(new Location(world, cx + 8, y + 1, cz + 7),
+                    LootTables.VILLAGE_PLAINS_HOUSE, true);
+        }
+
+        private void buildRefugeGatehouse(int cx, int cz, boolean northSouth) {
+            int y = localBuildY(cx, cz, 15, 9);
+            int gateHalf = 3;
+            for (int side : new int[]{-1, 1}) {
+                int tx = cx + (northSouth ? side * 10 : 0);
+                int tz = cz + (northSouth ? 0 : side * 10);
+                buildRefugeWatchPost(tx, tz, side + 5);
+            }
+            for (int a = -10; a <= 10; a++) for (int yy = 1; yy <= 9; yy++) {
+                int x = cx + (northSouth ? a : 0);
+                int z = cz + (northSouth ? 0 : a);
+                boolean opening = Math.abs(a) <= gateHalf && yy <= 6;
+                add(x, y + yy, z, opening ? Material.AIR
+                        : (yy == 5 ? Material.DARK_OAK_LOG : Material.STONE_BRICKS));
+            }
+            for (int a = -4; a <= 4; a++) {
+                int x = cx + (northSouth ? a : 0);
+                int z = cz + (northSouth ? 0 : a);
+                add(x, y + 9 + Math.abs(a) / 2, z, Material.DARK_OAK_SLAB);
+            }
+        }
+
+        private void buildRefugeWatchPost(int cx, int cz, int salt) {
+            int y = localBuildY(cx, cz, 6, 6);
+            preparePlot(cx, y, cz, 6, 6);
+            for (int x = cx - 5; x <= cx + 5; x++) for (int z = cz - 5; z <= cz + 5; z++) {
+                boolean wall = Math.abs(x - cx) == 5 || Math.abs(z - cz) == 5;
+                add(x, y, z, Material.COBBLESTONE);
+                if (wall) for (int yy = 1; yy <= 12 + Math.floorMod(salt, 4); yy++) {
+                    boolean slit = yy >= 5 && yy <= 7 && ((x + z) & 5) == 0;
+                    add(x, y + yy, z, slit ? Material.IRON_BARS
+                            : (((x + z + yy) & 11) == 0 ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS));
+                }
+            }
+            for (int layer = 0; layer <= 5; layer++) {
+                for (int x = cx - 6 + layer; x <= cx + 6 - layer; x++) {
+                    for (int z = cz - 6 + layer; z <= cz + 6 - layer; z++) {
+                        boolean edge = x == cx - 6 + layer || x == cx + 6 - layer
+                                || z == cz - 6 + layer || z == cz + 6 - layer;
+                        if (edge) add(x, y + 14 + layer, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            for (int yy = y + 1; yy <= y + 12; yy++) add(cx, yy, cz, Material.SCAFFOLDING);
+        }
+
+        private void buildAdaptiveWallSegment(int x1, int z1, int x2, int z2,
+                                              int height, boolean fortified) {
+            int dx = Math.abs(x2 - x1);
+            int dz = Math.abs(z2 - z1);
+            int sx = x1 < x2 ? 1 : -1;
+            int sz = z1 < z2 ? 1 : -1;
+            int err = dx - dz;
+            int x = x1;
+            int z = z1;
+            int step = 0;
+            while (true) {
+                int base = terrainSurfaceY(x, z) - 1;
+                int thickness = fortified ? 2 : 1;
+                for (int ox = -thickness; ox <= thickness; ox++) {
+                    for (int oz = -thickness; oz <= thickness; oz++) {
+                        if (Math.abs(ox) + Math.abs(oz) > thickness) continue;
+                        for (int yy = Math.max(world.getMinHeight() + 2, base - 5); yy <= base; yy++) {
+                            if (world.getBlockAt(x + ox, yy, z + oz).isEmpty()) {
+                                add(x + ox, yy, z + oz, Material.COBBLESTONE);
+                            }
+                        }
+                        for (int yy = 1; yy <= height; yy++) {
+                            add(x + ox, base + yy, z + oz,
+                                    ((x + z + yy) & 13) == 0
+                                            ? Material.MOSSY_STONE_BRICKS : Material.STONE_BRICKS);
+                        }
+                    }
+                }
+                if (step % (fortified ? 3 : 5) != 1) {
+                    add(x, base + height + 1, z, Material.STONE_BRICK_WALL);
+                }
+                if (x == x2 && z == z2) break;
+                int e2 = 2 * err;
+                if (e2 > -dz) { err -= dz; x += sx; }
+                if (e2 < dx) { err += dx; z += sz; }
+                step++;
+            }
+        }
+
         private void buildVillageMarket(int cx, int y, int cz) {
             for (int x = cx - 7; x <= cx + 7; x++) for (int z = cz - 5; z <= cz + 5; z++) {
                 add(x, y, z, ((x + z) & 5) == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
@@ -1289,6 +2551,8 @@ public final class OverworldTemplateManager implements Listener {
             }
             placeLootContainer(new Location(world, cx - 3, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
             placeLootContainer(new Location(world, cx + 3, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageCottage(int cx, int cz, int style, boolean smithy) {
@@ -1342,6 +2606,8 @@ public final class OverworldTemplateManager implements Listener {
             add(cx - 2, y + 1, cz, smithy ? Material.BLAST_FURNACE : Material.CRAFTING_TABLE);
             add(cx + 2, y + 1, cz, smithy ? Material.ANVIL : Material.BARREL);
             placeLootContainer(new Location(world, cx, y + 1, cz + 2), smithy ? LootTables.VILLAGE_WEAPONSMITH : LootTables.VILLAGE_PLAINS_HOUSE, false);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageBarn(int cx, int cz) {
@@ -1360,6 +2626,8 @@ public final class OverworldTemplateManager implements Listener {
             villageGabledRoof(cx - 12, cx + 12, cz - 9, cz + 9, y + 8, false, 6);
             placeLootContainer(new Location(world, cx - 4, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
             placeLootContainer(new Location(world, cx + 4, y + 1, cz), LootTables.VILLAGE_PLAINS_HOUSE, true);
+            addData(cx, y + 4, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
         }
 
         private void buildVillageWorkshop(int cx, int cz) {
@@ -1415,6 +2683,10 @@ public final class OverworldTemplateManager implements Listener {
             add(cx + 8, y + 6, cz + 4, Material.CHEST);
             placeLootContainer(new Location(world, cx - 8, y + 1, cz + 3), LootTables.VILLAGE_BUTCHER, true);
             placeLootContainer(new Location(world, cx + 8, y + 6, cz + 4), LootTables.VILLAGE_PLAINS_HOUSE, false);
+            addData(cx, y + 3, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
+            addData(cx, y + 7, cz, Material.LIGHT,
+                    "minecraft:light[level=14,waterlogged=false]");
         }
 
         /** Archivo/capilla que funciona como punto de orientación y sala de exploración. */
@@ -1445,6 +2717,56 @@ public final class OverworldTemplateManager implements Listener {
             add(cx, y + 6, cz, Material.LANTERN);
             placeLootContainer(new Location(world, cx - 4, y + 1, cz + 7), LootTables.STRONGHOLD_LIBRARY, false);
             placeLootContainer(new Location(world, cx + 4, y + 1, cz + 7), LootTables.VILLAGE_CARTOGRAPHER, true);
+            addData(cx, y + 4, cz, Material.LIGHT,
+                    "minecraft:light[level=15,waterlogged=false]");
+        }
+
+        /** Panadería con horno exterior y puesto propio; no comparte la silueta de la posada. */
+        private void buildVillageBakery(int cx, int cz) {
+            buildVillageCottage(cx, cz, 8, false);
+            int y = localBuildY(cx, cz, 13, 11);
+            for (int x = cx - 7; x <= cx - 3; x++) {
+                add(x, y + 1, cz - 7, Material.BRICKS);
+            }
+            add(cx - 5, y + 2, cz - 7, Material.SMOKER);
+            add(cx - 5, y + 3, cz - 7, Material.BRICK_STAIRS);
+            add(cx - 9, y + 1, cz - 3, Material.HAY_BLOCK);
+            add(cx - 9, y + 1, cz, Material.BARREL);
+            for (int x = cx + 4; x <= cx + 10; x++) {
+                add(x, y + 3, cz - 5, (x & 1) == 0 ? Material.YELLOW_WOOL : Material.WHITE_WOOL);
+            }
+            for (int x : new int[]{cx + 4, cx + 10}) {
+                add(x, y + 1, cz - 5, Material.OAK_FENCE);
+                add(x, y + 2, cz - 5, Material.OAK_FENCE);
+            }
+            add(cx + 7, y + 1, cz - 5, Material.CRAFTING_TABLE);
+            add(cx + 8, y + 1, cz - 5, Material.CAKE);
+        }
+
+        /** Iluminación perimetral visible; las calles añaden además luz invisible continua. */
+        private void illuminateSafeVillage(int cx, int base, int cz, int radius) {
+            for (int degrees = 0; degrees < 360; degrees += 24) {
+                double angle = Math.toRadians(degrees);
+                int x = cx + (int) Math.round(Math.cos(angle) * (radius - 8));
+                int z = cz + (int) Math.round(Math.sin(angle) * (radius - 8));
+                int y = Math.max(base - 5, Math.min(base + 7, terrainSurfaceY(x, z) - 1));
+                add(x, y + 1, z, Material.COBBLESTONE_WALL);
+                add(x, y + 2, z, Material.SPRUCE_FENCE);
+                add(x, y + 3, z, Material.LANTERN);
+                addData(x, y + 5, z, Material.LIGHT,
+                        "minecraft:light[level=15,waterlogged=false]");
+            }
+            int[][] publicLights = {
+                    {-16,-8}, {16,-8}, {-19,17}, {20,18}, {0,29},
+                    {0,-28}, {-37,4}, {38,3}, {-55,-38}, {55,-40}
+            };
+            for (int[] point : publicLights) {
+                int x = cx + point[0];
+                int z = cz + point[1];
+                int y = Math.max(base - 4, Math.min(base + 6, terrainSurfaceY(x, z) - 1));
+                addData(x, y + 3, z, Material.LIGHT,
+                        "minecraft:light[level=15,waterlogged=false]");
+            }
         }
 
         /** Detalles de plaza, descanso, iluminación y pequeñas recompensas visuales. */
@@ -1477,6 +2799,114 @@ public final class OverworldTemplateManager implements Listener {
             for (int[] p : new int[][]{{-2,-18},{2,-18},{0,-16},{0,-20}}) {
                 add(cx + p[0], base + 1, cz + p[1], Material.FLOWER_POT);
             }
+        }
+
+        /**
+         * Huerto comunal de forma irregular. Además de decorar, entrega una zona
+         * tranquila entre la posada y la salida sin crear otro patio vacío.
+         */
+        private void buildZoneAOrchard(int cx, int base, int cz) {
+            int[][] trees = {{-8,-5},{0,-8},{8,-4},{-6,5},{5,6}};
+            for (int[] tree : trees) {
+                int x = cx + tree[0], z = cz + tree[1];
+                int y = Math.max(base, terrainSurfaceY(x, z) - 1);
+                for (int yy = 1; yy <= 4; yy++) add(x, y + yy, z, Material.OAK_LOG);
+                for (int ox = -2; ox <= 2; ox++) for (int oz = -2; oz <= 2; oz++) {
+                    for (int oy = 3; oy <= 5; oy++) {
+                        if (Math.abs(ox) + Math.abs(oz) + Math.abs(oy - 4) > 5) continue;
+                        add(x + ox, y + oy, z + oz, Material.OAK_LEAVES);
+                    }
+                }
+            }
+            for (int x = cx - 11; x <= cx + 11; x++) {
+                int yNorth = Math.max(base, terrainSurfaceY(x, cz - 10) - 1);
+                int ySouth = Math.max(base, terrainSurfaceY(x, cz + 10) - 1);
+                if ((x - cx) % 5 != 0) {
+                    add(x, yNorth + 1, cz - 10, Material.OAK_FENCE);
+                    add(x, ySouth + 1, cz + 10, Material.OAK_FENCE);
+                }
+            }
+            for (int z = cz - 9; z <= cz + 9; z++) {
+                int yWest = Math.max(base, terrainSurfaceY(cx - 11, z) - 1);
+                if ((z - cz) % 4 != 0) add(cx - 11, yWest + 1, z, Material.OAK_FENCE);
+            }
+            int tableY = Math.max(base, terrainSurfaceY(cx, cz) - 1);
+            add(cx, tableY + 1, cz, Material.COMPOSTER);
+            add(cx + 2, tableY + 1, cz, Material.BARREL);
+            add(cx - 2, tableY + 1, cz, Material.BEE_NEST);
+        }
+
+        /**
+         * Límite natural por tramos: muros bajos, cercas y huecos. Deliberadamente
+         * no forma un rectángulo cerrado ni pretende comportarse como una muralla.
+         */
+        private void buildZoneAIrregularBoundary(int cx, int base, int cz) {
+            int[][] segments = {
+                    {-76,-22,-70,20}, {-66,35,-48,63}, {-40,72,-8,78},
+                    {12,78,39,70}, {58,58,75,31}, {78,16,80,-8},
+                    {73,-28,58,-55}, {42,-68,14,-74}, {-9,-75,-35,-68},
+                    {-51,-60,-70,-42}
+            };
+            for (int index = 0; index < segments.length; index++) {
+                int[] segment = segments[index];
+                lowBoundarySegment(cx + segment[0], cz + segment[1],
+                        cx + segment[2], cz + segment[3], base, index);
+            }
+        }
+
+        private void lowBoundarySegment(int x1, int z1, int x2, int z2,
+                                        int minimumY, int salt) {
+            int dx = Math.abs(x2 - x1), dz = Math.abs(z2 - z1);
+            int sx = x1 < x2 ? 1 : -1;
+            int sz = z1 < z2 ? 1 : -1;
+            int err = dx - dz;
+            int x = x1, z = z1, step = 0;
+            while (true) {
+                int y = Math.max(minimumY - 2, terrainSurfaceY(x, z) - 1);
+                Material material = (step + salt) % 7 == 0
+                        ? Material.MOSSY_COBBLESTONE_WALL
+                        : ((step + salt) % 3 == 0 ? Material.SPRUCE_FENCE
+                        : Material.COBBLESTONE_WALL);
+                if ((step + salt) % 11 != 0) add(x, y + 1, z, material);
+                if ((step + salt) % 17 == 0) add(x, y + 2, z, Material.LANTERN);
+                if (x == x2 && z == z2) break;
+                int e2 = 2 * err;
+                if (e2 > -dz) { err -= dz; x += sx; }
+                if (e2 < dx) { err += dx; z += sz; }
+                step++;
+            }
+        }
+
+        /**
+         * La ruta este sale de la aldea con una curva suave, un pequeño pórtico y
+         * una baliza visible. La Zona B podrá continuar desde el último punto.
+         */
+        private void buildZoneAExitRoute(int cx, int base, int cz) {
+            road(cx + 66, cz + 12, cx + 91, cz + 17, 5, Material.DIRT_PATH);
+            road(cx + 91, cz + 17, cx + 116, cz + 10, 5, Material.COARSE_DIRT);
+            road(cx + 116, cz + 10, cx + 142, cz + 19, 5, Material.DIRT_PATH);
+
+            int gateX = cx + 82, gateZ = cz + 15;
+            for (int side : new int[]{-1, 1}) {
+                int z = gateZ + side * 5;
+                for (int yy = 0; yy <= 5; yy++) {
+                    add(gateX, base + 1 + yy, z,
+                            yy == 0 ? Material.MOSSY_STONE_BRICKS : Material.STRIPPED_SPRUCE_LOG);
+                }
+                add(gateX, base + 7, z, Material.LANTERN);
+            }
+            for (int z = gateZ - 4; z <= gateZ + 4; z++) {
+                add(gateX, base + 6, z, Material.DARK_OAK_SLAB);
+            }
+
+            int beaconX = cx + 137, beaconZ = cz + 18;
+            int beaconY = Math.max(base, terrainSurfaceY(beaconX, beaconZ) - 1);
+            for (int yy = 1; yy <= 8; yy++) {
+                add(beaconX, beaconY + yy, beaconZ,
+                        yy % 3 == 0 ? Material.CHISELED_STONE_BRICKS : Material.COBBLESTONE);
+            }
+            add(beaconX, beaconY + 9, beaconZ, Material.CAMPFIRE);
+            add(beaconX - 1, beaconY + 2, beaconZ, Material.OAK_SIGN);
         }
 
         private void villageWallBlock(int x, int y, int z, int layer) {
@@ -1630,6 +3060,721 @@ public final class OverworldTemplateManager implements Listener {
         }
 
         private void buildDungeonRegion(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int base = medianHeight(cx, cz, 58);
+            dungeon = new Location(world, cx, base + 1, cz);
+
+            Location residential = new Location(world, cx - 170,
+                    surfaceY(cx - 170, cz + 100), cz + 100);
+            Location commercial = new Location(world, cx + 170,
+                    surfaceY(cx + 170, cz + 80), cz + 80);
+            Location military = new Location(world, cx,
+                    surfaceY(cx, cz - 190), cz - 190);
+
+            buildResidentialQuarterV3(residential);
+            buildCommercialQuarterV3(commercial);
+            buildMilitaryQuarterV3(military);
+
+            // Una única red de caminos conecta refugio, distritos y castillo.
+            road(village.getBlockX() + 78, village.getBlockZ() - 10,
+                    residential.getBlockX() - 42, residential.getBlockZ(), 7, Material.MOSSY_COBBLESTONE);
+            road(residential.getBlockX(), residential.getBlockZ() - 42,
+                    cx - 82, cz, 8, Material.COBBLESTONE);
+            road(commercial.getBlockX(), commercial.getBlockZ() - 42,
+                    cx + 78, cz + 18, 8, Material.POLISHED_ANDESITE);
+            road(military.getBlockX(), military.getBlockZ() + 46,
+                    cx, cz - 86, 9, Material.STONE_BRICKS);
+            road(cx - 82, cz, cx + 78, cz + 18, 7, Material.MOSSY_STONE_BRICKS);
+
+            prepareCitadelBiome(cx, cz, 112);
+            prepareBossBiome(cx, base + 10, cz + 130, 56);
+            buildInvadedCapitalV3(cx, cz, base);
+            decorateIslandFrontierV30(cx, base, cz, residential, commercial, military);
+        }
+
+        private void decorateIslandFrontierV30(int cityX, int cityBase, int cityZ,
+                                               Location residential, Location commercial,
+                                               Location military) {
+            int villageX = village.getBlockX() - 3;
+            int villageZ = village.getBlockZ() - 15;
+
+            buildVillageHarborV30(villageX - 150, villageZ + 52, villageX - 48, villageZ + 34);
+            buildVillageHarborV30(villageX - 136, villageZ - 92, villageX - 54, villageZ - 46);
+
+            plantWildGroveV30(villageX - 156, villageZ + 118, 26, 7, 3101L);
+            plantWildGroveV30(villageX - 128, villageZ - 136, 24, 6, 3102L);
+            plantWildGroveV30(villageX + 112, villageZ - 126, 22, 5, 3103L);
+            plantWildGroveV30(villageX + 138, villageZ + 122, 24, 6, 3104L);
+
+            spreadCorruptionFrontierV30(cityX - 132, cityZ - 20, 18, 3, 9201L);
+            spreadCorruptionFrontierV30(cityX + 132, cityZ + 36, 20, 4, 9202L);
+            spreadCorruptionFrontierV30(cityX + 28, cityZ + 176, 16, 3, 9203L);
+            spreadCorruptionFrontierV30(cityX - 24, cityZ - 164, 17, 3, 9204L);
+            spreadCorruptionFrontierV30(residential.getBlockX() - 76, residential.getBlockZ() + 18,
+                    14, 2, 9205L);
+            spreadCorruptionFrontierV30(commercial.getBlockX() + 72, commercial.getBlockZ() - 12,
+                    14, 2, 9206L);
+            spreadCorruptionFrontierV30(military.getBlockX() + 12, military.getBlockZ() - 84,
+                    15, 2, 9207L);
+
+            buildCorrosionTotemV30(cityX + 164, cityZ + 8, 9, 9310L);
+            buildCorrosionTotemV30(cityX - 162, cityZ - 14, 8, 9311L);
+            buildCorrosionTotemV30(cityX + 38, cityZ + 214, 10, 9312L);
+        }
+
+        private void buildVillageHarborV30(int anchorX, int anchorZ, int roadX, int roadZ) {
+            int seaLevel = plugin.getConfig().getInt("template-worlds.overworld.island.sea-level", 62);
+            int shorelineX = anchorX;
+            int shorelineZ = anchorZ;
+            for (int step = 0; step < 72; step++) {
+                int probeX = anchorX - step;
+                int probeY = terrainSurfaceY(probeX, anchorZ) - 1;
+                if (probeY <= seaLevel + 1 || world.getBlockAt(probeX, seaLevel, anchorZ).getType() == Material.WATER) {
+                    shorelineX = probeX + 4;
+                    break;
+                }
+            }
+
+            road(roadX, roadZ, shorelineX + 8, shorelineZ, 4, Material.DIRT_PATH);
+            int quayY = Math.max(seaLevel + 1, terrainSurfaceY(shorelineX + 8, shorelineZ) - 1);
+            preparePlot(shorelineX + 8, quayY, shorelineZ, 8, 6);
+
+            for (int x = shorelineX; x <= shorelineX + 16; x++) {
+                for (int z = shorelineZ - 6; z <= shorelineZ + 6; z++) {
+                    boolean rim = x == shorelineX || x == shorelineX + 16
+                            || z == shorelineZ - 6 || z == shorelineZ + 6;
+                    add(x, quayY, z, rim ? Material.COBBLESTONE : Material.SPRUCE_PLANKS);
+                    for (int y = quayY + 1; y <= quayY + 4; y++) add(x, y, z, Material.AIR);
+                }
+            }
+
+            for (int pier = 0; pier < 2; pier++) {
+                int pierZ = shorelineZ + (pier == 0 ? -3 : 3);
+                for (int x = shorelineX - 16; x <= shorelineX + 5; x++) {
+                    add(x, seaLevel, pierZ, Material.SPRUCE_PLANKS);
+                    if (Math.floorMod(x + pierZ, 4) == 0) {
+                        add(x, seaLevel - 1, pierZ, Material.DARK_OAK_LOG);
+                        add(x, seaLevel - 2, pierZ, Material.DARK_OAK_LOG);
+                    }
+                    if (x == shorelineX - 16 || x == shorelineX - 6 || x == shorelineX + 5) {
+                        add(x, seaLevel + 1, pierZ, Material.OAK_FENCE);
+                        add(x, seaLevel + 2, pierZ, Material.LANTERN);
+                    }
+                }
+            }
+
+            for (int dx = -2; dx <= 2; dx++) {
+                add(shorelineX + 11 + dx, quayY + 1, shorelineZ - 4, Material.BARREL);
+            }
+            add(shorelineX + 12, quayY + 1, shorelineZ + 4, Material.CRAFTING_TABLE);
+            add(shorelineX + 9, quayY + 1, shorelineZ + 4, Material.CHEST);
+            add(shorelineX + 4, quayY + 1, shorelineZ + 4, Material.CAMPFIRE);
+            add(shorelineX + 4, quayY + 2, shorelineZ + 4, Material.CHAIN);
+            add(shorelineX + 4, quayY + 3, shorelineZ + 4, Material.LANTERN);
+
+            int hutX = shorelineX + 14;
+            int hutZ = shorelineZ - 11;
+            int hutY = Math.max(quayY, terrainSurfaceY(hutX, hutZ) - 1);
+            preparePlot(hutX, hutY, hutZ, 5, 4);
+            for (int x = hutX - 4; x <= hutX + 4; x++) {
+                for (int z = hutZ - 3; z <= hutZ + 3; z++) {
+                    boolean edge = x == hutX - 4 || x == hutX + 4 || z == hutZ - 3 || z == hutZ + 3;
+                    add(x, hutY, z, Material.COBBLESTONE);
+                    for (int yy = 1; yy <= 4; yy++) {
+                        add(x, hutY + yy, z, edge ? Material.SPRUCE_PLANKS : Material.AIR);
+                    }
+                }
+            }
+            roofGable(hutX - 5, hutX + 5, hutZ - 4, hutZ + 4, hutY + 5, true);
+            add(hutX, hutY + 1, hutZ, Material.BARREL);
+            add(hutX - 2, hutY + 1, hutZ, Material.OAK_SLAB);
+            add(hutX + 2, hutY + 1, hutZ, Material.OAK_SLAB);
+            add(hutX + 4, hutY + 1, hutZ, Material.LANTERN);
+        }
+
+        private void plantWildGroveV30(int cx, int cz, int radius, int trees, long seed) {
+            Random local = new Random(seed);
+            for (int i = 0; i < trees; i++) {
+                int x = cx + local.nextInt(radius * 2 + 1) - radius;
+                int z = cz + local.nextInt(radius * 2 + 1) - radius;
+                if (Math.hypot(x - cx, z - cz) > radius + 0.5D) continue;
+                int y = terrainSurfaceY(x, z) - 1;
+                Material surface = world.getBlockAt(x, y, z).getType();
+                if (!surface.isSolid() || surface == Material.WATER || surface == Material.LAVA) continue;
+                int height = 4 + local.nextInt(4);
+                Material log = (i & 1) == 0 ? Material.SPRUCE_LOG : Material.OAK_LOG;
+                Material leaves = (i & 1) == 0 ? Material.SPRUCE_LEAVES : Material.OAK_LEAVES;
+                for (int trunk = 1; trunk <= height; trunk++) add(x, y + trunk, z, log);
+                for (int ox = -2; ox <= 2; ox++) {
+                    for (int oz = -2; oz <= 2; oz++) {
+                        for (int oy = height - 1; oy <= height + 1; oy++) {
+                            if (Math.abs(ox) + Math.abs(oz) + Math.abs(oy - height) > 4) continue;
+                            add(x + ox, y + oy, z + oz, leaves);
+                        }
+                    }
+                }
+                if (local.nextDouble() < 0.65D) add(x + 1, y + 1, z, Material.FERN);
+                if (local.nextDouble() < 0.45D) add(x - 1, y + 1, z + 1, Material.SHORT_GRASS);
+            }
+
+            for (int patch = 0; patch < 3; patch++) {
+                int patchX = cx + local.nextInt(radius * 2 + 1) - radius;
+                int patchZ = cz + local.nextInt(radius * 2 + 1) - radius;
+                mossPatch(patchX, terrainSurfaceY(patchX, patchZ), patchZ,
+                        3 + local.nextInt(3), new Random(seed + 200L + patch));
+            }
+        }
+
+        private void spreadCorruptionFrontierV30(int cx, int cz, int radius,
+                                                 int spikes, long seed) {
+            Random local = new Random(seed);
+            mossPatch(cx, terrainSurfaceY(cx, cz), cz, radius, local);
+            for (int i = 0; i < spikes; i++) {
+                int sx = cx + local.nextInt(radius * 2 + 1) - radius;
+                int sz = cz + local.nextInt(radius * 2 + 1) - radius;
+                int sy = terrainSurfaceY(sx, sz);
+                crystalSpike(sx, sy, sz, 4 + local.nextInt(4), new Random(seed + 31L * i));
+            }
+            for (int tree = 0; tree < 2; tree++) {
+                int tx = cx + local.nextInt(radius * 2 + 1) - radius;
+                int tz = cz + local.nextInt(radius * 2 + 1) - radius;
+                buildBlightedTreeV30(tx, tz, 4 + local.nextInt(4), new Random(seed + 79L * (tree + 1)));
+            }
+        }
+
+        private void buildBlightedTreeV30(int x, int z, int height, Random local) {
+            int y = terrainSurfaceY(x, z) - 1;
+            Material surface = world.getBlockAt(x, y, z).getType();
+            if (!surface.isSolid() || surface == Material.WATER || surface == Material.LAVA) return;
+            for (int trunk = 1; trunk <= height; trunk++) {
+                add(x, y + trunk, z, Material.STRIPPED_DARK_OAK_LOG);
+                if (trunk >= 2 && trunk < height && local.nextBoolean()) add(x + 1, y + trunk, z, Material.DARK_OAK_FENCE);
+            }
+            add(x, y + height, z, Material.EMERALD_BLOCK);
+            add(x + 1, y + height - 1, z, Material.MOSS_BLOCK);
+            add(x - 1, y + height - 1, z, Material.MOSS_BLOCK);
+            add(x, y + 1, z + 1, Material.DEAD_BUSH);
+        }
+
+        private void buildCorrosionTotemV30(int x, int z, int height, long seed) {
+            Random local = new Random(seed);
+            int y = terrainSurfaceY(x, z);
+            for (int i = 0; i < height; i++) {
+                Material material = i % 3 == 0 ? Material.VERDANT_FROGLIGHT
+                        : (i % 2 == 0 ? Material.EMERALD_BLOCK : Material.MOSS_BLOCK);
+                add(x, y + i, z, material);
+                if (i > 2 && i < height - 1 && local.nextBoolean()) add(x + (local.nextBoolean() ? 1 : -1), y + i, z, Material.MOSS_CARPET);
+            }
+            add(x, y + height, z, Material.LANTERN);
+        }
+
+        private void buildResidentialQuarterV3(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int y = localBuildY(cx, cz, 47, 42);
+            terraceCircle(cx, y, cz, 20, Material.COBBLESTONE, Material.MOSSY_COBBLESTONE);
+            buildIrregularDistrictBoundaryV3(cx, cz, 46, 38, 1);
+            road(cx, cz - 44, cx, cz + 42, 6, Material.MOSSY_COBBLESTONE);
+            road(cx - 41, cz - 8, cx + 39, cz + 10, 5, Material.COBBLESTONE);
+
+            buildRefugeBuilding(cx - 27, cz - 22, 19, 13, 2, false, "east", 3);
+            buildVillageArchive(cx + 25, cz - 25);
+            buildRuinedHouse(cx - 27, cz + 23, 15, 11, 14301);
+            buildVillageInn(cx + 25, cz + 24);
+            buildVillageCottage(cx + 3, cz + 36, 5, false);
+            buildRefugeMarketArcade(cx + 3, y + 1, cz + 3);
+            decorateOccupiedVillage(cx, y, cz, 0);
+            buildDistrictProgressionV3(cx, y, cz, 0,
+                    LootTables.VILLAGE_PLAINS_HOUSE);
+        }
+
+        private void buildCommercialQuarterV3(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int y = localBuildY(cx, cz, 52, 44);
+            terraceCircle(cx, y, cz, 23, Material.POLISHED_ANDESITE, Material.COBBLESTONE);
+            buildIrregularDistrictBoundaryV3(cx, cz, 50, 41, 2);
+            road(cx, cz - 47, cx, cz + 45, 7, Material.POLISHED_ANDESITE);
+            road(cx - 46, cz - 9, cx + 45, cz + 7, 6, Material.COBBLESTONE);
+
+            buildGrandMarketHallV3(cx, y, cz - 7);
+            buildCapitalHallV3(cx - 31, cz + 23, 23, 17, 13, 0);
+            buildVillageInn(cx + 32, cz + 26);
+            buildStorehouse(cx - 35, cz - 30);
+            buildVillageWorkshop(cx + 35, cz - 31);
+            buildVillageBakery(cx + 4, cz + 36);
+            decorateOccupiedVillage(cx, y, cz, 1);
+            buildDistrictProgressionV3(cx, y, cz, 1, LootTables.STRONGHOLD_CROSSING);
+        }
+
+        private void buildMilitaryQuarterV3(Location center) {
+            int cx = center.getBlockX();
+            int cz = center.getBlockZ();
+            int y = localBuildY(cx, cz, 55, 47);
+            terraceCircle(cx, y, cz, 25, Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
+            buildIrregularDistrictBoundaryV3(cx, cz, 54, 44, 3);
+            road(cx, cz - 50, cx, cz + 49, 8, Material.STONE_BRICKS);
+            road(cx - 49, cz + 5, cx + 48, cz + 5, 6, Material.MOSSY_STONE_BRICKS);
+
+            buildCapitalHallV3(cx - 31, cz - 21, 25, 17, 14, 3);
+            buildCapitalHallV3(cx + 31, cz - 21, 25, 17, 14, 5);
+            buildVillageBarn(cx - 32, cz + 27);
+            buildStorehouse(cx + 32, cz + 28);
+            buildMineEntrance(cx, cz + 39, true);
+            buildRefugeWatchPost(cx - 48, cz + 3, 30);
+            buildRefugeWatchPost(cx + 48, cz + 4, 31);
+            decorateOccupiedVillage(cx, y, cz, 2);
+            buildDistrictProgressionV3(cx, y, cz, 2, LootTables.PILLAGER_OUTPOST);
+        }
+
+        /**
+         * Convierte cada distrito en un pueblo que existía antes de la invasión: hay
+         * campamentos, barricadas, carros abandonados, jaulas y corrupción sobre una
+         * arquitectura civil, no cuatro arenas de combate idénticas.
+         */
+        private void decorateOccupiedVillage(int cx, int base, int cz, int district) {
+            int[][] barricades = {{-14,-5}, {15,7}, {-6,18}, {8,-20}};
+            for (int i = 0; i < barricades.length; i++) {
+                int x = cx + barricades[i][0];
+                int z = cz + barricades[i][1];
+                int y = terrainSurfaceY(x, z) - 1;
+                boolean alongX = ((i + district) & 1) == 0;
+                for (int offset = -3; offset <= 3; offset++) {
+                    int bx = x + (alongX ? offset : 0);
+                    int bz = z + (alongX ? 0 : offset);
+                    int sy = terrainSurfaceY(bx, bz) - 1;
+                    add(bx, sy + 1, bz, (offset & 1) == 0
+                            ? Material.SPRUCE_FENCE : Material.DARK_OAK_PLANKS);
+                    if (Math.abs(offset) == 2) add(bx, sy + 2, bz, Material.IRON_BARS);
+                }
+                add(x, y + 1, z, Material.GREEN_BANNER);
+            }
+
+            int tentX = cx + (district == 1 ? 18 : -17);
+            int tentZ = cz + (district == 2 ? -2 : 15);
+            int tentY = localBuildY(tentX, tentZ, 6, 5);
+            preparePlot(tentX, tentY, tentZ, 6, 5);
+            for (int x = tentX - 5; x <= tentX + 5; x++) {
+                for (int z = tentZ - 4; z <= tentZ + 4; z++) {
+                    add(x, tentY, z, Material.COARSE_DIRT);
+                    if (Math.abs(x - tentX) == 5 || Math.abs(z - tentZ) == 4) {
+                        int canopy = 4 - Math.min(3, Math.abs(x - tentX) / 2);
+                        add(x, tentY + canopy, z, ((x + z + district) & 1) == 0
+                                ? Material.GREEN_WOOL : Material.BLACK_WOOL);
+                    }
+                }
+            }
+            add(tentX, tentY + 1, tentZ, Material.SOUL_CAMPFIRE);
+            add(tentX - 3, tentY + 1, tentZ + 1, Material.BARREL);
+            add(tentX + 3, tentY + 1, tentZ + 1, Material.CRAFTING_TABLE);
+            addData(tentX, tentY + 3, tentZ, Material.LIGHT,
+                    "minecraft:light[level=12,waterlogged=false]");
+
+            int cartX = cx + (district - 1) * 9;
+            int cartZ = cz - 29;
+            int cartY = terrainSurfaceY(cartX, cartZ) - 1;
+            for (int x = cartX - 3; x <= cartX + 3; x++) {
+                add(x, cartY + 1, cartZ, Material.SPRUCE_PLANKS);
+            }
+            add(cartX - 3, cartY + 1, cartZ - 1, Material.DARK_OAK_TRAPDOOR);
+            add(cartX + 3, cartY + 1, cartZ - 1, Material.DARK_OAK_TRAPDOOR);
+            add(cartX, cartY + 2, cartZ, Material.COBWEB);
+            add(cartX + 1, cartY + 2, cartZ, Material.MOSS_BLOCK);
+
+            int cageX = cx - 8 + district * 7;
+            int cageZ = cz + 31;
+            int cageY = terrainSurfaceY(cageX, cageZ) - 1;
+            for (int dx = -2; dx <= 2; dx++) for (int dz = -2; dz <= 2; dz++) {
+                add(cageX + dx, cageY, cageZ + dz, Material.STONE_BRICKS);
+                if (Math.abs(dx) == 2 || Math.abs(dz) == 2) {
+                    add(cageX + dx, cageY + 1, cageZ + dz, Material.IRON_BARS);
+                    add(cageX + dx, cageY + 2, cageZ + dz, Material.IRON_BARS);
+                }
+            }
+            mossPatch(cx + 30 - district * 12, base, cz - 8 + district * 7,
+                    7, new Random(143000L + district * 997L));
+        }
+
+        private void buildIrregularDistrictBoundaryV3(int cx, int cz, int rx, int rz, int salt) {
+            int[][] points = {
+                    {-rx + 5,-rz + 8}, {-rx / 3,-rz - 3}, {rx / 2,-rz + 1}, {rx - 2,-rz / 2},
+                    {rx + 2,rz / 3}, {rx / 2,rz}, {-rx / 3,rz + 2}, {-rx,rz / 3}
+            };
+            for (int i = 0; i < points.length; i++) {
+                int[] a = points[i];
+                int[] b = points[(i + 1) % points.length];
+                boolean southGate = i == 0;
+                boolean northGate = i == 4;
+                if (!southGate && !northGate) {
+                    buildAdaptiveWallSegment(cx + a[0], cz + a[1], cx + b[0], cz + b[1],
+                            5 + Math.floorMod(salt + i, 2), false);
+                }
+            }
+            buildRefugeWatchPost(cx - rx + 5, cz - rz + 8, salt * 11);
+            buildRefugeWatchPost(cx + rx - 2, cz - rz / 2, salt * 11 + 1);
+            buildRefugeWatchPost(cx + rx / 2, cz + rz, salt * 11 + 2);
+        }
+
+        private void buildDistrictProgressionV3(int cx, int y, int cz, int district,
+                                                LootTables table) {
+            int pedestalZ = cz + 27;
+            terraceCircle(cx + 6, y + 1, pedestalZ, 6,
+                    Material.CHISELED_STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
+            placeLootContainer(new Location(world, cx + 6, y + 2, pedestalZ), table, true);
+            String[][] mobs = {
+                    {"arlightbosses:emerald_zombie_minion", "arlightbosses:emerald_creeper_minion",
+                            "arlightbosses:mossbound_spider_minion", "arlightbosses:emerald_zombie_minion"},
+                    {"arlightbosses:emerald_zombie_minion", "arlightbosses:emerald_skeleton_archer_minion",
+                            "arlightbosses:emerald_ravager_cub_minion", "arlightbosses:mossbound_spider_minion"},
+                    {"arlightbosses:emerald_golem_sentinel_minion", "arlightbosses:emerald_skeleton_archer_minion",
+                            "arlightbosses:emerald_ravager_cub_minion", "arlightbosses:emerald_creeper_minion"}
+            };
+            int[][] positions = {{0,0},{-20,-10},{19,13},{0,27}};
+            for (int i = 0; i < positions.length; i++) {
+                placeCustomSpawner(new Location(world, cx + positions[i][0], y + 2,
+                        cz + positions[i][1]), mobs[district][i]);
+            }
+        }
+
+        private void buildGrandMarketHallV3(int cx, int y, int cz) {
+            preparePlot(cx, y, cz, 18, 14);
+            for (int x = cx - 17; x <= cx + 17; x++) for (int z = cz - 13; z <= cz + 13; z++) {
+                boolean boundary = Math.abs(x - cx) == 17 || Math.abs(z - cz) == 13;
+                add(x, y, z, ((x + z) & 7) == 0 ? Material.POLISHED_ANDESITE : Material.STONE_BRICKS);
+                for (int yy = 1; yy <= 11; yy++) {
+                    boolean arch = boundary && yy >= 3 && yy <= 7
+                            && ((Math.abs(x - cx) == 17 && Math.floorMod(z - cz, 7) <= 2)
+                            || (Math.abs(z - cz) == 13 && Math.floorMod(x - cx, 7) <= 2));
+                    if (!boundary || arch) add(x, y + yy, z, Material.AIR);
+                    else add(x, y + yy, z, (yy == 1 || yy == 8
+                            ? Material.POLISHED_TUFF : Material.TUFF_BRICKS));
+                }
+            }
+            for (int x = cx - 14; x <= cx + 14; x += 7) for (int z = cz - 9; z <= cz + 9; z += 6) {
+                add(x, y + 1, z, Material.BARREL);
+                add(x, y + 2, z, ((x + z) & 1) == 0 ? Material.RED_WOOL : Material.YELLOW_WOOL);
+            }
+            roofGable(cx - 19, cx + 19, cz - 15, cz + 15, y + 12, true);
+        }
+
+        private void buildCapitalHallV3(int cx, int cz, int width, int depth,
+                                        int height, int role) {
+            int halfX = width / 2;
+            int halfZ = depth / 2;
+            int y = localBuildY(cx, cz, halfX + 3, halfZ + 3);
+            preparePlot(cx, y, cz, halfX + 3, halfZ + 3);
+            for (int x = cx - halfX; x <= cx + halfX; x++) for (int z = cz - halfZ; z <= cz + halfZ; z++) {
+                boolean boundary = Math.abs(x - cx) == halfX || Math.abs(z - cz) == halfZ;
+                add(x, y, z, ((x + z) & 9) == 0 ? Material.MOSSY_STONE_BRICKS : Material.POLISHED_TUFF);
+                for (int yy = 1; yy <= height; yy++) {
+                    boolean entrance = z == cz - halfZ && Math.abs(x - cx) <= 2 && yy <= 5;
+                    if (!boundary || entrance) {
+                        add(x, y + yy, z, Material.AIR);
+                        continue;
+                    }
+                    boolean buttress = (Math.abs(x - cx) == halfX && Math.floorMod(z - cz, 6) == 0)
+                            || (Math.abs(z - cz) == halfZ && Math.floorMod(x - cx, 6) == 0);
+                    boolean window = yy >= 4 && yy <= 8 && !buttress
+                            && ((x + z + role) & 3) == 0;
+                    add(x, y + yy, z, window ? Material.LIME_STAINED_GLASS_PANE
+                            : (buttress ? Material.DEEPSLATE_BRICKS
+                            : (((x + z + yy) & 17) == 0 ? Material.MOSSY_STONE_BRICKS : Material.TUFF_BRICKS)));
+                }
+            }
+            for (int floorY = y + 6; floorY < y + height; floorY += 6) {
+                for (int x = cx - halfX + 2; x <= cx + halfX - 2; x++) {
+                    for (int z = cz - halfZ + 2; z <= cz + halfZ - 2; z++) {
+                        if (Math.abs(x - cx) <= 1 && Math.abs(z - cz) <= 1) continue;
+                        add(x, floorY, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            roofGable(cx - halfX - 2, cx + halfX + 2, cz - halfZ - 2, cz + halfZ + 2,
+                    y + height + 1, (role & 1) == 0);
+            furnishCapitalHallV3(cx, y, cz, halfX, halfZ, role);
+        }
+
+        private void furnishCapitalHallV3(int cx, int y, int cz, int halfX, int halfZ, int role) {
+            switch (role) {
+                case 0, 1 -> {
+                    for (int z = cz - halfZ + 2; z <= cz + halfZ - 2; z += 3) {
+                        add(cx - halfX + 2, y + 1, z, Material.BOOKSHELF);
+                        add(cx + halfX - 2, y + 1, z, Material.BOOKSHELF);
+                    }
+                    add(cx, y + 1, cz, Material.LECTERN);
+                }
+                case 2 -> {
+                    add(cx - 4, y + 1, cz, Material.BREWING_STAND);
+                    add(cx, y + 1, cz, Material.CAULDRON);
+                    add(cx + 4, y + 1, cz, Material.CRAFTING_TABLE);
+                }
+                case 3 -> {
+                    add(cx - 4, y + 1, cz, Material.BLAST_FURNACE);
+                    add(cx, y + 1, cz, Material.SMITHING_TABLE);
+                    add(cx + 4, y + 1, cz, Material.ANVIL);
+                }
+                case 4 -> {
+                    for (int x = cx - halfX + 3; x <= cx + halfX - 3; x += 5) {
+                        for (int yy = 1; yy <= 4; yy++) add(x, y + yy, cz + 2, Material.IRON_BARS);
+                    }
+                    add(cx, y + 1, cz - 3, Material.CHAIN);
+                }
+                default -> {
+                    add(cx - 4, y + 1, cz, Material.FLETCHING_TABLE);
+                    add(cx, y + 1, cz, Material.CRAFTING_TABLE);
+                    add(cx + 4, y + 1, cz, Material.STONECUTTER);
+                }
+            }
+            add(cx - halfX + 2, y + 2, cz - halfZ + 2, Material.LANTERN);
+            add(cx + halfX - 2, y + 2, cz - halfZ + 2, Material.LANTERN);
+            placeLootContainer(new Location(world, cx, y + 1, cz + halfZ - 2),
+                    role <= 1 ? LootTables.STRONGHOLD_LIBRARY : LootTables.SIMPLE_DUNGEON,
+                    (role & 1) == 1);
+        }
+
+        /** Arquitectura central completamente nueva de la ciudad invadida. */
+        private void buildInvadedCapitalV3(int cx, int cz, int base) {
+            int[][] wall = {
+                    {-80,-82}, {-22,-94}, {52,-89}, {82,-54}, {80,54},
+                    {66,88}, {-66,88}, {-84,52}, {-86,-42}
+            };
+            for (int i = 0; i < wall.length; i++) {
+                int[] a = wall[i];
+                int[] b = wall[(i + 1) % wall.length];
+                // Puerta occidental y portón norte de progresión se dibujan por separado.
+                if (i == 5) {
+                    buildAdaptiveWallSegment(cx + a[0], cz + a[1], cx + 8, cz + 88, 12, true);
+                    buildAdaptiveWallSegment(cx - 8, cz + 88, cx + b[0], cz + b[1], 12, true);
+                } else if (i == 7) {
+                    buildAdaptiveWallSegment(cx + a[0], cz + a[1], cx - 84, cz + 8, 12, true);
+                    buildAdaptiveWallSegment(cx - 84, cz - 8, cx + b[0], cz + b[1], 12, true);
+                } else {
+                    buildAdaptiveWallSegment(cx + a[0], cz + a[1], cx + b[0], cz + b[1], 12, true);
+                }
+            }
+            buildCastleGatehouseV3(cx - 84, base, cz, false);
+            buildCastleGatehouseV3(cx, base, cz + 88, true);
+            buildSquareCitadelTowerV3(cx - 78, cz - 76, 9, 27, 0);
+            buildSquareCitadelTowerV3(cx + 48, cz - 84, 8, 24, 1);
+            buildSquareCitadelTowerV3(cx + 76, cz + 51, 9, 30, 2);
+            buildSquareCitadelTowerV3(cx - 64, cz + 82, 8, 25, 3);
+
+            road(cx - 96, cz, cx + 68, cz + 6, 10, Material.STONE_BRICKS);
+            road(cx, cz - 88, cx, cz + 92, 9, Material.MOSSY_STONE_BRICKS);
+            road(cx - 62, cz - 40, cx + 62, cz + 46, 6, Material.COBBLESTONE);
+            buildSewerNetworkV3(cx, base, cz);
+
+            buildCapitalHallV3(cx - 48, cz - 45, 27, 19, 15, 1);
+            buildCapitalHallV3(cx + 47, cz - 44, 29, 19, 15, 2);
+            buildCapitalHallV3(cx - 50, cz + 22, 27, 19, 16, 4);
+            buildCapitalHallV3(cx + 49, cz + 21, 29, 19, 16, 3);
+            buildCapitalHallV3(cx - 35, cz + 58, 23, 17, 13, 5);
+            buildCapitalHallV3(cx + 35, cz + 58, 23, 17, 13, 0);
+            buildCastleKeepV3(cx, base + 3, cz + 35);
+            buildBossSanctumV3(cx, base + 10, cz + 130);
+            buildNetherGateShrineV3(cx, base + 2, cz + 202);
+
+            String[] guards = {
+                    "arlightbosses:emerald_zombie_minion",
+                    "arlightbosses:emerald_skeleton_archer_minion",
+                    "arlightbosses:emerald_creeper_minion",
+                    "arlightbosses:emerald_ravager_cub_minion",
+                    "arlightbosses:emerald_golem_sentinel_minion"
+            };
+            int[][] positions = {{-55,-61},{49,-63},{-57,-3},{58,5},{0,67}};
+            for (int i = 0; i < positions.length; i++) {
+                placeCustomSpawner(new Location(world, cx + positions[i][0], base + 2,
+                        cz + positions[i][1]), guards[i]);
+            }
+        }
+
+        private void buildCastleGatehouseV3(int cx, int baseHint, int cz, boolean northSouth) {
+            int y = northSouth ? baseHint
+                    : localBuildY(cx, cz, northSouth ? 18 : 9, northSouth ? 9 : 18);
+            int length = 15;
+            for (int a = -length; a <= length; a++) for (int b = -4; b <= 4; b++) {
+                int x = cx + (northSouth ? a : b);
+                int z = cz + (northSouth ? b : a);
+                for (int yy = 0; yy <= 15; yy++) {
+                    boolean opening = Math.abs(a) <= 5 && yy >= 1 && yy <= 7;
+                    add(x, y + yy, z, opening ? Material.AIR
+                            : (yy == 6 || yy == 12 ? Material.POLISHED_TUFF : Material.DEEPSLATE_BRICKS));
+                }
+            }
+            if (northSouth) {
+                buildSquareCitadelTowerV3(cx - 17, cz, 7, 24, 10);
+                buildSquareCitadelTowerV3(cx + 17, cz, 7, 24, 11);
+            } else {
+                buildSquareCitadelTowerV3(cx, cz - 17, 7, 24, 12);
+                buildSquareCitadelTowerV3(cx, cz + 17, 7, 24, 13);
+            }
+        }
+
+        private void buildSquareCitadelTowerV3(int cx, int cz, int radius, int height, int salt) {
+            int y = localBuildY(cx, cz, radius + 1, radius + 1);
+            preparePlot(cx, y, cz, radius + 1, radius + 1);
+            for (int x = cx - radius; x <= cx + radius; x++) for (int z = cz - radius; z <= cz + radius; z++) {
+                boolean boundary = Math.abs(x - cx) == radius || Math.abs(z - cz) == radius;
+                add(x, y, z, Material.POLISHED_TUFF);
+                if (boundary) for (int yy = 1; yy <= height; yy++) {
+                    boolean window = yy >= 7 && yy <= 9 && Math.floorMod(x + z + salt, 6) == 0;
+                    add(x, y + yy, z, window ? Material.LIME_STAINED_GLASS_PANE
+                            : (((x + z + yy) & 15) == 0 ? Material.MOSSY_STONE_BRICKS : Material.TUFF_BRICKS));
+                }
+            }
+            for (int floor = 7; floor < height; floor += 7) {
+                for (int x = cx - radius + 1; x <= cx + radius - 1; x++) {
+                    for (int z = cz - radius + 1; z <= cz + radius - 1; z++) {
+                        if (Math.abs(x - cx) <= 1 && Math.abs(z - cz) <= 1) continue;
+                        add(x, y + floor, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            for (int layer = 0; layer <= radius; layer++) {
+                int roofY = y + height + 1 + layer;
+                for (int x = cx - radius - 1 + layer; x <= cx + radius + 1 - layer; x++) {
+                    for (int z = cz - radius - 1 + layer; z <= cz + radius + 1 - layer; z++) {
+                        boolean edge = x == cx - radius - 1 + layer || x == cx + radius + 1 - layer
+                                || z == cz - radius - 1 + layer || z == cz + radius + 1 - layer;
+                        if (edge) add(x, roofY, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            for (int yy = y + 1; yy < y + height; yy++) add(cx, yy, cz, Material.SCAFFOLDING);
+        }
+
+        private void buildCastleKeepV3(int cx, int y, int cz) {
+            int halfX = 31;
+            int halfZ = 25;
+            preparePlot(cx, y, cz, halfX + 5, halfZ + 5);
+            for (int x = cx - halfX; x <= cx + halfX; x++) for (int z = cz - halfZ; z <= cz + halfZ; z++) {
+                boolean chamfered = Math.abs(x - cx) + Math.abs(z - cz) <= halfX + halfZ - 8;
+                if (!chamfered) continue;
+                boolean boundary = Math.abs(x - cx) >= halfX - 1 || Math.abs(z - cz) >= halfZ - 1
+                        || Math.abs(x - cx) + Math.abs(z - cz) >= halfX + halfZ - 10;
+                add(x, y, z, Material.POLISHED_TUFF);
+                for (int yy = 1; yy <= 24; yy++) {
+                    boolean southDoor = z <= cz - halfZ + 1 && Math.abs(x - cx) <= 4 && yy <= 7;
+                    boolean northDoor = z >= cz + halfZ - 1 && Math.abs(x - cx) <= 4 && yy <= 7;
+                    if (!boundary || southDoor || northDoor) add(x, y + yy, z, Material.AIR);
+                    else {
+                        boolean window = yy >= 7 && yy <= 11 && Math.floorMod(x + z, 8) <= 1;
+                        add(x, y + yy, z, window ? Material.LIME_STAINED_GLASS_PANE
+                                : (((x * 3 + z + yy) & 19) == 0
+                                ? Material.MOSSY_STONE_BRICKS : Material.DEEPSLATE_BRICKS));
+                    }
+                }
+            }
+            for (int floorY : new int[]{y + 8, y + 16}) {
+                for (int x = cx - halfX + 3; x <= cx + halfX - 3; x++) {
+                    for (int z = cz - halfZ + 3; z <= cz + halfZ - 3; z++) {
+                        if (Math.abs(x - cx) <= 3 && z >= cz - halfZ + 4 && z <= cz + halfZ - 4) continue;
+                        add(x, floorY, z, Material.DARK_OAK_PLANKS);
+                    }
+                }
+            }
+            buildSquareCitadelTowerV3(cx - 31, cz - 24, 8, 32, 20);
+            buildSquareCitadelTowerV3(cx + 31, cz - 24, 8, 29, 21);
+            buildSquareCitadelTowerV3(cx - 31, cz + 24, 8, 35, 22);
+            buildSquareCitadelTowerV3(cx + 31, cz + 24, 8, 31, 23);
+            roofGable(cx - halfX - 2, cx + halfX + 2, cz - halfZ - 2, cz + halfZ + 2,
+                    y + 25, true);
+            for (int z = cz - 18; z <= cz + 18; z += 6) {
+                add(cx - 9, y + 1, z, Material.CHISELED_TUFF_BRICKS);
+                add(cx + 9, y + 1, z, Material.CHISELED_TUFF_BRICKS);
+                add(cx - 9, y + 2, z, Material.LANTERN);
+                add(cx + 9, y + 2, z, Material.LANTERN);
+            }
+            placeLootContainer(new Location(world, cx - 12, y + 1, cz + 8),
+                    LootTables.STRONGHOLD_CROSSING, false);
+            placeLootContainer(new Location(world, cx + 12, y + 1, cz + 8),
+                    LootTables.STRONGHOLD_CORRIDOR, false);
+        }
+
+        private void buildBossSanctumV3(int cx, int y, int cz) {
+            terraceCircle(cx, y, cz, 48, Material.POLISHED_TUFF, Material.MOSSY_STONE_BRICKS);
+            // Escalera ancha desde el sello de z+88 hasta el patio elevado.
+            for (int step = 0; step <= 28; step++) {
+                int z = cz - 48 + step;
+                int stepY = y - 9 + step / 4;
+                for (int x = cx - 6; x <= cx + 6; x++) add(x, stepY, z,
+                        (step % 5 == 0) ? Material.CHISELED_STONE_BRICKS : Material.STONE_BRICKS);
+            }
+            for (int degree = 0; degree < 360; degree += 3) {
+                double angle = Math.toRadians(degree);
+                int x = cx + (int) Math.round(Math.cos(angle) * 46.0D);
+                int z = cz + (int) Math.round(Math.sin(angle) * 42.0D);
+                boolean entrance = z < cz - 34 && Math.abs(x - cx) <= 8;
+                if (entrance) continue;
+                for (int yy = 1; yy <= 12; yy++) add(x, y + yy, z,
+                        yy == 6 ? Material.POLISHED_TUFF : Material.DEEPSLATE_BRICKS);
+            }
+            for (int x = cx - 18; x <= cx + 18; x++) for (int z = cz - 17; z <= cz + 17; z++) {
+                add(x, y, z, ((x + z) & 7) == 0 ? Material.CHISELED_TUFF_BRICKS : Material.POLISHED_TUFF);
+                for (int yy = 1; yy <= 16; yy++) add(x, y + yy, z, Material.AIR);
+            }
+            // Trono y cristal quedan detrás del punto del jefe, dejando la arena libre.
+            for (int level = 0; level < 6; level++) {
+                for (int x = cx - 8 + level; x <= cx + 8 - level; x++) {
+                    add(x, y + level, cz + 27 + level, Material.DEEPSLATE_BRICKS);
+                }
+            }
+            crystalSpike(cx, y + 6, cz + 35, 19, new Random(1420130L));
+            for (int[] pillar : new int[][]{{-35,-18},{35,-18},{-35,20},{35,20}}) {
+                buildSquareCitadelTowerV3(cx + pillar[0], cz + pillar[1], 5, 17, pillar[0] + pillar[1]);
+            }
+            placeLootContainer(new Location(world, cx - 25, y + 1, cz + 8),
+                    LootTables.STRONGHOLD_CROSSING, false);
+            placeLootContainer(new Location(world, cx + 25, y + 1, cz + 8),
+                    LootTables.STRONGHOLD_CROSSING, false);
+        }
+
+        private void buildNetherGateShrineV3(int cx, int y, int cz) {
+            terraceCircle(cx, y, cz, 17, Material.POLISHED_ANDESITE, Material.MOSSY_STONE_BRICKS);
+            for (int x = cx - 8; x <= cx + 8; x++) for (int z = cz - 6; z <= cz + 6; z++) {
+                add(x, y, z, ((x + z) & 5) == 0 ? Material.CHISELED_STONE_BRICKS : Material.STONE_BRICKS);
+                for (int yy = 1; yy <= 12; yy++) add(x, y + yy, z, Material.AIR);
+            }
+            for (int x : new int[]{cx - 8, cx + 8}) for (int yy = 1; yy <= 12; yy++) {
+                add(x, y + yy, cz, yy % 4 == 0 ? Material.EMERALD_BLOCK : Material.DEEPSLATE_BRICKS);
+            }
+            for (int x = cx - 8; x <= cx + 8; x++) {
+                int arch = 12 + Math.max(0, 4 - Math.abs(x - cx) / 2);
+                add(x, y + arch, cz, Material.DEEPSLATE_BRICKS);
+            }
+            add(cx - 5, y + 2, cz + 4, Material.LANTERN);
+            add(cx + 5, y + 2, cz + 4, Material.LANTERN);
+        }
+
+        private void buildSewerNetworkV3(int cx, int base, int cz) {
+            int sewerY = base - 7;
+            for (int x = cx - 58; x <= cx + 58; x++) for (int width = -2; width <= 2; width++) {
+                int z = cz + width;
+                add(x, sewerY - 1, z, Material.STONE_BRICKS);
+                for (int yy = 0; yy <= 4; yy++) add(x, sewerY + yy, z,
+                        Math.abs(width) == 2 ? Material.MOSSY_STONE_BRICKS : Material.AIR);
+                add(x, sewerY + 5, z, Material.STONE_BRICKS);
+            }
+            for (int z = cz - 72; z <= cz + 72; z++) for (int width = -2; width <= 2; width++) {
+                int x = cx + width;
+                add(x, sewerY - 1, z, Material.STONE_BRICKS);
+                for (int yy = 0; yy <= 4; yy++) add(x, sewerY + yy, z,
+                        Math.abs(width) == 2 ? Material.MOSSY_STONE_BRICKS : Material.AIR);
+                add(x, sewerY + 5, z, Material.STONE_BRICKS);
+            }
+            for (int[] access : new int[][]{{-52,0},{52,0},{0,-60},{0,60}}) {
+                for (int yy = sewerY; yy <= base + 1; yy++) {
+                    add(cx + access[0], yy, cz + access[1], Material.SCAFFOLDING);
+                }
+                placeLootContainer(new Location(world, cx + access[0] + 2, sewerY, cz + access[1]),
+                        LootTables.SIMPLE_DUNGEON, true);
+            }
+        }
+
+        /** Conservado sin llamadas; 1.43.0 nunca lo coloca en una revisión nueva. */
+        @SuppressWarnings("unused")
+        private void buildLegacyDungeonRegion(Location center) {
             int cx = center.getBlockX();
             int cz = center.getBlockZ();
             int base = medianHeight(cx, cz, 58);
@@ -2422,18 +4567,27 @@ public final class OverworldTemplateManager implements Listener {
         private void preparePlot(int cx, int y, int cz, int halfX, int halfZ) {
             for (int x = cx - halfX; x <= cx + halfX; x++) for (int z = cz - halfZ; z <= cz + halfZ; z++) {
                 int current = surfaceY(x, z) - 1;
-                if (current < y) {
+                int edgeDistance = Math.min(halfX - Math.abs(x - cx), halfZ - Math.abs(z - cz));
+                // El último bloque es una transición de terreno, no el borde recto de una losa.
+                int target = edgeDistance == 0
+                        ? y + Math.max(-1, Math.min(1, current - y)) : y;
+                if (current < target) {
                     // La versión anterior rellenaba solo seis bloques y dejaba plataformas
                     // suspendidas sobre laderas. Ahora toda la diferencia se integra al terreno.
-                    for (int yy = current + 1; yy <= y; yy++) {
+                    for (int yy = current + 1; yy <= target; yy++) {
                         boolean face = x == cx - halfX || x == cx + halfX || z == cz - halfZ || z == cz + halfZ;
-                        Material material = yy == y ? Material.STONE
+                        Material material = yy == target
+                                ? (edgeDistance == 0
+                                ? (((x * 3 + z) & 5) == 0 ? Material.MOSS_BLOCK : Material.COARSE_DIRT)
+                                : Material.STONE)
                                 : (face && (yy + x + z) % 7 == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
                         add(x, yy, z, material);
                     }
                 } else {
-                    for (int yy = y + 1; yy <= Math.min(current + 12, world.getMaxHeight() - 2); yy++) add(x, yy, z, Material.AIR);
-                    add(x, y, z, Material.STONE);
+                    for (int yy = target + 1; yy <= Math.min(current + 12, world.getMaxHeight() - 2); yy++) add(x, yy, z, Material.AIR);
+                    add(x, target, z, edgeDistance == 0
+                            ? (((x + z) & 3) == 0 ? Material.MOSS_BLOCK : Material.COARSE_DIRT)
+                            : Material.STONE);
                 }
             }
         }
@@ -2458,35 +4612,78 @@ public final class OverworldTemplateManager implements Listener {
         }
 
         private void road(int x1, int z1, int x2, int z2, int width, Material material) {
-            int dx = Math.abs(x2 - x1), dz = Math.abs(z2 - z1);
-            int sx = x1 < x2 ? 1 : -1;
-            int sz = z1 < z2 ? 1 : -1;
-            int err = dx - dz;
-            int x = x1, z = z1;
-            int lastY = terrainSurfaceY(x, z) - 1;
-            while (true) {
-                int natural = surfaceY(x, z) - 1;
-                int y = Math.max(lastY - 1, Math.min(lastY + 1, natural));
-                lastY = y;
-                for (int wx = -width / 2; wx <= width / 2; wx++) for (int wz = -width / 2; wz <= width / 2; wz++) {
-                    if (Math.abs(wx) + Math.abs(wz) > width / 2 + 1) continue;
-                    int bx = x + wx, bz = z + wz;
+            int deltaX = x2 - x1;
+            int deltaZ = z2 - z1;
+            int steps = Math.max(Math.abs(deltaX), Math.abs(deltaZ));
+            if (steps == 0) return;
+            double length = Math.hypot(deltaX, deltaZ);
+            double perpendicularX = -deltaZ / length;
+            double perpendicularZ = deltaX / length;
+            int hash = Math.floorMod(x1 * 31 + z1 * 17 + x2 * 13 + z2 * 7, 2);
+            double bend = steps < 18 ? 0.0D : Math.min(9.0D, steps / 11.0D) * (hash == 0 ? -1.0D : 1.0D);
+
+            int previousX = x1;
+            int previousZ = z1;
+            int previousY = terrainSurfaceY(x1, z1) - 1;
+            for (int step = 0; step <= steps; step++) {
+                double t = step / (double) steps;
+                double arc = Math.sin(Math.PI * t) * bend;
+                int x = (int) Math.round(x1 + deltaX * t + perpendicularX * arc);
+                int z = (int) Math.round(z1 + deltaZ * t + perpendicularZ * arc);
+                if (step > 0 && x == previousX && z == previousZ) continue;
+
+                int natural = terrainSurfaceY(x, z) - 1;
+                int y = step == 0 ? natural : Math.max(previousY - 1, Math.min(previousY + 1, natural));
+                int moveX = Integer.compare(x, previousX);
+                int moveZ = Integer.compare(z, previousZ);
+                boolean mostlyX = Math.abs(x - previousX) >= Math.abs(z - previousZ);
+                boolean heightChange = step > 0 && y != previousY;
+                String facing = cardinalFacing(heightChange && y < previousY ? -moveX : moveX,
+                        heightChange && y < previousY ? -moveZ : moveZ);
+
+                for (int offset = -width / 2; offset <= width / 2; offset++) {
+                    int bx = mostlyX ? x : x + offset;
+                    int bz = mostlyX ? z + offset : z;
                     int belowRoad = terrainSurfaceY(bx, bz) - 1;
-                    if (belowRoad < y) {
-                        for (int fy = belowRoad + 1; fy < y; fy++) {
-                            add(bx, fy, bz, ((fy + bx + bz) & 7) == 0 ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
-                        }
+                    for (int fillY = belowRoad + 1; fillY < y; fillY++) {
+                        add(bx, fillY, bz, ((fillY + bx + bz) & 7) == 0
+                                ? Material.MOSSY_COBBLESTONE : Material.COBBLESTONE);
                     }
-                    add(bx, y, bz, ((bx + bz) % 8 == 0) ? Material.MOSSY_COBBLESTONE : material);
-                    add(bx, y + 1, bz, Material.AIR);
-                    add(bx, y + 2, bz, Material.AIR);
-                    add(bx, y + 3, bz, Material.AIR);
+                    if (heightChange) {
+                        Material stairs = material == Material.DIRT_PATH || material == Material.COARSE_DIRT
+                                ? Material.COBBLESTONE_STAIRS : Material.STONE_BRICK_STAIRS;
+                        addData(bx, y, bz, stairs, "minecraft:" + stairs.name().toLowerCase(Locale.ROOT)
+                                + "[facing=" + facing + ",half=bottom,shape=straight,waterlogged=false]");
+                    } else {
+                        Material roadBlock = Math.floorMod(bx * 5 + bz * 3, 13) == 0
+                                ? Material.MOSSY_COBBLESTONE : material;
+                        add(bx, y, bz, roadBlock);
+                    }
+                    for (int clearY = y + 1; clearY <= y + 4; clearY++) add(bx, clearY, bz, Material.AIR);
                 }
-                if (x == x2 && z == z2) break;
-                int e2 = 2 * err;
-                if (e2 > -dz) { err -= dz; x += sx; }
-                if (e2 < dx) { err += dx; z += sz; }
+
+                if (step % 7 == 0) {
+                    addData(x, y + 3, z, Material.LIGHT,
+                            "minecraft:light[level=15,waterlogged=false]");
+                }
+                if (step > 0 && step < steps && step % 19 == 0) {
+                    int side = width / 2 + 2;
+                    int lampX = mostlyX ? x : x + side;
+                    int lampZ = mostlyX ? z + side : z;
+                    int lampY = Math.max(y, terrainSurfaceY(lampX, lampZ) - 1);
+                    add(lampX, lampY + 1, lampZ, Material.COBBLESTONE_WALL);
+                    add(lampX, lampY + 2, lampZ, Material.SPRUCE_FENCE);
+                    add(lampX, lampY + 3, lampZ, Material.LANTERN);
+                }
+                previousX = x;
+                previousY = y;
+                previousZ = z;
             }
+        }
+
+        private String cardinalFacing(int dx, int dz) {
+            if (Math.abs(dx) >= Math.abs(dz)) return dx >= 0 ? "east" : "west";
+            return dz >= 0 ? "south" : "north";
         }
 
         private void fenceRectangle(int cx, int y, int cz, int halfX, int halfZ, Material fence) {

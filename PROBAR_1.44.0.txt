@@ -1,0 +1,34 @@
+PRUEBAS ARLIGHTBINGO 1.44.0 - REPARACIÓN OVERWORLD
+====================================================
+
+1. Mantén guardado el JAR y la revisión 1.43.0; no la borres ni la promociones
+   de nuevo.
+2. Instala ArlightBingo 1.44.0 y reinicia completamente. No uses /reload.
+3. Descarta únicamente la revisión de trabajo incompleta, si existe:
+   /bingo template overworld reset
+4. Genera una revisión completamente nueva:
+   /bingo template overworld generate island-1.44-test1
+5. Espera a que la construcción normal termine. Después espera el mensaje de
+   consola "Reparación 1.44.0 completada".
+6. Comprueba que existen en la carpeta del mundo:
+   arlight-overworld-layout-1.44.0.done
+   arlight-overworld-layout-1.44.0-report.txt
+7. Revisa el informe. "solapamientos-detectados" y "rutas-pendiente-alta"
+   deben ser cero o explicarse visualmente antes de promover.
+8. Recorre a pie cada acceso del pueblo inicial. Ninguna ruta debe atravesar
+   paredes, tejados, interiores, granjas o edificios vecinos.
+9. Comprueba las parcelas mostradas en las capturas anteriores:
+   - sin agua usada como suelo;
+   - sin construcciones flotantes;
+   - sin tejados cortados por caminos;
+   - entradas despejadas y conectadas;
+   - máximo un bloque de desnivel por paso;
+   - iluminación en interiores y rutas.
+10. Revisa que los edificios cercanos tengan detalles diferentes: chimenea,
+    toldo, jardín o anexo.
+11. Reinicia el servidor durante la reparación. Debe conservar el archivo
+    .in-progress y continuar sin repetir Chunky ni borrar el mundo.
+12. Ejecuta:
+    /bingo template overworld audit
+    /bingo template overworld tp
+13. No uses promote hasta aprobar visualmente toda la revisión 1.44.0.

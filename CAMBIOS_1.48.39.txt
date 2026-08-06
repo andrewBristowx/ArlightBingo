@@ -1,0 +1,7 @@
+ArlightBingo 1.48.39
+
+- La restauración de minas antiguas se ejecuta como un plan independiente.
+- Si la mina nueva falla, la limpieza antigua sí se aplica y no se pierde todo el trabajo.
+- Añade una pasada final autoritativa que reabre el eje principal, las dos galerías de servicio, los cruces y la entrada a la geoda.
+- La auditoría acepta un carril cercano transitable en vez de exigir un único bloque central exacto ocupado a veces por raíles o decoración.
+- Conserva la infección progresiva y la protección del puerto de 1.48.38.
