@@ -1,0 +1,29 @@
+ArlightBingo 1.48.32 LORE-MINE-ISLAND-DECORATION
+
+Cambios principales
+- El comando /bingo template overworld decorate fue reemplazado por un decorador seguro que nunca vuelve a tocar el puerto editado manualmente.
+- Nuevas categorías independientes: forests, camps, mine, corruption y all/apply.
+- Tres bosques grandes e irregulares, con vegetación persistente, troncos caídos y un bosque infectado.
+- Tres campamentos temáticos y un campamento adicional junto a la mina.
+- Mina abandonada de gran escala excavada dentro de una montaña natural validada: entrada monumental, túnel principal descendente, ramales, sala de extracción, dormitorio, galería derrumbada y soportes mineros.
+- Seis diarios de mineros en atriles explican que la corrupción de esmeralda musgosa nació en la Veta 7.
+- Geoda gigante en el nivel más profundo con una arena central preparada para un futuro jefe opcional, sin invocar aún ninguna entidad.
+- Marcador arlight-overworld-lore-decoration.properties con coordenadas de entrada, geoda y arena opcional para futuras integraciones.
+- Rastros de corrupción entre la mina y la fortaleza, cristales, musgo, árboles enfermos y zonas degradadas.
+- Hojas generadas por el decorador quedan marcadas como persistentes para que no desaparezcan.
+
+Comandos
+- /bingo template overworld decorate preview [all|forests|camps|mine|corruption]
+- /bingo template overworld decorate all
+- /bingo template overworld decorate forests
+- /bingo template overworld decorate camps
+- /bingo template overworld decorate mine
+- /bingo template overworld decorate corruption
+- /bingo template overworld decorate status
+- /bingo template overworld decorate cancel
+- /bingo template overworld decorate force [categoría]
+
+Seguridad
+- El puerto queda excluido del plan y, si existe el marcador de la versión anterior, se protege además un radio de 220 bloques alrededor de sus coordenadas.
+- Las decoraciones superficiales sólo reemplazan aire, plantas o terreno natural y rechazan zonas con construcciones.
+- La mina sólo se crea tras validar que la montaña y el volumen subterráneo sean mayoritariamente naturales.

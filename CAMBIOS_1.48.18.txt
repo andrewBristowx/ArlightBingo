@@ -1,0 +1,9 @@
+ArlightBingo 1.48.18 - PULIDO DE FORTALEZA Y RUTAS
+
+- Reubica boss-portal-north-rim fuera de la masa sólida de la puerta monumental.
+- Crea una explanada de giro exterior sin perforar torres.
+- Rehace la subida norte del boss con piedra, descansos y muros de contención.
+- Elimina el montículo temporal de madera que interrumpía la subida.
+- Divide el patio interior de la ciudadela en corredor central, entrenamiento y suministros.
+- Completa cuatro corredores de torres con piso, altura libre y bordes contenidos.
+- Mantiene la autorreparación regional y evita terraformación global.

@@ -1,0 +1,19 @@
+ARLIGHTBINGO 1.48.7 - ACCESO DEL JEFE Y PUEBLO PULIDOS
+
+Correcciones de la prueba 1.48.6
+- boss-north-approach usa el ancho libre real entre las dos torres.
+- La pared de la escalera de boss-gate-west queda fuera del corredor auditado.
+- El acceso norte del jefe comparte cota con el terreno y deja de formar una zanja.
+- Los laterales del acceso reciben hombros verdes y pétreos de transición suave.
+- Las antiguas líneas circulares se sustituyen por tres gradas continuas y apoyadas.
+- El pasillo ceremonial norte permanece abierto en todas las gradas.
+- El pabellón de la campana queda elevado, abierto y con cubierta escalonada.
+- La fuente recibe un remate central reconocible y mantiene el vaso cerrado.
+- Las macetas tienen soporte completo y una auditoría propia contra flotación.
+- Las manchas del pueblo se agrupan; desaparece el patrón de tierra bloque por bloque.
+- Los fallos de camino informan coordenadas y materiales exactos.
+
+Alcance
+- Solo cambia el diseño generado del Overworld.
+- Nether y End no se regeneran ni reciben cambios.
+- Requiere reset y generación limpia de la plantilla Overworld.

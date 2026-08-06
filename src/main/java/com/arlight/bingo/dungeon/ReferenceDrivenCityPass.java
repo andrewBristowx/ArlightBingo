@@ -59,42 +59,23 @@ public final class ReferenceDrivenCityPass {
         Random random = new Random(base.getWorld().getSeed() ^ 0x4F564552574F524CL);
         List<Location> checkpoints = new ArrayList<>();
 
-        // Reemplaza las manzanas repetidas por edificios con funciones y siluetas distintas.
+        // La plantilla 1.43.0 ya contiene pueblos completos. Esta pasada de partida no vuelve
+        // a vaciar parcelas ni a pegar catorce manzanas: solo añade huellas de la ocupación.
         int[][] districts = {
                 {-118,-126},{-78,-132},{-38,-130},{38,-130},{78,-132},{118,-126},
                 {-126,-72},{126,-72},{-132,-8},{132,-8},
                 {-126,62},{126,62},{-78,96},{78,96}
         };
-        OverworldUse[] uses = {
-                OverworldUse.GUARDHOUSE, OverworldUse.INN, OverworldUse.BLACKSMITH,
-                OverworldUse.WAREHOUSE, OverworldUse.APOTHECARY, OverworldUse.GUARDHOUSE,
-                OverworldUse.LIBRARY, OverworldUse.BLACKSMITH, OverworldUse.HOME,
-                OverworldUse.WAREHOUSE, OverworldUse.CHAPEL, OverworldUse.APOTHECARY,
-                OverworldUse.HOME, OverworldUse.WAREHOUSE
-        };
         for (int i = 0; i < districts.length; i++) {
             Location desired = base.clone().add(districts[i][0], 0, districts[i][1]);
             Location center = terrainAnchored(desired, base.getBlockY(), 18).add(0, 1, 0);
-            loot.unregisterInBox(center, 18, 18, -5, 28);
-            spawners.unregisterInBox(center, 18, 18, -5, 28);
-            rebuildOverworldBlock(center, uses[i], Facing.values()[i % 4], i % 3 == 0, random, loot);
+            buildOccupiedStreetDetail(center, i, random);
             checkpoints.add(centered(center));
-            buildTerrainStreet(base.clone().add(0, 0, -35), center.clone().add(0, -1, 0), 4,
-                    Material.COBBLESTONE, Material.MOSSY_COBBLESTONE);
         }
 
-        // Avenidas principales que siguen la altura real de cada columna.
-        buildTerrainStreet(base.clone().add(-12, 0, -48), terrainAnchored(base.clone().add(-118, 0, -126), base.getBlockY(), 18),
-                5, Material.COBBLESTONE, Material.MOSSY_COBBLESTONE);
-        buildTerrainStreet(base.clone().add(12, 0, -48), terrainAnchored(base.clone().add(118, 0, -126), base.getBlockY(), 18),
-                5, Material.COBBLESTONE, Material.MOSSY_COBBLESTONE);
-        buildTerrainStreet(base.clone().add(-18, 0, 12), terrainAnchored(base.clone().add(-126, 0, 62), base.getBlockY(), 18),
-                4, Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
-        buildTerrainStreet(base.clone().add(18, 0, 12), terrainAnchored(base.clone().add(126, 0, 62), base.getBlockY(), 18),
-                4, Material.STONE_BRICKS, Material.MOSSY_STONE_BRICKS);
-
         // El alcantarillado se conserva bajo el núcleo, pero los barrios externos ya no
-        // dependen de una plataforma rectangular común.
+        // dependen de una plataforma rectangular común. La red de calles orgánicas
+        // pertenece a la plantilla y esta pasada de partida nunca vuelve a cortarla.
         buildSewerNetwork(base, loot, spawners);
 
         return new Expansion(-164, 164, -176, 132, List.copyOf(checkpoints));
@@ -185,6 +166,37 @@ public final class ReferenceDrivenCityPass {
     // ---------------------------------------------------------------------
     // OVERWORLD
     // ---------------------------------------------------------------------
+
+    private static void buildOccupiedStreetDetail(Location center, int index, Random random) {
+        World world = center.getWorld();
+        if (world == null) return;
+        Facing direction = Facing.values()[index % Facing.values().length];
+
+        // Barricada corta que sigue la calle existente sin despejar edificios ni interiores.
+        for (int offset = -3; offset <= 3; offset++) {
+            Location at = local(center, direction.left(), offset, direction, 0);
+            int y = world.getHighestBlockYAt(at.getBlockX(), at.getBlockZ());
+            Material material = (offset & 1) == 0 ? Material.DARK_OAK_FENCE : Material.SPRUCE_PLANKS;
+            world.getBlockAt(at.getBlockX(), y, at.getBlockZ()).setType(material, false);
+            if (Math.abs(offset) == 2) {
+                world.getBlockAt(at.getBlockX(), y + 1, at.getBlockZ()).setType(Material.IRON_BARS, false);
+            }
+        }
+
+        Location camp = local(center, direction.right(), 5, direction.opposite(), 4);
+        int campY = world.getHighestBlockYAt(camp.getBlockX(), camp.getBlockZ());
+        world.getBlockAt(camp.getBlockX(), campY, camp.getBlockZ()).setType(
+                index % 3 == 0 ? Material.SOUL_CAMPFIRE : Material.CAMPFIRE, false);
+        world.getBlockAt(camp.getBlockX() + 1, campY, camp.getBlockZ()).setType(Material.BARREL, false);
+        world.getBlockAt(camp.getBlockX() - 1, campY, camp.getBlockZ()).setType(Material.COBWEB, false);
+
+        Location lamp = local(center, direction.left(), 6, direction, 5);
+        int lampY = world.getHighestBlockYAt(lamp.getBlockX(), lamp.getBlockZ());
+        world.getBlockAt(lamp.getBlockX(), lampY, lamp.getBlockZ()).setType(Material.COBBLESTONE_WALL, false);
+        world.getBlockAt(lamp.getBlockX(), lampY + 1, lamp.getBlockZ()).setType(Material.DARK_OAK_FENCE, false);
+        world.getBlockAt(lamp.getBlockX(), lampY + 2, lamp.getBlockZ()).setType(
+                random.nextBoolean() ? Material.SOUL_LANTERN : Material.LANTERN, false);
+    }
 
     private static void rebuildOverworldBlock(Location c, OverworldUse use, Facing facing,
                                               boolean ruined, Random random,
