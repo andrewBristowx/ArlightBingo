@@ -1,0 +1,39 @@
++                        + "Si una partida antigua no inició la cinemática, usa el altar central como recuperación.");
+             }
+         }
+     }
+@@ -443,6 +494,7 @@
+     private void awakenRitualBoss(World world, Layout layout) {
+         for (Entity entity : world.getNearbyEntities(layout.boss(), 74.0D, 42.0D, 74.0D)) {
+             if (!entity.getScoreboardTags().contains("arlightbingo_boss_surface")) continue;
++            if (entity.getScoreboardTags().contains(SurfaceGuardianRequestBridge.ACTIVE_TAG)) continue;
+             entity.teleport(layout.boss());
+             entity.setInvisible(false);
+             entity.setInvulnerable(false);
+@@ -502,7 +554,7 @@
+         };
+         sender.sendMessage(ChatColor.GREEN + "Solicitud de " + description + " creada en "
+                 + TEST_BOSS_X + " " + TEST_BOSS_Y + " " + TEST_BOSS_Z + ".");
+-        sender.sendMessage(ChatColor.GRAY + "ArlightBosses 1.22.8 la procesará desde el siguiente tick NeoForge.");
++        sender.sendMessage(ChatColor.GRAY + "ArlightBosses 1.22.12 la procesará desde el siguiente tick NeoForge.");
+ 
+         BukkitTask previous = testBossRemovalTasks.remove(world.getUID());
+         if (previous != null) previous.cancel();
+@@ -571,7 +623,7 @@
+             saveGateSnapshot(world, folder.resolve(TEST_GATE_SNAPSHOT));
+             Files.deleteIfExists(folder.resolve(TEST_OPEN_MARKER));
+             Files.writeString(folder.resolve(TEST_ACTIVE_MARKER),
+-                    "version=1.48.51\\nstarted=" + System.currentTimeMillis() + "\\n",
++                    "version=1.48.52\\nstarted=" + System.currentTimeMillis() + "\\n",
+                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
+                     StandardOpenOption.TRUNCATE_EXISTING);
+             medalRitual.reset(world);
+@@ -744,7 +796,7 @@
+     private void writeMarker(Path marker, Player player, String stage) {
+         try {
+             Files.writeString(marker,
+-                    "version=1.48.51\nstage=" + stage + "\nplayer="
++                    "version=1.48.52\nstage=" + stage + "\nplayer="
+                             + (player == null ? "system" : player.getUniqueId())
+                             + "\ntime=" + System.currentTimeMillis() + "\n",
+                     StandardCharsets.UTF_8, StandardOpenOption.CREATE,
