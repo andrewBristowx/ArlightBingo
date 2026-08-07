@@ -1,7 +1,0 @@
-ARLIGHTBINGO 1.20.0 — DRAGÓN CORRUPTO INDEPENDIENTE
-
-- Invoca arlightbosses:amethyst_corrupted_ender_dragon directamente.
-- Ya no etiqueta ni transforma un EnderDragon vanilla.
-- Localiza la entidad mediante la etiqueta arlightbingo_boss_dragon.
-- Conserva objetivo boss_dragon, killer, gateway y reintentos.
-- Fallback vanilla solo si se desactiva el dragón corrupto en config.yml.

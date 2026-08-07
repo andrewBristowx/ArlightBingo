@@ -1,0 +1,42 @@
+name: Validar ArlightBingo 1.48.52
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Extraer fuente exacta
+        run: |
+          mkdir work
+          tar -xJf compile-source.tar.xz -C work
+      - name: Instalar ArlightCore
+        run: |
+          git clone --depth 1 https://github.com/andrewBristowx/ArlightCore.git /tmp/ArlightCore
+          mvn -B -U -DskipTests -f /tmp/ArlightCore/pom.xml clean install
+      - name: Compilar
+        working-directory: work
+        run: mvn -B -U -DskipTests clean package
+      - name: Mostrar JAR
+        run: find work/target -maxdepth 1 -type f -name '*.jar' ! -name 'original-*' -ls
+      - name: Subir clases compiladas
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.48.52-compiled
+          path: work/target/ArlightBingo-1.48.52.jar
+          if-no-files-found: error
+          retention-days: 3

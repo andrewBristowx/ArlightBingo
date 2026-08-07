@@ -1,7 +1,0 @@
-1. Apaga el servidor y sustituye únicamente el JAR de ArlightBingo.
-2. Conserva las tres plantillas maestras. No es necesario borrar bingo_template_nether.
-3. Borra o deja que el plugin descarte bingo_arena_1* por el nuevo marcador runtime.
-4. Inicia el servidor y espera: Arena del pool 1 lista desde las tres plantillas maestras.
-5. Ejecuta /bingo join y /bingo start.
-6. La partida no debe cancelarse por llegada segura del Nether.
-7. Si el marcador estaba dañado, la consola mostrará que fue reparado automáticamente.

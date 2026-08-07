@@ -1,8 +1,0 @@
-ArlightBingo 1.27.0 TERRAIN-ADAPTIVE-CRYSTAL-CAMPAIGN
-
-- Pasada territorial para Overworld, Nether y End.
-- Cimientos, terrazas, muros naturales y transiciones orgánicas.
-- Corrupción cristalina temática en las tres dimensiones.
-- Cofres ambientales adicionales administrados por el sistema personal/Lootr.
-- Portal final del End usa una ubicación reservada y aparece después de la cinemática.
-- Se conservan nombres de llaves, mobs, jefes y progresión.

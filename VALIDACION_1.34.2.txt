@@ -1,9 +1,0 @@
-VALIDACIÓN DE FUENTE - 1.34.2
-
-- pom.xml y plugin.yml actualizados a 1.34.2.
-- TemplateWorldCloner importa org.bukkit.Bukkit.
-- No quedan llamadas world.getServer().getWorldContainer() en TemplateWorldCloner.
-- La llamada compatible usa Bukkit.getWorldContainer().
-- Se validó sintaxis del archivo corregido con stubs mínimos de Bukkit y Java 21.
-- Se comprobó integridad del ZIP.
-- No se ejecutó una compilación Maven completa por ausencia de Maven y dependencias Paper en el entorno.

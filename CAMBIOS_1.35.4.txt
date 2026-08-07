@@ -1,9 +1,0 @@
-ArlightBingo 1.35.4 — ARCLIGHT DIMENSION ROOT LEVEL.DAT FIX
-
-- Corrige plantillas Nether/End cuyo World#getWorldFolder() apunta a DIM-1 o DIM1.
-- Resuelve por separado la raíz de metadatos (level.dat) y la raíz dimensional (region).
-- Genera copias autónomas: level.dat en la raíz y chunks de Nether/End en region.
-- Acepta tanto mundos separados como el formato dimensional de Arclight/Multiverse.
-- Busca marcadores en raíz, carpeta dimensional y carpeta expuesta por Bukkit.
-- Invalida copias 1.35.3 incompletas y las vuelve a copiar desde las plantillas.
-- No regenera plantillas, no cambia semillas y no ejecuta Chunky.

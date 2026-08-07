@@ -1,8 +1,0 @@
-ArlightBingo 1.13.2 - UI cleanup y BossBar estable
-
-- Limpia el cartón cliente al reconectar, incluso si el jugador se desconectó durante la partida.
-- Repite CLEAR tras registrar los canales de NeoForge para evitar GUI residual.
-- Solo resincroniza el cartón si el jugador todavía pertenece a una partida válida.
-- La BossBar usa una sola instancia y solo actualiza título, progreso y color cuando cambian.
-- Evita barras duplicadas durante recuperación de partidas.
-- Conserva el hotfix 1.13.1: no teletransporte al unirse y sin pregeneración interna bloqueante.

@@ -1,7 +1,0 @@
-ArlightBingo 1.24.1 — CAMPAIGN-WORLD-COMPILE-FIX
-
-- Corrige el error de compilación en DimensionDungeonManager.java:1081.
-- Añade el método isCampaignWorld(World), que faltaba en la versión 1.24.0.
-- Reconoce el mundo principal configurado, los mundos extra, los mundos dinámicos
-  del pool y las regiones ya registradas por la campaña.
-- Conserva todos los cambios de ArlightBingo 1.24.0.

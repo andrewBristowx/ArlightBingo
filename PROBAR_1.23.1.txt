@@ -1,6 +1,0 @@
-PRUEBA ARLIGHTBINGO 1.23.1
-
-1. Instala ArlightCore 1.17.0 con: mvn clean install
-2. Compila este proyecto con: mvn clean package
-3. Verifica que ya no aparezca el error cannot find symbol en OverworldInfestedCity.java:532.
-4. El JAR se genera en target/ArlightBingo-1.23.1.jar.

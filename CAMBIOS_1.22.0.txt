@@ -1,8 +1,0 @@
-ArlightBingo 1.22.0 - ANIMATED NETHER LOCK
-
-- Usa arlightbosses:nether_dungeon_lock en la puerta del Guardián del Nether.
-- La Llave Ígnea activa primero la animación de la cerradura.
-- El portón empieza a elevarse al final de la animación y se abre por capas.
-- Sonidos de cadenas, pistones, lava y ancla de reaparición sincronizados.
-- La cerradura conserva estados locked/opening/opened y no se reemplaza por otro bloque.
-- Si ArlightBosses no expone el bloque, se conserva un Respawn Anchor como fallback.

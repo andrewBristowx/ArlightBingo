@@ -1,6 +1,0 @@
-ArlightBingo 1.13.5
-- /bingo screen waiting [jugador]
-- /bingo screen preparation [0-100] [jugador]
-- /bingo screen notice [jugador]
-- /bingo screen hide [jugador]
-Los comandos funcionan sin cola ni partida activa y también desde consola.

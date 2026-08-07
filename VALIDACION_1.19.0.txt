@@ -1,9 +1,0 @@
-VALIDACIÓN ARLIGHTBINGO 1.19.0
-
-- pom.xml válido y versión 1.19.0.
-- plugin.yml válido y versión 1.19.0.
-- config.yml válido; el Dragón Corrupto está habilitado por defecto.
-- EndEncounterManager conserva EntityType.ENDER_DRAGON y añade las etiquetas de integración.
-- El evento de muerte continúa reclamando boss_dragon y abriendo el gateway.
-- GoalGenerator conserva la exclusión de arlightbosses:dragon_guardian (Somita).
-- La compilación completa debe hacerse con Paper API y ArlightCore 1.17.0 disponibles en Maven local.

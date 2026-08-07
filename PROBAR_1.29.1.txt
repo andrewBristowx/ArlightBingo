@@ -1,9 +1,0 @@
-1. Apagar el servidor.
-2. Borrar la carpeta bingo_template_overworld incompleta.
-3. Instalar el JAR compilado de ArlightBingo 1.29.1.
-4. Conservar la nueva config.yml.
-5. Iniciar el servidor.
-6. Ejecutar /bingo template overworld generate force.
-7. Consultar /bingo template overworld status.
-8. Cuando termine, usar /bingo template overworld tp.
-9. Explorar varios chunks: la corrupcion se coloca cuando cada chunk ya esta cargado.

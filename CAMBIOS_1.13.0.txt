@@ -1,7 +1,0 @@
-ARLIGHTBINGO 1.13.0
-
-- Protocolo SET2 con id e icono por objetivo.
-- Iconos dedicados para jefes y esbirros personalizados.
-- Objetivos ENTITY_KILL compatibles con huevos de aparición e iconos propios.
-- Scoreboard visual dinámico enviado mediante ArlightCore 1.16.0.
-- Se mantiene el scoreboard Bukkit como respaldo.

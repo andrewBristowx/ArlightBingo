@@ -1,9 +1,0 @@
-ARLIGHTBINGO 1.19.0 — AMETHYST CORRUPTED DRAGON
-
-- Reemplaza el dragón vanilla del encuentro del End por el Dragón del End Corrupto por la Amatista.
-- El plugin sigue creando EntityType.ENDER_DRAGON para conservar compatibilidad con Arclight, Bukkit y EndDragonFight.
-- Añade las etiquetas arlightbingo_boss_dragon y arlightbosses_amethyst_corrupted_dragon.
-- ArlightBosses 1.11.0 detecta la etiqueta y aplica 500 HP, armadura, aspecto corrupto y tres fases.
-- Actualiza mensajes, objetivo de Bingo y anuncio de muerte.
-- Configurable en end-encounter.amethyst-corrupted-dragon.enabled.
-- Somita/dragon_guardian continúa completamente excluida.

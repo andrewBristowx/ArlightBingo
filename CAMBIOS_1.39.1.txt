@@ -1,7 +1,0 @@
-ArlightBingo 1.39.1 - SERVER HANG WATCHDOG FIX
-
-- Elimina búsquedas recursivas Files.find del hilo principal durante ChunkLoadEvent.
-- El listener de corrupción usa el estado COMPLETE en memoria y no toca el disco por chunk.
-- La planificación inicial usa anclas deterministas y deja de escanear cientos de columnas en un solo tick.
-- Conserva la ciudad jugable V2 de 1.39.0.
-- No repite Chunky al reanudar una plantilla existente.

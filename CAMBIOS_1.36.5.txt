@@ -1,9 +1,0 @@
-ArlightBingo 1.36.5 - MAINTENANCE TASK CLEANUP FIX
-
-- Corrige el spam repetido "Could not set the block" cada cinco segundos.
-- La tarea de mantenimiento de campaña sólo trabaja en RUNNING, TIEBREAK o ENDED.
-- /bingo stop libera todas las referencias a las arenas, cerraduras, cofres, portales y jefes.
-- La cerradura del Nether se repara como máximo una vez por partida.
-- El mantenimiento periódico ya no usa /setblock como respaldo para cambiar propiedades visuales.
-- La tarea global se cancela correctamente al deshabilitar el plugin.
-- Conserva el clonado correcto DIM-1/DIM1 de la versión 1.36.4.

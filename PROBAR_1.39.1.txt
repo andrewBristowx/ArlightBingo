@@ -1,6 +1,0 @@
-1. Quita el JAR 1.39.0 del servidor.
-2. Instala 1.39.1 y reinicia completamente.
-3. Ejecuta /bingo template status.
-4. Para una plantilla limpia sin fortaleza vieja usa generate force solo después de hacer respaldo.
-5. Espera COMPLETE y crea una arena nueva.
-6. Entra a la arena y confirma que el tick no se congela.

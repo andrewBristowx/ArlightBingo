@@ -1,7 +1,0 @@
-1. Apaga el servidor y respalda plugins/ArlightBingo.
-2. Sustituye el JAR por ArlightBingo-1.36.0.jar.
-3. Borra solo bingo_arena_1, bingo_arena_1_nether y bingo_arena_1_the_end.
-4. Conserva las tres plantillas COMPLETE.
-5. Inicia el servidor. Se crearán los archivos config-sections/*.yml.
-6. Inicia una partida y usa /bingo campaign tpnether y /bingo campaign tpend.
-7. La consola no debe declarar lista una copia cuyo manifiesto no coincida.

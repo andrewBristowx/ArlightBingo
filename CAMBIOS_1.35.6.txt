@@ -1,8 +1,0 @@
-ArlightBingo 1.35.6 - NETHER/END SAFE ARRIVAL AUTO REPAIR
-
-- Conserva la reparación automática de llegada segura del Nether.
-- Añade la misma reparación automática para la llegada segura del End.
-- Crea una plataforma 7x7 de ladrillos de piedra del End bajo el punto persistente.
-- Limpia una cámara 3x3x4 para impedir aparición atrapada o sobre el vacío.
-- No reconstruye ni borra la ciudadela, cofres, altar, jefe o arquitectura existente.
-- La partida sólo se cancela si la llegada continúa siendo inválida después de repararla.
