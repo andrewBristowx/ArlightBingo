@@ -19,7 +19,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: maven
       - name: Descargar base 1.48.51
         run: |
           set -euo pipefail
