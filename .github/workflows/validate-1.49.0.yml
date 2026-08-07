@@ -1,0 +1,50 @@
+name: Validar ArlightBingo 1.49.0
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Descargar fuente exacta 1.49.0
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 'https://drive.usercontent.google.com/download?id=1CcPCWveNtDuuARUo7SaDHlQ9_OH9buw7&export=download&confirm=t' -o /tmp/source.zip
+          unzip -t /tmp/source.zip | tail -1
+          mkdir -p /tmp/buildsrc
+          unzip -q /tmp/source.zip -d /tmp/buildsrc
+      - name: Instalar ArlightCore
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/andrewBristowx/ArlightCore.git /tmp/ArlightCore
+          mvn -B -U -DskipTests -f /tmp/ArlightCore/pom.xml clean install
+      - name: Compilar
+        working-directory: /tmp/buildsrc
+        run: mvn -B -U -DskipTests clean package
+      - name: Validar JAR
+        run: |
+          set -euo pipefail
+          test -f /tmp/buildsrc/target/ArlightBingo-1.49.0.jar
+          jar tf /tmp/buildsrc/target/ArlightBingo-1.49.0.jar >/dev/null
+          unzip -p /tmp/buildsrc/target/ArlightBingo-1.49.0.jar plugin.yml | grep -F 'version: 1.49.0'
+      - name: Subir JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArlightBingo-1.49.0
+          path: /tmp/buildsrc/target/ArlightBingo-1.49.0.jar
+          if-no-files-found: error
+          retention-days: 3
