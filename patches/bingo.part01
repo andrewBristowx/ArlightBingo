@@ -1,0 +1,84 @@
++        // El constructor de la plantilla todavía puede tener un boss dormido de compatibilidad.
++        // Se retira justo antes de entregar el control a ArlightBosses para evitar duplicados.
++        removeDormantSurfaceBoss(world, layout);
++        writeMarker(awakened, activator,
++                fallbackFromAltar ? "boss-cinematic-fallback" : "boss-cinematic-after-gate");
+         CampaignItemBridge.animateCorruptedAltar(layout.invocationAltar());
+         boolean requested = SurfaceGuardianRequestBridge.request(
+                 layout.boss().clone().add(0.5D, 0.0D, 0.5D), "real", 20 * 60 * 30);
+@@ -152,16 +175,27 @@
+             try {
+                 Files.deleteIfExists(awakened);
+             } catch (IOException ignored) {
+-                // El siguiente inicio volverá a auditar este marcador temporal.
++                // El altar central queda disponible como recuperación manual.
+             }
+-            player.sendMessage(ChatColor.RED + "No se pudo crear la solicitud de invocación del Guardián.");
+-            return;
++            return false;
+         }
++
+         for (Player online : world.getPlayers()) {
+-            online.sendMessage(ChatColor.GOLD + "[Bingo] El altar respondió. "
+-                    + ChatColor.WHITE + "La entrada del Guardián comenzará en unos instantes.");
++            online.sendMessage(ChatColor.GOLD + "[Bingo] La reja terminó de abrirse. "
++                    + ChatColor.WHITE + "El Guardián de la Superficie está despertando...");
+             online.playSound(online.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.9F, 0.72F);
+         }
++        return true;
++    }
++
++
++    private void removeDormantSurfaceBoss(World world, Layout layout) {
++        for (Entity entity : new ArrayList<>(world.getNearbyEntities(
++                layout.boss(), 74.0D, 42.0D, 74.0D))) {
++            if (!entity.getScoreboardTags().contains(SurfaceGuardianRequestBridge.BINGO_BOSS_TAG)) continue;
++            if (entity.getScoreboardTags().contains(SurfaceGuardianRequestBridge.ACTIVE_TAG)) continue;
++            entity.remove();
++        }
+     }
+ 
+     private void startIfEligible(World world) {
+@@ -379,11 +413,23 @@
+                 online.sendMessage(ChatColor.GREEN + "[Bingo] El sello exterior fue destruido. "
+                         + ChatColor.WHITE + (test
+                         ? "Usa /bingo template overworld ritual reset para restaurar la prueba."
+-                        : "El Guardián aún debe ser invocado desde el altar central."));
++                        : "La entrada cinematográfica del Guardián comenzará automáticamente."));
+                 online.playSound(online.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 1.1F, 0.75F);
+                 online.spawnParticle(Particle.TOTEM_OF_UNDYING,
+                         online.getLocation().add(0, 1.2D, 0), 42, 0.8D, 0.8D, 0.8D, 0.04D);
+             }
++            if (!test) {
++                // Da un instante para que la última capa de la reja desaparezca y luego
++                // enlaza puerta -> cámara -> aparición -> combate sin un segundo clic.
++                plugin.getServer().getScheduler().runTaskLater(plugin, () -> {
++                    if (!requestGuardianAfterGate(world, layout, activator, false)) {
++                        for (Player online : world.getPlayers()) {
++                            online.sendMessage(ChatColor.RED + "[Bingo] La cinemática no pudo iniciar automáticamente. "
++                                    + ChatColor.GRAY + "El altar central queda disponible para reintentarlo.");
++                        }
++                    }
++                }, 16L);
++            }
+         };
+ 
+         if (test) {
+@@ -411,6 +457,9 @@
+         for (Entity entity : world.getNearbyEntities(layout.boss(), 74.0D, 42.0D, 74.0D)) {
+             if (!entity.getScoreboardTags().contains("arlightbingo_boss_surface")) continue;
+             found = true;
++            // El boss activo lo controla ArlightBosses durante cinemática/combate.
++            // No reactivar IA ni quitar invulnerabilidad desde Bukkit mientras la toma está corriendo.
++            if (entity.getScoreboardTags().contains(SurfaceGuardianRequestBridge.ACTIVE_TAG)) continue;
+             if (awakened) {
+                 entity.setInvisible(false);
+                 entity.setInvulnerable(false);
+@@ -434,8 +483,10 @@
+         if (found && gateOpen && !awakened && dormantBossNotices.add(world.getUID())) {
+             for (Player player : world.getPlayers()) {
+                 player.sendTitle(ChatColor.DARK_GREEN + "Arena abierta",
+-                        ChatColor.GOLD + "Activa el altar central para invocar al Guardián",
++                        ChatColor.GOLD + "El Guardián debería despertar automáticamente",
+                         10, 70, 15);
++                player.sendMessage(ChatColor.GRAY
