@@ -20,23 +20,39 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Extraer fuente exacta
+      - name: Descargar base 1.48.51
         run: |
-          mkdir work
-          tar -xJf compile-source.tar.xz -C work
+          set -euo pipefail
+          URL1='https://drive.usercontent.google.com/download?id=19r82-T9tLoD0nMtVdwi3l5_UbcloIFrc&export=download&confirm=t'
+          URL2='https://drive.google.com/uc?export=download&id=19r82-T9tLoD0nMtVdwi3l5_UbcloIFrc&confirm=t'
+          curl -L --fail --retry 3 "$URL1" -o /tmp/base.zip || curl -L --fail --retry 3 "$URL2" -o /tmp/base.zip
+          unzip -t /tmp/base.zip | tail -1
+          mkdir -p /tmp/buildsrc
+          unzip -q /tmp/base.zip -d /tmp/buildsrc
+      - name: Aplicar revisión 1.48.52
+        run: |
+          set -euo pipefail
+          cat patches/bingo.part* > /tmp/change.patch
+          cd /tmp/buildsrc
+          patch -p1 --batch < /tmp/change.patch
       - name: Instalar ArlightCore
         run: |
+          set -euo pipefail
           git clone --depth 1 https://github.com/andrewBristowx/ArlightCore.git /tmp/ArlightCore
           mvn -B -U -DskipTests -f /tmp/ArlightCore/pom.xml clean install
       - name: Compilar
-        working-directory: work
+        working-directory: /tmp/buildsrc
         run: mvn -B -U -DskipTests clean package
-      - name: Mostrar JAR
-        run: find work/target -maxdepth 1 -type f -name '*.jar' ! -name 'original-*' -ls
-      - name: Subir clases compiladas
+      - name: Validar JAR
+        run: |
+          set -euo pipefail
+          test -f /tmp/buildsrc/target/ArlightBingo-1.48.52.jar
+          jar tf /tmp/buildsrc/target/ArlightBingo-1.48.52.jar >/dev/null
+          unzip -p /tmp/buildsrc/target/ArlightBingo-1.48.52.jar plugin.yml | grep -F 'version: 1.48.52'
+      - name: Subir JAR
         uses: actions/upload-artifact@v4
         with:
-          name: ArlightBingo-1.48.52-compiled
-          path: work/target/ArlightBingo-1.48.52.jar
+          name: ArlightBingo-1.48.52
+          path: /tmp/buildsrc/target/ArlightBingo-1.48.52.jar
           if-no-files-found: error
           retention-days: 3
