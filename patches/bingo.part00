@@ -1,0 +1,85 @@
+diff -ruN '--exclude=*.jar' /mnt/data/bingo-base-1.48.51/BUILD_VERSION.txt /mnt/data/bingo-src/BUILD_VERSION.txt
+--- a/BUILD_VERSION.txt	2026-08-06 08:50:18.000000000 +0000
++++ b/BUILD_VERSION.txt	2026-08-07 01:21:08.905212044 +0000
+@@ -1 +1 @@
+-1.48.51
++1.48.52
+diff -ruN '--exclude=*.jar' /mnt/data/bingo-base-1.48.51/CAMBIOS_1.48.52.txt /mnt/data/bingo-src/CAMBIOS_1.48.52.txt
+--- a/CAMBIOS_1.48.52.txt	1970-01-01 00:00:00.000000000 +0000
++++ b/CAMBIOS_1.48.52.txt	2026-08-07 01:21:08.905347565 +0000
+@@ -0,0 +1,9 @@
++ArlightBingo 1.48.52 — GATE TO GUARDIAN CINEMATIC
++
++- La apertura real de la reja ritual ahora dispara automáticamente la solicitud del Guardián.
++- Ya no hace falta un segundo clic en el altar central durante el flujo normal.
++- El altar central se conserva como recuperación manual para partidas antiguas o solicitudes fallidas.
++- Mensajes de ritual y depuración actualizados para ArlightBosses 1.22.12.
++- El marcador ritual se versiona como 1.48.52.
++
++Requiere ArlightBosses 1.22.12 en servidor y clientes para la cinemática actualizada.
+diff -ruN '--exclude=*.jar' /mnt/data/bingo-base-1.48.51/PROBAR_1.48.52.txt /mnt/data/bingo-src/PROBAR_1.48.52.txt
+--- a/PROBAR_1.48.52.txt	1970-01-01 00:00:00.000000000 +0000
++++ b/PROBAR_1.48.52.txt	2026-08-07 01:21:08.905511127 +0000
+@@ -0,0 +1,8 @@
++PRUEBA 1.48.52
++
++1. Reinicia servidor con ArlightBingo 1.48.52 y ArlightBosses 1.22.12.
++2. Abre la reja mediante las tres medallas.
++3. Al terminar de abrirse, la cinemática debe comenzar sola (sin tocar el altar central).
++4. Tras la cinemática debe iniciar el combate.
++5. Para prueba aislada sigue disponible: /bingo template overworld boss test cinematic
++6. Para limpiar: /bingo template overworld boss test stop
+diff -ruN '--exclude=*.jar' /mnt/data/bingo-base-1.48.51/SOURCE_VERSION.txt /mnt/data/bingo-src/SOURCE_VERSION.txt
+--- a/SOURCE_VERSION.txt	2026-08-06 08:50:18.000000000 +0000
++++ b/SOURCE_VERSION.txt	2026-08-07 01:21:08.905237923 +0000
+@@ -1 +1 @@
+-ArlightBingo 1.48.51 SURFACE-GUARDIAN-REQUEST-TESTS
++ArlightBingo 1.48.52 GATE-TO-GUARDIAN-CINEMATIC
+diff -ruN '--exclude=*.jar' /mnt/data/bingo-base-1.48.51/pom.xml /mnt/data/bingo-src/pom.xml
+--- a/pom.xml	2026-08-06 08:50:18.000000000 +0000
++++ b/pom.xml	2026-08-07 01:21:08.905178965 +0000
+@@ -6,7 +6,7 @@
+ 
+     <groupId>com.arlight</groupId>
+     <artifactId>ArlightBingo</artifactId>
+-    <version>1.48.51</version>
++    <version>1.48.52</version>
+     <packaging>jar</packaging>
+ 
+     <properties>
+diff -ruN '--exclude=*.jar' /mnt/data/bingo-base-1.48.51/src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java /mnt/data/bingo-src/src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java
+--- a/src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java	2026-08-06 08:50:18.000000000 +0000
++++ b/src/main/java/com/arlight/bingo/listeners/OverworldCampaignLandscape148.java	2026-08-07 01:31:41.199929802 +0000
+@@ -116,7 +116,10 @@
+     private void handleOuterAltar(Player player, World world, Layout layout) {
+         Path marker = world.getWorldFolder().toPath().resolve(GATE_OPEN_MARKER);
+         if (Files.isRegularFile(marker)) {
+-            player.sendMessage(ChatColor.GREEN + "La puerta ritual ya está abierta. Entra y activa el altar central.");
++            Path awakened = world.getWorldFolder().toPath().resolve(BOSS_AWAKENED_MARKER);
++            player.sendMessage(Files.isRegularFile(awakened)
++                    ? ChatColor.GREEN + "La puerta ritual ya está abierta y el Guardián ya fue invocado."
++                    : ChatColor.GOLD + "La puerta ritual ya está abierta. La cinemática del Guardián debería comenzar automáticamente.");
+             return;
+         }
+         List<String> missing = medalRitual.missing(world);
+@@ -144,7 +147,27 @@
+             player.sendMessage(ChatColor.GREEN + "El Guardián ya fue invocado.");
+             return;
+         }
+-        writeMarker(awakened, player, "boss-cinematic-request");
++        // Desde 1.48.52 el altar central queda como recuperación manual: la ruta normal
++        // dispara la cinemática automáticamente cuando termina de abrirse la reja.
++        if (!requestGuardianAfterGate(world, layout, player, true)) {
++            player.sendMessage(ChatColor.RED + "No se pudo crear la solicitud de invocación del Guardián.");
++        }
++    }
++
++    private boolean requestGuardianAfterGate(World world, Layout layout, Player activator,
++                                             boolean fallbackFromAltar) {
++        if (world == null || layout == null) return false;
++        Path folder = world.getWorldFolder().toPath();
++        Path gateMarker = folder.resolve(GATE_OPEN_MARKER);
++        Path awakened = folder.resolve(BOSS_AWAKENED_MARKER);
++        if (!Files.isRegularFile(gateMarker) || Files.isRegularFile(awakened)) return false;
++        if (SurfaceGuardianRequestBridge.hasPendingOrActive(world)) return true;
++
