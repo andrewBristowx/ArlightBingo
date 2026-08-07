@@ -1,0 +1,10 @@
+diff -ruN '--exclude=*.jar' /mnt/data/bingo-base-1.48.51/src/main/resources/plugin.yml /mnt/data/bingo-src/src/main/resources/plugin.yml
+--- a/src/main/resources/plugin.yml	2026-08-06 08:50:18.000000000 +0000
++++ b/src/main/resources/plugin.yml	2026-08-07 01:40:00.000000000 +0000
+@@ -1,5 +1,5 @@
+ name: ArlightBingo
+-version: 1.48.51
++version: 1.48.52
+ main: com.arlight.bingo.BingoPlugin
+ api-version: '1.21'
+ softdepend: [ArlightCore, ArlightEventGuard, Chunky, Lootr, Multiverse-Core, Multiverse-NetherPortals, Multiverse-Inventories]
